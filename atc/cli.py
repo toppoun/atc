@@ -5,7 +5,17 @@ from pathlib import Path
 
 # ===== 設定 =====
 PROBLEMS = ["A", "B", "C", "D", "E"]
-TEMPLATE = """"""
+TEMPLATE = """from collections import deque, defaultdict, Counter
+from heapq import heappop, heappush
+from itertools import product, combinations, accumulate
+from math import sqrt, isqrt
+DIR4 = [(1,0),(-1,0),(0,1),(0,-1)]
+DIR8 = [(1,0),(-1,0),(0,1),(0,-1),(1,1),(1,-1),(-1,1),(-1,-1)]
+INF = 10**18
+YES,NO = "Yes", "No"
+def int1(): return int(input())
+def ints(): return map(int,input().split())
+def inlist(): return list(map(int,input().split()))"""
 # =================
 RED   = "\033[31m"
 GREEN = "\033[32m"
