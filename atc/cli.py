@@ -15,7 +15,15 @@ INF = 10**18
 YES,NO = "Yes", "No"
 def int1(): return int(input())
 def ints(): return map(int,input().split())
-def inlist(): return list(map(int,input().split()))"""
+def inlist(): return list(map(int,input().split()))
+def main():
+    n = int1()
+    a = inlist()
+
+    print()
+
+if __name__ == '__main__':
+    main()"""
 # =================
 RED   = "\033[31m"
 GREEN = "\033[32m"
