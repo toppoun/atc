@@ -5,20 +5,29 @@ from pathlib import Path
 
 # ===== 設定 =====
 PROBLEMS = ["A", "B", "C", "D", "E"]
-TEMPLATE = """from collections import deque, defaultdict, Counter
+TEMPLATE = """import sys
+from collections import deque, defaultdict, Counter
 from heapq import heappop, heappush
 from itertools import product, combinations, accumulate
 from math import sqrt, isqrt
+
+input = sys.stdin.readline
+sys.setrecursionlimit(10**7)
+
 DIR4 = [(1,0),(-1,0),(0,1),(0,-1)]
 DIR8 = [(1,0),(-1,0),(0,1),(0,-1),(1,1),(1,-1),(-1,1),(-1,-1)]
+
 INF = 10**18
 YES,NO = "Yes", "No"
-def int1(): return int(input())
-def ints(): return map(int,input().split())
-def inlist(): return list(map(int,input().split()))
+
+def ni(): return int(input())
+def nm(): return map(int,input().split())
+def nl(): return list(map(int,nm()))
+
+
 def main():
-    n = int1()
-    a = inlist()
+    n = ni()
+    a = nl()
 
     print()
 
