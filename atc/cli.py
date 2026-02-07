@@ -22,7 +22,11 @@ YES,NO = "Yes", "No"
 
 def ni(): return int(input())
 def nm(): return map(int,input().split())
-def nl(): return list(map(int,nm()))
+def nl(): return list(nm())
+
+def si(): return input().strip()
+def sm(): return si().split()
+def sl(): return list(si())
 
 
 def main():
