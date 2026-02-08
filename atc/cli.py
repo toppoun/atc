@@ -7,7 +7,7 @@ from pathlib import Path
 PROBLEMS = ["A", "B", "C", "D", "E"]
 TEMPLATE = """import sys
 from collections import deque, defaultdict, Counter
-from heapq import heappop, heappush
+from heapq import heappop, heappush, heapify
 from itertools import product, combinations, accumulate
 from math import sqrt, isqrt
 
