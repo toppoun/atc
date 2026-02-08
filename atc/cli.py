@@ -8,8 +8,8 @@ PROBLEMS = ["A", "B", "C", "D", "E"]
 TEMPLATE = """import sys
 from collections import deque, defaultdict, Counter
 from heapq import heappop, heappush, heapify
-from itertools import product, combinations, accumulate
-from math import sqrt, isqrt
+from itertools import product, combinations, accumulate, permutations, groupby
+from math import sqrt, isqrt, comb
 
 input = sys.stdin.readline
 sys.setrecursionlimit(10**7)
