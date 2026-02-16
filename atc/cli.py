@@ -1,7 +1,7 @@
 import sys
-import time
 import subprocess
 import shutil
+import time
 from pathlib import Path
 
 # ===== 設定 =====
@@ -45,12 +45,22 @@ YELLOW= "\033[33m"
 RESET = "\033[0m"
 
 
+# ---------- interpreter ----------
+
+def detect_pypy():
+    for name in ["pypy3", "pypy"]:
+        path = shutil.which(name)
+        if path:
+            return path
+    return None
+
+
 # ---------- usage ----------
 
 def usage():
     print("使い方:")
     print("  atc new abc413")
-    print("  atc run A")
+    print("  atc run A [python|pypy]")
     sys.exit(1)
 
 # ---------- new ----------
@@ -89,10 +99,18 @@ def cmd_new(contest: str):
     print(f"{contest} ready.")
 
 # ---------- run ----------
-def cmd_run(problem: str):
+def cmd_run(problem: str, interpreter="python"):
     cwd = Path.cwd()
     py = cwd / f"{problem}.py"
     testdir = cwd / "tests" / problem
+
+    if interpreter == "pypy":
+        exe = detect_pypy()
+        if exe is None:
+            print("PyPy が見つからない")
+            sys.exit(1)
+    else:
+        exe = sys.executable
 
     if not py.exists():
         print(f"{py} が見つからない")
@@ -118,21 +136,22 @@ def cmd_run(problem: str):
             start = time.perf_counter()
 
             proc = subprocess.run(
-                [sys.executable, py],
+                [exe, py],
                 stdin=fin,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
             )
-            
-            end = time.perf_counter()
-            elapsed = end-start
 
-    # ランタイムエラーの場合
+            end = time.perf_counter()
+            elapsed = end - start
+
+        # ランタイムエラー
         if proc.returncode != 0:
             print(f" {RED}RE{RESET}")
             print(f" {YELLOW}stderr:{RESET}")
             print(proc.stderr.strip())
+            print(f" time: {elapsed*1000:.2f} ms")
             continue
 
         out = proc.stdout.strip()
@@ -141,6 +160,7 @@ def cmd_run(problem: str):
             print(" expected: (なし)")
             print(" output:")
             print(out)
+            print(f" time: {elapsed*1000:.2f} ms")
             continue
 
         exp = outfile.read_text(encoding="utf-8").strip()
@@ -154,6 +174,7 @@ def cmd_run(problem: str):
             print(exp)
             print(" output:")
             print(out)
+
         print(f" time: {elapsed*1000:.2f} ms")
 
     print(f"\n結果: {ok}/{total} AC")
@@ -167,8 +188,9 @@ def main():
 
     if cmd == "new" and len(sys.argv) == 3:
         cmd_new(sys.argv[2])
-    elif (cmd == "test" or cmd == "t" or cmd == "run") and len(sys.argv) == 3:
-        cmd_run(sys.argv[2])
+    elif (cmd in ["test", "t", "run"]) and len(sys.argv) >= 3:
+        interpreter = sys.argv[3] if len(sys.argv) == 4 else "python"
+        cmd_run(sys.argv[2], interpreter)
     else:
         usage()
 
