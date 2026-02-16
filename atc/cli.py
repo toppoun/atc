@@ -1,4 +1,5 @@
 import sys
+import time
 import subprocess
 import shutil
 from pathlib import Path
@@ -114,6 +115,8 @@ def cmd_run(problem: str):
         print(f"=== {infile.name} ===")
 
         with open(infile, "r", encoding="utf-8") as fin:
+            start = time.perf_counter()
+
             proc = subprocess.run(
                 [sys.executable, py],
                 stdin=fin,
@@ -121,6 +124,9 @@ def cmd_run(problem: str):
                 stderr=subprocess.PIPE,
                 text=True,
             )
+            
+            end = time.perf_counter()
+            elapsed = end-start
 
     # ランタイムエラーの場合
         if proc.returncode != 0:
@@ -148,6 +154,7 @@ def cmd_run(problem: str):
             print(exp)
             print(" output:")
             print(out)
+        print(f" time: {elapsed*1000:.2f} ms")
 
     print(f"\n結果: {ok}/{total} AC")
 
