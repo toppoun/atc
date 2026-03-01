@@ -20,6 +20,8 @@ DIR8 = [(1,0),(-1,0),(0,1),(0,-1),(1,1),(1,-1),(-1,1),(-1,-1)]
 
 INF = 10**18
 YES,NO = "Yes", "No"
+MOD = 10**9 + 7
+MOD2  = 998244353
 
 def ni(): return int(input())
 def nm(): return map(int,input().split())
