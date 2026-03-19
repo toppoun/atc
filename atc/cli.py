@@ -63,6 +63,7 @@ def usage():
     print("使い方:")
     print("  atc new abc413")
     print("  atc run A [python|pypy]")
+    print("  atc manual A B C (または atc manual A~E)")
     sys.exit(1)
 
 # ---------- new ----------
@@ -100,6 +101,83 @@ def cmd_new(contest: str):
     shutil.rmtree(tmp, ignore_errors=True)
     print(f"{contest} ready.")
 
+# ---------- manual ----------
+def cmd_manual(args):
+    cwd = Path.cwd()
+    targets = []
+
+    for arg in args:
+        # "A~E" や "A-E" のような範囲指定を展開
+        if "~" in arg or "-" in arg:
+            sep = "~" if "~" in arg else "-"
+            parts = arg.split(sep)
+            if len(parts) == 2 and len(parts[0]) == 1 and len(parts[1]) == 1:
+                start, end = ord(parts[0]), ord(parts[1])
+                if start <= end:
+                    for c in range(start, end + 1):
+                        targets.append(chr(c))
+                    continue
+        # 通常の指定（"A" など）
+        targets.append(arg)
+
+    if not targets:
+        print("作成するファイル名を指定してください。(例: A B C または A~E)")
+        sys.exit(1)
+
+    for p in targets:
+        py = cwd / f"{p}.py"
+        if not py.exists():
+            py.write_text(TEMPLATE, encoding="utf-8")
+            print(f" {GREEN}Created{RESET}: {py.name}")
+        else:
+            print(f" {YELLOW}Skipped{RESET}: {py.name} (すでに存在します)")
+
+# ---------- manual tests ----------
+def cmd_manual_tests(contest: str = None):
+    cwd = Path.cwd()
+    
+    # 引数がない場合はカレントディレクトリ名を利用
+    if not contest:
+        contest = cwd.name
+        print(f"{YELLOW}コンテスト名が指定されなかったため、フォルダ名 '{contest}' を使用します。{RESET}")
+
+    tests = cwd / "tests"
+    tmp = cwd / ".oj_tmp"
+
+    tests.mkdir(exist_ok=True)
+
+    for p in PROBLEMS:
+        print(f"fetching {p} ...")
+        url = f"https://atcoder.jp/contests/{contest}/tasks/{contest}_{p.lower()}"
+        dst = tests / p
+
+        # 既にテストケースがある場合はスキップ
+        if dst.exists() and any(dst.iterdir()):
+            print(f"  {YELLOW}Skipped{RESET}: tests/{p} (すでに存在します)")
+            continue
+
+        shutil.rmtree(tmp, ignore_errors=True)
+
+        try:
+            # ojコマンドを実行。不要なエラー出力で画面が埋まらないようにstderrをキャプチャ
+            subprocess.run(
+                ["oj", "d", url, "-d", str(tmp)],
+                check=True,
+                stderr=subprocess.PIPE
+            )
+        except subprocess.CalledProcessError:
+            print(f"  {RED}Failed{RESET}: {p} のテストが見つかりませんでした。(URL: {url})")
+            continue
+
+        dst.mkdir(parents=True, exist_ok=True)
+        for f in tmp.iterdir():
+            shutil.move(str(f), dst / f.name)
+        
+        print(f"  {GREEN}Success{RESET}: tests/{p}")
+
+    shutil.rmtree(tmp, ignore_errors=True)
+    print(f"テストケースの準備が完了しました。")
+    
 # ---------- run ----------
 def cmd_run(problem: str, interpreter="python"):
     cwd = Path.cwd()
@@ -193,6 +271,14 @@ def main():
     elif (cmd in ["test", "t", "run"]) and len(sys.argv) >= 3:
         interpreter = sys.argv[3] if len(sys.argv) == 4 else "python"
         cmd_run(sys.argv[2], interpreter)
+    elif cmd == "manual" and len(sys.argv) >= 3:
+            # manual tests の場合
+            if sys.argv[2] == "tests":
+                contest_name = sys.argv[3] if len(sys.argv) >= 4 else None
+                cmd_manual_tests(contest_name)
+            # manual A~E などの場合
+            else:
+                cmd_manual(sys.argv[2:])
     else:
         usage()
 
