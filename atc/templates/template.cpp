@@ -19,12 +19,16 @@ const int MOD2 = 998244353;
 #define rep(i, n) for (int i = 0; i < (int)(n); i++)
 #define all(x) (x).begin(), (x).end()
 
+void solve(){
+    int n;
+    cin >> n;
+}
 
 int main(){
     ios::sync_with_stdio(false);
     std::cin.tie(nullptr);
     
-    
+    solve();
 
     return 0;
 }
