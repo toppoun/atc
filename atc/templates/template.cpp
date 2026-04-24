@@ -20,6 +20,14 @@ const int MOD2 = 998244353;
 #define rep2(i, s, n) for (int i = (s); i < (int)(n); i++)
 #define all(x) (x).begin(), (x).end()
 
+// 関数
+template<class T>
+void print_vec(const vector<T>& v) {
+    for (int i = 0; i < (int)v.size(); i++) {
+        cout << v[i] << (i + 1 == (int)v.size() ? '\n' : ' ');
+    }
+}
+
 void solve(){
     int n;
     cin >> n;
