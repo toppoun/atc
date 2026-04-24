@@ -52,14 +52,14 @@ def _download_samples(contest: str, problem_char: str, dst_dir: Path):
 
 def usage():
     print("使い方:")
-    print("  atc new abc413 [py|cpp]  (デフォルトは py)")
+    print("  atc new abc413 [py|cpp]  (デフォルトは cpp)")
     print("  atc run A [python|pypy]")
     print("  atc manual A B C")
     print("  atc manual tests [contest_id]")
     sys.exit(1)
 
 # ---------- new ----------
-def cmd_new(contest: str, lang: str = "py"):
+def cmd_new(contest: str, lang: str = "cpp"):
     base = Path(contest)
     tests = base / "tests"
     base.mkdir(exist_ok=True)
@@ -85,7 +85,7 @@ def cmd_new(contest: str, lang: str = "py"):
 def cmd_manual(args):
     cwd = Path.cwd()
     # 簡易的に拡張子を判別（引数に .cpp 等が含まれていればそれを使う）
-    lang = "py"
+    lang = "cpp"
     targets = []
     for arg in args:
         if arg in ["py", "cpp"]:
