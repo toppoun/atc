@@ -173,7 +173,7 @@ def main():
     cmd = sys.argv[1]
 
     if cmd == "new" and len(sys.argv) >= 3:
-        lang = sys.argv[3] if len(sys.argv) == 4 else "py"
+        lang = sys.argv[3] if len(sys.argv) == 4 else "cpp"
         cmd_new(sys.argv[2], lang)
     elif cmd in ["run", "r", "test", "t"] and len(sys.argv) >= 3:
         interp = sys.argv[3] if len(sys.argv) == 4 else "python"
