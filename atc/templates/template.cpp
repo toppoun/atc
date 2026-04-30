@@ -28,6 +28,11 @@ void print_vec(const vector<T>& v) {
     }
 }
 
+int ctoi(char c) {
+    if ('0' <= c && c <= '9') return c - '0';
+    return -1; // エラー扱い
+}
+
 void solve(){
     int n;
     cin >> n;
