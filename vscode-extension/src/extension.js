@@ -23,6 +23,9 @@ class AtcViewProvider {
     this.context = context;
     this.view = undefined;
     this.currentProcess = undefined;
+    this.currentBaseDirectory = context.workspaceState.get("baseDirectory");
+    this.currentContestName = context.workspaceState.get("contestName", "");
+    this.contestNameSaveQueue = Promise.resolve();
   }
 
   resolveWebviewView(webviewView) {
@@ -46,6 +49,15 @@ class AtcViewProvider {
     switch (message.type) {
       case "ready":
         this.postWorkspace();
+        break;
+      case "setBaseDirectory":
+        await this.setBaseDirectory(message.value);
+        break;
+      case "refreshDirectories":
+        this.postWorkspace();
+        break;
+      case "setContestName":
+        await this.setContestName(message.value);
         break;
       case "createContest":
         await this.createContest(message);
@@ -71,18 +83,19 @@ class AtcViewProvider {
   }
 
   async createContest(message) {
-    const contest = normalizeToken(message.contest).toLowerCase();
+    const contest = normalizeContestName(message.contest);
     const lang = message.lang === "py" ? "py" : "cpp";
-    const workspaceRoot = this.getWorkspaceRoot();
+    const baseDirectory = this.getBaseDirectory();
 
-    if (!workspaceRoot) {
+    if (!baseDirectory) {
       throw new Error("VS Code で作業フォルダを開いてください。");
     }
     if (!contest) {
-      throw new Error("コンテストIDを入力してください。");
+      throw new Error("コンテスト名を入力してください。");
     }
 
-    const code = await this.runAtc(["new", contest, lang], workspaceRoot);
+    await this.setContestName(contest);
+    const code = await this.runAtc(["new", contest, lang], baseDirectory);
     if (code === 0) {
       this.post({ type: "contestCreated", contest });
     }
@@ -90,12 +103,18 @@ class AtcViewProvider {
 
   async runProblem(message) {
     const problem = normalizeToken(message.problem).toUpperCase();
+    const contest = normalizeContestName(message.contest);
     const interpreter = message.interpreter === "pypy" ? "pypy" : "python";
-    const cwd = this.resolveWorkingDirectory(message.directory);
 
     if (!problem) {
       throw new Error("問題を選択してください。");
     }
+    if (!contest) {
+      throw new Error("コンテスト名を入力してください。");
+    }
+
+    await this.setContestName(contest);
+    const cwd = this.resolveWorkingDirectory(contest);
     if (!fs.existsSync(cwd)) {
       throw new Error(`作業フォルダが見つかりません: ${cwd}`);
     }
@@ -122,12 +141,12 @@ class AtcViewProvider {
   }
 
   async chooseDirectory(target) {
-    const workspaceRoot = this.getWorkspaceRoot();
+    const defaultDirectory = target === "baseDir" ? this.getWorkspaceRoot() : this.getBaseDirectory();
     const result = await vscode.window.showOpenDialog({
       canSelectFiles: false,
       canSelectFolders: true,
       canSelectMany: false,
-      defaultUri: workspaceRoot ? vscode.Uri.file(workspaceRoot) : undefined,
+      defaultUri: defaultDirectory ? vscode.Uri.file(defaultDirectory) : undefined,
       openLabel: "このフォルダを使う"
     });
 
@@ -136,10 +155,18 @@ class AtcViewProvider {
     }
 
     const selectedPath = result[0].fsPath;
+    if (target === "baseDir") {
+      this.currentBaseDirectory = selectedPath;
+      await this.context.workspaceState.update("baseDirectory", selectedPath);
+      this.postWorkspace();
+      return;
+    }
+
+    const baseDirectory = this.getBaseDirectory();
     this.post({
       type: "setDirectory",
       target,
-      value: workspaceRoot ? toWorkspaceRelative(workspaceRoot, selectedPath) : selectedPath
+      value: baseDirectory ? toWorkspaceRelative(baseDirectory, selectedPath) : selectedPath
     });
   }
 
@@ -251,20 +278,20 @@ class AtcViewProvider {
   }
 
   resolveWorkingDirectory(input) {
-    const workspaceRoot = this.getWorkspaceRoot();
+    const baseDirectory = this.getBaseDirectory();
     const value = String(input || "").trim();
 
-    if (!workspaceRoot) {
+    if (!baseDirectory) {
       throw new Error("VS Code で作業フォルダを開いてください。");
     }
     if (!value) {
-      return workspaceRoot;
+      return baseDirectory;
     }
     if (path.isAbsolute(value)) {
       return value;
     }
 
-    return path.join(workspaceRoot, value);
+    return path.join(baseDirectory, value);
   }
 
   getWorkspaceRoot() {
@@ -280,6 +307,68 @@ class AtcViewProvider {
     return folder ? folder.uri.fsPath : undefined;
   }
 
+  getBaseDirectory() {
+    const workspaceRoot = this.getWorkspaceRoot();
+    if (!workspaceRoot) {
+      return undefined;
+    }
+    if (this.currentBaseDirectory && fs.existsSync(this.currentBaseDirectory)) {
+      return this.currentBaseDirectory;
+    }
+
+    return workspaceRoot;
+  }
+
+  async setBaseDirectory(value) {
+    const workspaceRoot = this.getWorkspaceRoot();
+    if (!workspaceRoot) {
+      throw new Error("VS Code で作業フォルダを開いてください。");
+    }
+
+    const rawValue = String(value || "").trim();
+    this.currentBaseDirectory = rawValue
+      ? (path.isAbsolute(rawValue) ? rawValue : path.join(workspaceRoot, rawValue))
+      : workspaceRoot;
+    await this.context.workspaceState.update("baseDirectory", this.currentBaseDirectory);
+    this.postWorkspace();
+  }
+
+  async setContestName(value) {
+    this.currentContestName = normalizeContestName(value);
+    this.contestNameSaveQueue = this.contestNameSaveQueue.then(() => {
+      return this.context.workspaceState.update("contestName", this.currentContestName);
+    });
+    await this.contestNameSaveQueue;
+    this.post({
+      type: "contestName",
+      value: this.currentContestName
+    });
+  }
+
+  listWorkspaceDirectories() {
+    const workspaceRoot = this.getWorkspaceRoot();
+    if (!workspaceRoot) {
+      return [];
+    }
+
+    const ignored = new Set([".git", ".vscode", "__pycache__", "node_modules", "dist", "build"]);
+    try {
+      return fs.readdirSync(workspaceRoot, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory() && !ignored.has(entry.name))
+        .map((entry) => {
+          const fullPath = path.join(workspaceRoot, entry.name);
+          return {
+            label: entry.name,
+            value: entry.name,
+            path: fullPath
+          };
+        })
+        .sort((a, b) => a.label.localeCompare(b.label, "ja"));
+    } catch {
+      return [];
+    }
+  }
+
   stopCurrentProcess() {
     if (!this.currentProcess) {
       return;
@@ -291,9 +380,15 @@ class AtcViewProvider {
 
   postWorkspace() {
     const root = this.getWorkspaceRoot();
+    const baseDirectory = this.getBaseDirectory();
     this.post({
       type: "workspace",
-      value: root || "未選択"
+      root: root || "",
+      rootLabel: root || "未選択",
+      baseDirectory: baseDirectory || "",
+      baseLabel: root && baseDirectory ? toWorkspaceRelative(root, baseDirectory) || "." : "未選択",
+      contestName: this.currentContestName || "",
+      directories: this.listWorkspaceDirectories()
     });
   }
 
@@ -361,6 +456,21 @@ class AtcViewProvider {
       font-size: 12px;
       overflow-wrap: anywhere;
     }
+    .workspace-meta {
+      display: grid;
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+    .workspace-label {
+      color: var(--vscode-descriptionForeground);
+      font-size: 12px;
+    }
+    .compact-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
     label {
       display: flex;
       flex-direction: column;
@@ -416,6 +526,24 @@ class AtcViewProvider {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 8px;
+    }
+    .quick-run-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 6px;
+      margin: 10px 0;
+    }
+    .quick-run {
+      min-width: 0;
+      min-height: 34px;
+      padding: 5px 0;
+      font-weight: 700;
+    }
+    .primary-actions {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      margin: 10px 0;
     }
     .output {
       min-height: 180px;
@@ -562,15 +690,27 @@ class AtcViewProvider {
 <body>
   <main>
     <section>
-      <div class="section-title">ワークスペース</div>
-      <div class="workspace" id="workspace">${escapeHtml(workspaceRoot)}</div>
+      <div class="section-title">作業場所</div>
+      <div class="workspace-meta">
+        <div class="workspace-label">VS Code</div>
+        <div class="workspace" id="workspaceRoot">${escapeHtml(workspaceRoot)}</div>
+      </div>
+      <label>
+        基準フォルダ
+        <select id="baseDir"></select>
+      </label>
+      <div class="workspace" id="baseDirLabel">.</div>
+      <div class="compact-actions">
+        <button class="secondary" id="chooseBaseDir">選択</button>
+        <button class="secondary" id="refreshDirs">更新</button>
+      </div>
     </section>
 
     <section>
-      <div class="section-title">コンテスト作成</div>
+      <div class="section-title">コンテスト</div>
       <label>
-        コンテストID
-        <input id="contest" autocomplete="off" placeholder="abc413">
+        コンテスト名
+        <input id="contestName" autocomplete="off" placeholder="abc413">
       </label>
       <label>
         言語
@@ -579,18 +719,6 @@ class AtcViewProvider {
           <option value="py">Python</option>
         </select>
       </label>
-      <button id="createContest">作成してサンプル取得</button>
-    </section>
-
-    <section>
-      <div class="section-title">テスト実行</div>
-      <div class="row">
-        <label>
-          作業フォルダ
-          <input id="runDir" autocomplete="off" placeholder="abc413 または空欄">
-        </label>
-        <button class="secondary choose-dir" data-target="runDir">選択</button>
-      </div>
       <label>
         問題
         <select id="problem">
@@ -609,7 +737,18 @@ class AtcViewProvider {
           <option value="pypy">PyPy</option>
         </select>
       </label>
-      <button id="runProblem">テスト実行</button>
+      <div class="primary-actions">
+        <button id="createContest">作成</button>
+        <button id="runProblem">テストケース実行</button>
+      </div>
+      <div class="quick-run-grid" aria-label="問題別クイック実行">
+        <button class="quick-run" data-problem="A">A</button>
+        <button class="quick-run" data-problem="B">B</button>
+        <button class="quick-run" data-problem="C">C</button>
+        <button class="quick-run" data-problem="D">D</button>
+        <button class="quick-run" data-problem="E">E</button>
+        <button class="quick-run" data-problem="F">F</button>
+      </div>
     </section>
 
     <section id="testResultsSection" class="hidden">
@@ -657,13 +796,16 @@ class AtcViewProvider {
     const $ = (id) => document.getElementById(id);
     const output = $("output");
     const status = $("status");
+    const baseDir = $("baseDir");
+    const contestName = $("contestName");
     const testResultsSection = $("testResultsSection");
     const testSummary = $("testSummary");
     const testCases = $("testCases");
     const buttons = [
       $("createContest"),
       $("runProblem"),
-      $("manualCreate")
+      $("manualCreate"),
+      ...document.querySelectorAll(".quick-run")
     ];
 
     vscode.postMessage({ type: "ready" });
@@ -671,20 +813,56 @@ class AtcViewProvider {
     $("createContest").addEventListener("click", () => {
       vscode.postMessage({
         type: "createContest",
-        contest: $("contest").value,
+        contest: contestName.value,
         lang: $("newLang").value
       });
     });
 
+    contestName.addEventListener("input", () => {
+      vscode.postMessage({
+        type: "setContestName",
+        value: contestName.value
+      });
+    });
+
+    baseDir.addEventListener("change", () => {
+      vscode.postMessage({
+        type: "setBaseDirectory",
+        value: baseDir.value
+      });
+    });
+
+    $("chooseBaseDir").addEventListener("click", () => {
+      vscode.postMessage({
+        type: "chooseDirectory",
+        target: "baseDir"
+      });
+    });
+
+    $("refreshDirs").addEventListener("click", () => {
+      vscode.postMessage({ type: "refreshDirectories" });
+    });
+
     $("runProblem").addEventListener("click", () => {
+      runSelectedProblem($("problem").value);
+    });
+
+    document.querySelectorAll(".quick-run").forEach((button) => {
+      button.addEventListener("click", () => {
+        $("problem").value = button.dataset.problem;
+        runSelectedProblem(button.dataset.problem);
+      });
+    });
+
+    function runSelectedProblem(problem) {
       clearTestResults();
       vscode.postMessage({
         type: "runProblem",
-        directory: $("runDir").value,
-        problem: $("problem").value,
+        contest: contestName.value,
+        problem,
         interpreter: $("interpreter").value
       });
-    });
+    }
 
     $("manualCreate").addEventListener("click", () => {
       vscode.postMessage({
@@ -716,7 +894,11 @@ class AtcViewProvider {
       const message = event.data;
       switch (message.type) {
         case "workspace":
-          $("workspace").textContent = message.value;
+          renderWorkspace(message);
+          setContestName(message.contestName);
+          break;
+        case "contestName":
+          setContestName(message.value);
           break;
         case "appendOutput":
           output.textContent += message.text;
@@ -740,7 +922,7 @@ class AtcViewProvider {
           status.textContent = message.value ? "実行中" : "待機中";
           break;
         case "contestCreated":
-          $("runDir").value = message.contest;
+          setContestName(message.contest);
           $("manualDir").value = message.contest;
           break;
         case "setDirectory":
@@ -752,6 +934,42 @@ class AtcViewProvider {
           break;
       }
     });
+
+    function renderWorkspace(message) {
+      $("workspaceRoot").textContent = message.rootLabel || "未選択";
+      $("baseDirLabel").textContent = "現在: " + (message.baseLabel || ".");
+
+      const current = message.baseDirectory || "";
+      const root = message.root || "";
+      const options = message.directories || [];
+      const selectedDirectory = options.find((directory) => directory.path === current);
+      baseDir.replaceChildren();
+      baseDir.append(createOption("", "ワークスペース直下"));
+
+      options.forEach((directory) => {
+        baseDir.append(createOption(directory.value, directory.label));
+      });
+
+      if (current && current !== root && !selectedDirectory) {
+        const label = message.baseLabel || current;
+        baseDir.append(createOption(current, label));
+      }
+
+      baseDir.value = selectedDirectory ? selectedDirectory.value : (current && current !== root ? current : "");
+    }
+
+    function setContestName(value) {
+      if (document.activeElement !== contestName) {
+        contestName.value = value || "";
+      }
+    }
+
+    function createOption(value, label) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      return option;
+    }
 
     function clearTestResults() {
       testSummary.replaceChildren();
@@ -865,6 +1083,10 @@ class AtcViewProvider {
 
 function normalizeToken(value) {
   return String(value || "").trim().replace(/[^A-Za-z0-9_-]/g, "");
+}
+
+function normalizeContestName(value) {
+  return normalizeToken(value).toLowerCase();
 }
 
 function stripAnsi(value) {

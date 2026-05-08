@@ -105,4 +105,8 @@ atc run A
 
 VS Code でこのリポジトリを開き、実行とデバッグから `Run ATC VS Code Extension` を選ぶと、Extension Development Host が起動します。左の Activity Bar にある `ATC` から操作パネルを開き、コンテスト作成、テスト実行、問題ファイル作成を GUI で実行できます。
 
+操作パネル上部の `基準フォルダ` で、`ABC(Atcoder Beginner Contest)` や `typical90` などのカテゴリ別フォルダを切り替えられます。
+
+`コンテスト名` 入力は作成とテスト実行で共通です。入力値は保持され、テスト実行は A〜F のボタンからワンクリックで実行できます。
+
 サンプル取得には CLI 版と同じく `online-judge-tools` の `oj` コマンドが必要です。

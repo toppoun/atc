@@ -6,7 +6,7 @@ import platform
 from pathlib import Path
 
 # ===== 設定 =====
-PROBLEMS = ["A", "B", "C", "D", "E"]
+PROBLEMS = ["A", "B", "C", "D", "E", "F"]
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 
 # =================
@@ -54,7 +54,7 @@ def usage():
     print("使い方:")
     print("  atc new abc413 [py|cpp]  (デフォルトは cpp)")
     print("  atc run A [python|pypy]")
-    print("  atc manual A B C")
+    print("  atc manual A B C D E F")
     print("  atc manual tests [contest_id]")
     sys.exit(1)
 
