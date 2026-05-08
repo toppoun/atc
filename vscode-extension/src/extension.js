@@ -4,6 +4,7 @@ const path = require("path");
 const vscode = require("vscode");
 
 const VIEW_TYPE = "atc-helper.main";
+const PROBLEMS = ["A", "B", "C", "D", "E", "F"];
 
 function activate(context) {
   const provider = new AtcViewProvider(context);
@@ -65,6 +66,9 @@ class AtcViewProvider {
       case "runProblem":
         await this.runProblem(message);
         break;
+      case "openContestFiles":
+        await this.openContestFiles(message);
+        break;
       case "manualCreate":
         await this.manualCreate(message);
         break;
@@ -98,6 +102,9 @@ class AtcViewProvider {
     const code = await this.runAtc(["new", contest, lang], baseDirectory);
     if (code === 0) {
       this.post({ type: "contestCreated", contest });
+      if (this.shouldOpenFilesAfterCreate()) {
+        await this.openContestFiles({ contest, lang });
+      }
     }
   }
 
@@ -120,6 +127,48 @@ class AtcViewProvider {
     }
 
     await this.runAtc(["run", problem, interpreter], cwd);
+  }
+
+  async openContestFiles(message) {
+    const contest = normalizeContestName(message.contest);
+    const preferredLang = message.lang === "py" ? "py" : "cpp";
+
+    if (!contest) {
+      throw new Error("コンテスト名を入力してください。");
+    }
+
+    await this.setContestName(contest);
+    const contestDirectory = this.resolveWorkingDirectory(contest);
+    if (!fs.existsSync(contestDirectory)) {
+      throw new Error(`コンテストフォルダが見つかりません: ${contestDirectory}`);
+    }
+
+    const files = PROBLEMS
+      .map((problem) => this.findProblemFile(contestDirectory, problem, preferredLang))
+      .filter(Boolean);
+
+    if (!files.length) {
+      throw new Error("開ける問題ファイルが見つかりません。");
+    }
+
+    const documents = [];
+    for (const file of files) {
+      const document = await vscode.workspace.openTextDocument(vscode.Uri.file(file));
+      documents.push(document);
+      await vscode.window.showTextDocument(document, {
+        preview: false,
+        preserveFocus: true,
+        viewColumn: vscode.ViewColumn.Active
+      });
+    }
+
+    await vscode.window.showTextDocument(documents[0], {
+      preview: false,
+      preserveFocus: false,
+      viewColumn: vscode.ViewColumn.Active
+    });
+
+    this.appendLog(`\n${files.length} 個の問題ファイルをタブに開きました。`, "info");
   }
 
   async manualCreate(message) {
@@ -265,11 +314,33 @@ class AtcViewProvider {
     };
   }
 
+  shouldOpenFilesAfterCreate() {
+    const config = vscode.workspace.getConfiguration("atcHelper");
+    return config.get("openFilesAfterCreate") !== false;
+  }
+
+  findProblemFile(contestDirectory, problem, preferredLang) {
+    const preferred = path.join(contestDirectory, `${problem}.${preferredLang}`);
+    if (fs.existsSync(preferred)) {
+      return preferred;
+    }
+
+    for (const ext of ["cpp", "py"]) {
+      const candidate = path.join(contestDirectory, `${problem}.${ext}`);
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+
+    return undefined;
+  }
+
   findLocalPythonModuleRoot() {
     const extensionPath = this.context.extensionUri.fsPath;
     const candidates = [
+      path.resolve(extensionPath, "python"),
       path.resolve(extensionPath, ".."),
-      path.resolve(extensionPath, "python")
+      path.resolve(extensionPath, "..", "python")
     ];
 
     return candidates.find((candidate) => {
@@ -741,6 +812,7 @@ class AtcViewProvider {
         <button id="createContest">作成</button>
         <button id="runProblem">テストケース実行</button>
       </div>
+      <button class="secondary" id="openContestFiles">A〜F を開く</button>
       <div class="quick-run-grid" aria-label="問題別クイック実行">
         <button class="quick-run" data-problem="A">A</button>
         <button class="quick-run" data-problem="B">B</button>
@@ -804,6 +876,7 @@ class AtcViewProvider {
     const buttons = [
       $("createContest"),
       $("runProblem"),
+      $("openContestFiles"),
       $("manualCreate"),
       ...document.querySelectorAll(".quick-run")
     ];
@@ -845,6 +918,14 @@ class AtcViewProvider {
 
     $("runProblem").addEventListener("click", () => {
       runSelectedProblem($("problem").value);
+    });
+
+    $("openContestFiles").addEventListener("click", () => {
+      vscode.postMessage({
+        type: "openContestFiles",
+        contest: contestName.value,
+        lang: $("newLang").value
+      });
     });
 
     document.querySelectorAll(".quick-run").forEach((button) => {

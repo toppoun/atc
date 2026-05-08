@@ -34,6 +34,11 @@
           "type": "string",
           "default": "",
           "description": "インストール済みの atc コマンドを直接使う場合に、そのコマンド名またはパスを指定します。空の場合は同じリポジトリ内の Python CLI を優先し、見つからない場合は atc コマンドを使います。"
+        },
+        "atcHelper.openFilesAfterCreate": {
+          "type": "boolean",
+          "default": true,
+          "description": "コンテスト作成後に A〜F のソースファイルをタブに開きます。"
         }
       }
     },
@@ -57,6 +62,8 @@
     }
   },
   "scripts": {
-    "check": "node --check src/extension.js"
+    "check": "node --check src/extension.js && node --check scripts/sync-python-cli.js",
+    "sync-python-cli": "node scripts/sync-python-cli.js",
+    "package": "npm run sync-python-cli && npx @vscode/vsce package"
   }
 }
