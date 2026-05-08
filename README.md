@@ -98,3 +98,11 @@ atc new abc413
 cd abc413
 atc run A
 ```
+
+## VS Code 拡張機能
+
+`vscode-extension` フォルダに、GUI で操作できる VS Code 拡張機能を追加しています。
+
+VS Code でこのリポジトリを開き、実行とデバッグから `Run ATC VS Code Extension` を選ぶと、Extension Development Host が起動します。左の Activity Bar にある `ATC` から操作パネルを開き、コンテスト作成、テスト実行、問題ファイル作成を GUI で実行できます。
+
+サンプル取得には CLI 版と同じく `online-judge-tools` の `oj` コマンドが必要です。
