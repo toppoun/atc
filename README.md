@@ -998,11 +998,11 @@ WATCH_DEBOUNCE_SECONDS = 1.5
 
 ## 🔗 関連リンク
 
-- AtCoder 公式サイト: https://atcoder.jp/
-- online-judge-tools: https://github.com/online-judge-tools/oj
-- VS Code: https://code.visualstudio.com/
-- VS Code Extension API: https://code.visualstudio.com/api
-- MSYS2: https://www.msys2.org/
+- AtCoder 公式サイト: <https://atcoder.jp/>
+- online-judge-tools: <https://github.com/online-judge-tools/oj>
+- VS Code: <https://code.visualstudio.com/>
+- VS Code Extension API: <https://code.visualstudio.com/api>
+- MSYS2: <https://www.msys2.org/>
 
 VS Code Marketplace について:
 
