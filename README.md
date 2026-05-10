@@ -1,213 +1,957 @@
 # atc
 
-AtCoder の問題用フォルダ作成、サンプル取得、ローカルテスト実行を簡単にするためのコマンドラインツールです。
+AtCoder のコンテスト準備、サンプル取得、ローカルテスト、watch 実行、VS Code の分割ターミナル起動をまとめて扱うための個人用 CLI ツールです。
 
-## 機能
+主な用途は次の通りです。
 
-- AtCoder のコンテスト用フォルダを作成
-- A〜E 問題のファイルを自動作成
-- `templates/template.py` または `templates/template.cpp` からテンプレートを読み込み
-- `online-judge-tools` を使ってサンプルケースを自動取得
-- Python / PyPy / C++ のローカルテスト実行
-- ファイル保存後に関連する問題だけを自動テスト
-- 手動で問題ファイルを追加作成
+- `atc new abc413 cpp` でコンテストフォルダ、問題ファイル、サンプルテストを作成する
+- `atc contest abc413 cpp` で、コンテストがなければ作成し、既にあればアクティブ化だけ行う
+- `atc run A` / `atc t A` / `atc run all` でローカルテストする
+- `atc watch` で保存時に対象問題だけ自動テストする
+- VS Code 拡張機能 `atc-helper` と連携し、手動用ターミナルと `atc watch` 用ターミナルを左右分割で開く
 
-## 必要なもの
+この README は現在の実装に合わせています。未実装の機能は「現時点では未対応」と明記しています。
 
-Python 3 が必要です。
+## 目次
 
-サンプル取得には `online-judge-tools` を使います。
+- [インストール](#-インストール)
+- [セットアップ](#-セットアップ)
+- [対応コンテスト](#-対応コンテスト)
+- [コマンドの詳細オプション](#️-コマンドの詳細オプション)
+- [トラブルシューティング](#-トラブルシューティング)
+- [使用例](#-使用例)
+- [プロジェクト構造](#️-プロジェクト構造)
+- [ライセンス](#-ライセンス)
+- [貢献ガイド](#-貢献ガイド)
+- [パフォーマンス情報](#-パフォーマンス情報)
+- [関連リンク](#-関連リンク)
+- [FAQ](#-faq)
+- [サポート情報](#-サポート情報)
 
-## 使い方
+## 📦 インストール
 
-```Bash
-atc new abc413
+### 必要なもの
+
+- Python 3.x
+- Python 3.10 以上推奨
+- `online-judge-tools`
+- C++ を使う場合は `g++`
+- VS Code 拡張機能を使う場合は Node.js / npm / VS Code
+
+`pyproject.toml` 上の `requires-python` は `>=3.8` ですが、開発・利用環境としては Python 3.10 以上を推奨します。
+
+### Python CLI のインストール
+
+リポジトリ直下で以下を実行します。
+
+```bash
+python -m pip install -e .
 ```
 
-デフォルトではcppファイルが生成されます
+依存パッケージとして `online-judge-tools` が指定されていますが、個別に入れ直したい場合は次を実行します。
 
-```Bash
-abc413/
-├── A.cpp
-├── B.cpp
-├── C.cpp
-├── D.cpp
-├── E.cpp
-└── tests/
-    ├── A/
-    ├── B/
-    ├── C/
-    ├── D/
-    └── E/
+```bash
+python -m pip install online-judge-tools
 ```
 
-Pythonで作成したい場合は、最後に `py` を指定します。
+インストール後、`atc` コマンドが見えるか確認します。
 
-## テンプレート
-
-テンプレートファイルは `templates` フォルダに置きます。
-
-Python用: `templates/template.py`
-
-C++用: `templates/template.cpp`
-
-## テスト実行
-
-作成したコンテストフォルダに移動します。
-
-```Bash
-cd abc413
+```bash
+atc
 ```
 
-A 問題を実行する場合：
+Windows の場合:
 
-```Bash
-atc run a
+```powershell
+where atc
 ```
 
-短縮コマンドも使えます。
+macOS / Linux の場合:
 
-```Bash
-atc r A
-atc test A
-atc t A
+```bash
+which atc
 ```
 
-全問題をまとめて確認する場合：
+### Windows で `atc` が見つからない場合
 
-```Bash
-atc run all
+`pip` がインストールした Scripts ディレクトリが PATH に入っていない可能性があります。
+
+代表的な場所:
+
+```text
+C:\Users\<ユーザー名>\AppData\Local\Programs\Python\Python3xx\Scripts
+C:\Users\<ユーザー名>\AppData\Roaming\Python\Python3xx\Scripts
 ```
 
-直前に失敗したケースだけを再実行する場合：
+仮想環境を使っている場合:
 
-```Bash
-atc rerun
+```text
+<プロジェクト>\.venv\Scripts
 ```
 
-## 自動テスト
+確認:
 
-編集中にテストを自動実行したい場合は、コンテストフォルダで `watch` を使います。
-
-```Bash
-atc watch
+```powershell
+where atc
+where python
 ```
 
-起動時に一度テストを実行し、その後は A〜E のソースファイルと `tests` フォルダを監視します。
+PATH を追加した後は、ターミナルや VS Code を開き直してください。
 
-- `A.py` または `A.cpp` が変わったら A 問題だけ実行
-- `tests/A` のサンプルが変わったら A 問題だけ実行
-- `pyproject.toml` や `requirements.txt` などの設定ファイルが変わったら、検出できる問題をまとめて実行
-- 変更直後には実行せず、1.5 秒待ってから実行
+### Windows / macOS / Linux の環境構築例
 
-特定の問題だけ監視することもできます。
+Windows:
 
-```Bash
-atc watch A
+```powershell
+cd D:\atc
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -U pip
+python -m pip install -e .
+python -m pip install online-judge-tools
 ```
 
-PyPy で実行したい場合：
+macOS:
 
-```Bash
-atc watch A pypy
+```bash
+cd ~/atc
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+python -m pip install -e .
+python -m pip install online-judge-tools
 ```
 
-自動テストではターミナルに詳細ログを流し続けず、結果の要約だけを表示します。
+Linux:
 
-```Text
-PASS A: 3 tests in 0.42s
-Full log: .atc/test-runs/last.log
+```bash
+cd ~/atc
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+python -m pip install -e .
+python -m pip install online-judge-tools
 ```
 
-失敗時もターミナルには失敗したケースの一覧だけを出します。期待値、出力、エラー内容などの詳細は `.atc/test-runs/last.log` に保存されます。
+### C++ を使う場合の g++ 環境
 
-## 手動で問題ファイルを作成する
+この CLI は `A.cpp` などが存在する場合、`g++` でコンパイルしてからテストします。現在のコンパイルコマンドは CLI 内で固定されており、概ね次の形です。
 
-現在のフォルダに A.py, B.py, C.py を作成する場合：
-
-```Bash
-atc manual A B C
+```bash
+g++ -O2 A.cpp -o _A.exe
 ```
 
-範囲指定もできます。
+Windows では MSYS2 UCRT64 を推奨します。
 
-```Bash
-atc manual A-E
+```powershell
+where g++
 ```
 
-または
+MSYS2 UCRT64 の代表的な PATH:
 
-```Bash
-atc manual A~E
+```text
+C:\msys64\ucrt64\bin
 ```
 
-現在のコンテストフォルダ名からサンプルケースだけ取得する場合：
+macOS:
 
-```Bash
-atc manual tests
+- Xcode Command Line Tools
+- または Homebrew の gcc
+
+```bash
+xcode-select --install
+g++ --version
 ```
 
-## コマンド一覧
+Linux:
 
-| コマンド | 説明 |
-| - | - |
-| `atc new abc413` | abc413 フォルダを作成し、A〜E の C++ ファイルとサンプルを取得 |
-| `atc run A` | A問題をテスト実行 |
-| `atc run all` | 検出できる問題をまとめてテスト実行 |
-| `atc rerun` | 直前に失敗したケースだけ再実行 |
-| `atc watch` | 変更された問題を自動テスト |
-| `atc watch A` | A問題だけを監視して自動テスト |
-| `atc manual A B C` | A.py, B.py, C.py を手動作成 |
-| `atc manual A-E` | A.py 〜 E.cpp を手動作成 |
-| `atc manual tests` | 現在のフォルダ名をコンテストIDとしてサンプルを取得 |
+```bash
+sudo apt update
+sudo apt install build-essential
+g++ --version
+```
 
-## VS Code 拡張機能のローカルインストール
+## 🔧 セットアップ
 
-普段使いでは、拡張機能を VSIX としてローカルインストールします。
+### テンプレート
 
-```Bash
+新規問題ファイルはテンプレートから作成されます。
+
+このリポジトリでは実際のテンプレートは次の場所にあります。
+
+```text
+atc/templates/template.py
+atc/templates/template.cpp
+```
+
+CLI 内ではパッケージ内の `templates/template.py` / `templates/template.cpp` として読み込まれます。内容を変えたい場合は、上記ファイルを直接編集してください。
+
+テンプレートが存在しない場合は、警告を表示し、空ファイルを作成します。
+
+```text
+Warning: ... が見つかりません。空ファイルを作成します。
+```
+
+カスタムテンプレートをコマンドラインオプションで指定する機能は、現時点では未対応です。
+
+### 初期設定ファイル
+
+現時点では専用の初期設定ファイルはありません。
+
+ただし、watch の再実行対象判定では以下のような設定ファイルの変更を検知します。
+
+```text
+pyproject.toml
+requirements.txt
+poetry.lock
+uv.lock
+Pipfile
+Pipfile.lock
+Makefile
+CMakeLists.txt
+```
+
+これらが変更された場合、検出できる問題をまとめて再実行します。
+
+### online-judge-tools
+
+サンプル取得には `online-judge-tools` の `oj` コマンドを使います。
+
+```bash
+python -m pip install online-judge-tools
+oj --version
+```
+
+AtCoder のサンプル取得でログインが必要な場合があります。
+
+```bash
+oj login https://atcoder.jp/
+```
+
+手動でサンプル取得を試す場合:
+
+```bash
+oj d https://atcoder.jp/contests/abc413/tasks/abc413_a -d tests/A
+```
+
+### VS Code 拡張機能
+
+VS Code 拡張機能は次の場所にあります。
+
+```text
+vscode/atc-helper/
+```
+
+役割:
+
+- `.atc/current-contest.json` の変更を監視
+- 変更を検知したら、今開いている VS Code ワークスペース内で分割ターミナルを開く
+- 左側: `atc terminal`
+- 右側: `atc watch`
+
+#### ローカル VSIX インストール
+
+通常利用では、Extension Development Host ではなく VSIX としてローカルインストールします。
+
+```powershell
 cd vscode/atc-helper
 npm install
 npm run compile
-npm install -g @vscode/vsce
-vsce package
-code --install-extension ./atc-helper-0.0.1.vsix --force
+npx @vscode/vsce package --allow-missing-repository
 ```
 
-インストールされたか確認する場合:
+VS Code の UI からインストールする場合:
 
-```Bash
-code --list-extensions --show-versions | findstr atc-helper
+```text
+Extensions → ... → Install from VSIX...
 ```
 
-`kouki.atc-helper@0.0.1` が表示されればインストール済みです。インストール後に VS Code を再読み込みすると、通常の VS Code で `AtC: Open Contest Terminals` が使えるようになります。
+生成された `atc-helper-0.0.1.vsix` を選択してください。
 
-## VS Code 拡張機能を変更した後の更新
+コマンドでインストールする場合:
+
+```powershell
+code --install-extension .\atc-helper-0.0.1.vsix --force
+```
+
+ただし、`code --install-extension` は環境によって VS Code が新しく開くことがあります。通常は VS Code の UI から `Install from VSIX...` を使う方が分かりやすいです。
+
+インストール後は VS Code で `Developer: Reload Window` を実行してください。
+
+#### 拡張機能を変更した後の更新
 
 拡張機能のコードを変更したら、VSIX を作り直して再インストールします。
 
-```Bash
+```powershell
 cd vscode/atc-helper
 npm install
 npm run compile
-vsce package
-code --install-extension ./atc-helper-0.0.1.vsix --force
+npx @vscode/vsce package --allow-missing-repository
 ```
 
-インストール後、VS Code で `Developer: Reload Window` を実行してください。同じ `0.0.1` のまま入れ直す場合も、`--force` を付ければ上書きできます。
+その後:
 
-## 注意点
+```text
+Extensions → ... → Install from VSIX...
+Developer: Reload Window
+```
 
-- `atc new` は A〜E 問題を対象にしています。
-- `atc run` は、現在のフォルダにある `A.py` または `A.cpp` を実行します。
-- `atc watch` は、現在のフォルダにある A〜E のソースと `tests/A` 〜 `tests/E` を監視します。
-- Python ファイルと C++ ファイルの両方がある場合、C++ が優先されます。
+コマンドで入れ直す場合:
 
-## 使用例
+```powershell
+code --install-extension .\atc-helper-0.0.1.vsix --force
+```
 
-```Bash
-atc new abc413
-cd abc413
+同じ `0.0.1` のまま入れ直す場合も、`--force` を付ければ上書きできます。
+
+## 🎯 対応コンテスト
+
+主な対象は AtCoder の以下の形式です。
+
+- ABC: AtCoder Beginner Contest
+- ARC: AtCoder Regular Contest
+- AGC: AtCoder Grand Contest
+
+現在の標準問題セットは `A`, `B`, `C`, `D`, `E` です。
+
+```python
+PROBLEMS = ["A", "B", "C", "D", "E"]
+```
+
+`atc/cli.py` の `PROBLEMS` を変更すれば、作成・取得・watch 対象の問題数を変えられます。
+
+サンプル取得時の URL は、現在は次の形式に依存しています。
+
+```text
+https://atcoder.jp/contests/{contest}/tasks/{contest}_{problem}
+```
+
+例:
+
+```text
+https://atcoder.jp/contests/abc413/tasks/abc413_a
+```
+
+そのため、ADT、鉄則本、特殊な練習コンテストなど、URL 形式が異なるものは制限がある可能性があります。サンプル取得は `online-judge-tools` に依存しており、AtCoder 側のページ構成変更やログイン状態、ネットワーク状態の影響を受けます。
+
+問題レベル自体に制限はありませんが、標準では A-E だけを対象にします。F 以降を扱う場合は `PROBLEMS` の変更や手動作成を検討してください。
+
+## ⚙️ コマンドの詳細オプション
+
+| コマンド | 説明 | 備考 |
+| - | - | - |
+| `atc new abc413 [py|cpp]` | `abc413/` を作成し、A-E の問題ファイルとサンプルを作成 | 既存フォルダでも `cmd_new` は走るため、サンプル取得を再試行します |
+| `atc contest abc413 [py|cpp]` | なければ作成、あれば作成とサンプル取得をスキップし、`.atc/current-contest.json` を更新 | VS Code 拡張機能連携用 |
+| `atc contests abc413 [py|cpp]` | `atc contest` と同じ | 複数形エイリアス |
+| `atc run A [python|pypy|cpp]` | A 問題を詳細表示付きでテスト | `cpp` の明示指定は現時点では未対応。`A.cpp` があれば C++ が優先されます |
+| `atc r A [python|pypy|cpp]` | `atc run A` の短縮 | `cpp` の明示指定は現時点では未対応 |
+| `atc test A [python|pypy|cpp]` | `atc run A` のエイリアス | `A.cpp` があれば C++ が優先されます |
+| `atc t A [python|pypy|cpp]` | `atc run A` の短縮エイリアス | よく使う短縮形。`cpp` の明示指定は現時点では未対応 |
+| `atc run all [python|pypy|cpp]` | 検出できる全問題をまとめてテスト | `cpp` の明示指定は現時点では未対応。C++ ソースがあれば自動的に C++ 優先 |
+| `atc rerun [python|pypy|cpp]` | 直前に失敗したケースだけ再実行 | `.atc/test-runs/last_failed.txt` を使用。`cpp` の明示指定は現時点では未対応 |
+| `atc retry [python|pypy|cpp]` | `atc rerun` のエイリアス | 同上 |
+| `atc watch [A] [python|pypy|cpp]` | ファイル変更を監視して自動テスト | `cpp` 引数は現時点では未対応。C++ ソースがあれば自動的に C++ 優先 |
+| `atc manual A B C [py|cpp]` | 現在のフォルダに指定問題ファイルを作成 | デフォルトは `cpp` |
+| `atc manual A~E [py|cpp]` | 範囲指定で問題ファイルを作成 | `A-E` 形式も使用可能 |
+| `atc manual tests` | 現在のフォルダ名を contest ID としてサンプル取得 | A-E が対象 |
+
+### 言語指定
+
+作成時:
+
+- `py`
+- `cpp`
+
+例:
+
+```bash
+atc new abc413 py
+atc contest abc413 cpp
+```
+
+実行時:
+
+- `python`
+- `pypy`
+- C++ は `A.cpp` などが存在すると自動的に優先
+
+例:
+
+```bash
 atc run A
+atc run A pypy
+```
+
+現時点では `--lang python` のようなフラグ形式は未対応です。位置引数で指定してください。
+
+### C++ 実行について
+
+現在の実装では、同じ問題に `A.py` と `A.cpp` がある場合、`A.cpp` が優先されます。
+
+つまり、`atc run A cpp` のような明示的な `cpp` 指定は未対応ですが、`A.cpp` があれば C++ としてコンパイル・実行されます。
+
+### 未対応のオプション
+
+以下は現時点では未対応です。
+
+- `--lang python` のようなフラグ形式
+- コマンドラインからのカスタムテンプレート指定
+- タイムアウト設定
+- C++ コンパイルオプションの設定ファイル化
+- 問題数や対象コンテスト形式の設定ファイル化
+
+テンプレートを変える場合は `atc/templates/template.py` と `atc/templates/template.cpp` を直接編集してください。
+
+## 📋 トラブルシューティング
+
+### `atc` が見つからない
+
+原因:
+
+- pip でインストールされた Scripts ディレクトリが PATH に入っていない
+- 仮想環境を有効化していない
+
+確認:
+
+```powershell
+where atc
+```
+
+対処:
+
+- Windows の場合、`C:\Users\<ユーザー名>\AppData\Local\Python\...\Scripts` を PATH に追加
+- 仮想環境を使っている場合は `.venv\Scripts\Activate.ps1` を実行
+- PATH 変更後はターミナルや VS Code を開き直す
+
+### `oj` が見つからない
+
+確認:
+
+```bash
+oj --version
+```
+
+対処:
+
+```bash
+python -m pip install online-judge-tools
+```
+
+仮想環境を使っている場合は、仮想環境を有効化した状態で実行してください。
+
+### テストケース取得に失敗する
+
+原因候補:
+
+- contest ID が間違っている
+- URL 形式が非対応
+- online-judge-tools が未ログイン
+- ネットワークエラー
+- AtCoder 側のページ構成変更
+- Python / pip 環境に `oj` が入っていない
+
+対処:
+
+```bash
+oj login https://atcoder.jp/
+```
+
+手動で `oj d <URL>` を試します。
+
+```bash
+oj d https://atcoder.jp/contests/abc413/tasks/abc413_a -d tests/A
+```
+
+現在の CLI は `oj` のダウンロード失敗時に `failed` と表示します。詳細原因を見たい場合は、まず手動で `oj d` を実行してください。
+
+### `g++` が見つからない
+
+確認:
+
+```powershell
+where g++
+```
+
+Windows:
+
+- MSYS2 UCRT64 をインストール
+- `C:\msys64\ucrt64\bin` を PATH に追加
+- ターミナルを開き直す
+
+macOS:
+
+```bash
+xcode-select --install
+g++ --version
+```
+
+Linux:
+
+```bash
+sudo apt install build-essential
+g++ --version
+```
+
+### `#include <bits/stdc++.h>` に VS Code で赤波線が出る
+
+原因:
+
+- VS Code C/C++ 拡張が g++ の includePath を認識していない
+
+対処例:
+
+- `compilerPath` を `C:/msys64/ucrt64/bin/g++.exe` に設定
+- `intelliSenseMode` を `windows-gcc-x64` に設定
+
+`.vscode/c_cpp_properties.json` の例:
+
+```json
+{
+  "configurations": [
+    {
+      "name": "Win32",
+      "compilerPath": "C:/msys64/ucrt64/bin/g++.exe",
+      "intelliSenseMode": "windows-gcc-x64",
+      "cppStandard": "c++20"
+    }
+  ],
+  "version": 4
+}
+```
+
+このファイルの自動生成は現時点では未対応です。
+
+### VS Code 拡張機能が動かない
+
+確認:
+
+- 拡張機能がインストールされているか
+- VS Code を Reload したか
+- `D:\atcoder` など AtCoder ルートを VS Code で開いているか
+- `.atc/current-contest.json` がワークスペース直下、または拡張機能が探索する場所に作られているか
+- `AtC: Open Contest Terminals` がコマンドパレットに出るか
+
+インストール確認:
+
+```powershell
+code --list-extensions --show-versions | findstr atc-helper
+```
+
+期待例:
+
+```text
+kouki.atc-helper@0.0.1
+```
+
+### VS Code 拡張機能を更新したのに反映されない
+
+対処:
+
+```powershell
+cd vscode/atc-helper
+npm run compile
+npx @vscode/vsce package --allow-missing-repository
+```
+
+その後:
+
+- Extensions → ... → Install from VSIX...
+- Developer: Reload Window
+
+コマンドで入れ直す場合:
+
+```powershell
+code --install-extension .\atc-helper-0.0.1.vsix --force
+```
+
+### `atc contest` で VS Code が反応しない
+
+確認:
+
+- VS Code 拡張機能がインストール済みか
+- VS Code で AtCoder ルートを開いているか
+- `atc contest` 実行後に `.atc/current-contest.json` の `requestId` が更新されているか
+- VS Code を Reload したか
+
+`atc contest` は VS Code の `code` コマンドを直接起動しません。CLI が `.atc/current-contest.json` を更新し、VS Code 拡張機能がそれを監視して反応します。
+
+## 📝 使用例
+
+### 新しいABCを始める
+
+```powershell
+cd "D:\atcoder\ABC(Atcoder Beginner Contest)"
+atc contest abc413 cpp
+```
+
+期待される動作:
+
+- `abc413/` が無ければ作成
+- `A.cpp` から `E.cpp` を作成
+- サンプル取得
+- `D:\atcoder\.atc\current-contest.json` を更新
+- VS Code 拡張が分割ターミナルを開く
+- 左が手動用
+- 右が `atc watch` 用
+
+### 既存コンテストを開く
+
+```powershell
+cd "D:\atcoder\ABC(Atcoder Beginner Contest)"
+atc contest abc413 cpp
+```
+
+期待される動作:
+
+- `abc413/` が既に存在する場合、作成とサンプル取得はスキップ
+- `.atc/current-contest.json` だけ更新
+- VS Code 拡張が変更を検知
+- ターミナル分割だけ起動
+
+表示例:
+
+```text
+abc413 already exists. Skip creation and sample download.
+current contest saved: D:\atcoder\.atc\current-contest.json
+```
+
+### 純粋に新規作成だけ行う
+
+```powershell
+cd "D:\atcoder\ABC(Atcoder Beginner Contest)"
+atc new abc413 py
+```
+
+期待される動作:
+
+- `abc413/` を作成
+- `A.py` から `E.py` を作成
+- サンプル取得
+- VS Code 拡張機能用の `current-contest.json` は更新しない
+
+### 手動でテストする
+
+```powershell
+cd abc413
+atc t A
+```
+
+`A.cpp` があれば C++、なければ `A.py` を実行します。
+
+### 全問題をテストする
+
+```powershell
+atc run all
+```
+
+検出できる問題をまとめて実行し、結果を要約表示します。
+
+### 失敗したテストケースだけ再実行する
+
+```powershell
+atc rerun
+```
+
+`.atc/test-runs/last_failed.txt` に保存された失敗ケースだけを再実行します。
+
+### watch モード中のワークフロー
+
+```powershell
+atc watch
+```
+
+動作:
+
+- 起動時に一度テストを実行
+- ファイル保存を検知
+- 対象問題だけ自動実行
+- `.atc/test-runs/last.log` にログ保存
+- `.atc/test-runs/last_failed.txt` に失敗ケース保存
+- `Ctrl+C` で終了
+
+特定問題だけ監視:
+
+```powershell
 atc watch A
 ```
+
+PyPy で実行:
+
+```powershell
+atc watch A pypy
+```
+
+### 手動で問題ファイルを追加する
+
+```powershell
+atc manual A B C py
+```
+
+範囲指定:
+
+```powershell
+atc manual A~E cpp
+atc manual A-E py
+```
+
+### 現在のフォルダ名でサンプルだけ取得する
+
+```powershell
+cd abc413
+atc manual tests
+```
+
+現在のフォルダ名 `abc413` を contest ID として、A-E のサンプルを取得します。
+
+## 🏗️ プロジェクト構造
+
+実際の主な構成:
+
+```text
+.
+├── atc/
+│   ├── cli.py
+│   └── templates/
+│       ├── template.py
+│       └── template.cpp
+├── vscode/
+│   └── atc-helper/
+│       ├── package.json
+│       ├── tsconfig.json
+│       ├── README.md
+│       ├── out/
+│       │   └── extension.js
+│       └── src/
+│           └── extension.ts
+├── .atc/
+│   ├── current-contest.json
+│   └── test-runs/
+│       ├── last.log
+│       └── last_failed.txt
+├── pyproject.toml
+└── README.md
+```
+
+各ディレクトリの役割:
+
+- `atc/`: Python CLI 本体
+- `atc/cli.py`: `atc` コマンドの実装
+- `atc/templates/`: 新規問題ファイルの雛形
+- `vscode/atc-helper/`: VS Code 拡張機能
+- `vscode/atc-helper/src/extension.ts`: 拡張機能の TypeScript ソース
+- `vscode/atc-helper/out/extension.js`: コンパイル後の拡張機能本体
+- `.atc/`: 実行時に生成される作業ディレクトリ
+- `.atc/current-contest.json`: CLI と VS Code 拡張機能の連携用ファイル
+- `.atc/test-runs/`: テストログ保存用
+
+`.atc/` はリポジトリ直下だけでなく、コンテストフォルダ内や AtCoder ルート直下に作られることがあります。`atc contest` は AtCoder ルートを推定し、可能な場合は `D:\atcoder\.atc\current-contest.json` のようにルート直下へ書き込みます。
+
+## 📄 ライセンス
+
+現時点ではリポジトリの LICENSE ファイルは未設定です。
+
+個人利用の範囲ならこのままでも使えますが、公開や再配布を考える場合は MIT License などの明示的なライセンス設定を推奨します。
+
+使用している外部ツール:
+
+- online-judge-tools
+- VS Code API
+- TypeScript
+- @vscode/vsce
+
+外部ツールのライセンスは各プロジェクトに従います。
+
+## 🤝 貢献ガイド
+
+現時点では個人用ツールとして開発していますが、改善提案や修正は歓迎です。
+
+### バグ報告
+
+バグ報告では、次の情報があると調査しやすくなります。
+
+- OS
+- Python バージョン
+- `atc` の実行コマンド
+- エラーメッセージ
+- コンテスト ID
+- Python / C++ どちらを使っているか
+- VS Code 拡張機能の有無
+
+### 新機能提案
+
+新機能提案では、次を説明してください。
+
+- 何をしたいか
+- どのコマンドに追加したいか
+- 既存機能との違い
+- 手作業では何が面倒か
+
+### プルリクエスト
+
+作業ブランチ例:
+
+```bash
+git switch -c feature/your-feature-name
+```
+
+PR 前に確認すること:
+
+- Python CLI の対象コマンドを実行する
+- VS Code 拡張機能を変更した場合は `npm run compile` を実行する
+- VSIX インストールが必要な変更なら、`npx @vscode/vsce package --allow-missing-repository` でパッケージできるか確認する
+- Python CLI と VS Code 拡張機能は別々に確認する
+
+## ⚡ パフォーマンス情報
+
+watch モードはポーリング方式です。
+
+現在の設定:
+
+```python
+WATCH_POLL_SECONDS = 0.25
+WATCH_DEBOUNCE_SECONDS = 1.5
+```
+
+意味:
+
+- 0.25 秒ごとに対象ファイルの更新状態を確認
+- 変更後すぐには実行せず、1.5 秒待ってからテスト実行
+- 連続保存や生成途中のファイルに対する過剰実行を減らす
+
+メモリ使用量は通常小さいですが、巨大な `tests/` ディレクトリでは監視対象が増えるため、多少増える可能性があります。
+
+テスト実行時間は以下に依存します。
+
+- 提出コードの実行時間
+- Python / PyPy / C++ の違い
+- テストケース数
+- C++ のコンパイル時間
+
+最大対応ファイルサイズは明示的には設けていません。ただし、巨大な入力・出力ファイルを大量に置く使い方は非推奨です。
+
+## 🔗 関連リンク
+
+- AtCoder 公式サイト: https://atcoder.jp/
+- online-judge-tools: https://github.com/online-judge-tools/oj
+- VS Code: https://code.visualstudio.com/
+- VS Code Extension API: https://code.visualstudio.com/api
+- MSYS2: https://www.msys2.org/
+
+VS Code Marketplace について:
+
+- 現在は未公開です
+- ローカル VSIX インストールで利用してください
+
+## ❓ FAQ
+
+### Q. 複数コンテストを並行できますか？
+
+フォルダを分ければ可能です。
+
+ただし、VS Code 拡張機能が見る `current-contest.json` は基本的に1つです。`atc contest` を最後に実行したコンテストがアクティブになります。
+
+### Q. テンプレートはどう変えますか？
+
+以下を編集してください。
+
+```text
+atc/templates/template.py
+atc/templates/template.cpp
+```
+
+コマンドラインから別テンプレートを指定する機能は、現時点では未対応です。
+
+### Q. C++ のコンパイルオプションはどこで変えますか？
+
+現在は `atc/cli.py` 内の `g++` 呼び出し部分です。
+
+現在の例:
+
+```text
+g++ -O2 A.cpp -o _A.exe
+```
+
+将来的には設定ファイル化する予定です。必要に応じて `-std=c++20`, `-Wall`, `-Wextra` などを追加してください。
+
+### Q. Python のバージョンを切り替えたいです
+
+仮想環境を使ってください。
+
+```bash
+python -m venv .venv
+```
+
+Windows:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+macOS / Linux:
+
+```bash
+source .venv/bin/activate
+```
+
+PyPy を使う場合:
+
+```bash
+atc run A pypy
+```
+
+### Q. `atc contest` と `atc new` の違いは？
+
+`atc new` は純粋な新規作成コマンドです。
+
+- フォルダ作成
+- テンプレート作成
+- サンプル取得
+
+`atc contest` は「なければ作る、あればアクティブ化する」コマンドです。
+
+- フォルダがなければ `cmd_new` 相当を実行
+- 既にあれば作成とサンプル取得をスキップ
+- `.atc/current-contest.json` を更新
+- VS Code 拡張機能が監視していれば分割ターミナルを開く
+
+### Q. VS Code を開いた瞬間にターミナルが開きますか？
+
+開きません。
+
+VS Code 拡張機能は起動時に `current-contest.json` の監視を登録しますが、既存ファイルを読んで即座にターミナルを開く挙動にはしていません。ターミナルが開くのは、`atc contest` によって `current-contest.json` が更新された時、または `AtC: Open Contest Terminals` を手動実行した時です。
+
+### Q. `atc watch A cpp` は使えますか？
+
+現時点では `watch` の `cpp` 引数は未対応です。
+
+ただし `A.cpp` が存在する場合、実行時には C++ が自動的に優先されます。`atc watch A` を使ってください。
+
+## 📊 サポート情報
+
+Issue トラッカー:
+
+- GitHub 未公開の場合は未設定
+
+メンテナー:
+
+- 個人メンテナンス
+
+開発状況:
+
+- アクティブ開発中
+- 破壊的変更の可能性あり
+
+サポート対象:
+
+- Windows
+- macOS
+- Linux
+
+主な検証環境:
+
+- Windows
+- VS Code
+- MSYS2 UCRT64
+- Python 3.x
+
+macOS / Linux でも動作する想定ですが、特に Windows + VS Code + MSYS2 UCRT64 を主な検証環境としています。
