@@ -105,6 +105,7 @@ def _download_samples(contest: str, problem_char: str, dst_dir: Path):
 def usage():
     print("使い方:")
     print("  atc new abc413 [py|cpp]  (デフォルトは cpp)")
+    print("  atc contest abc413 [py|cpp]")
     print("  atc run A [python|pypy]")
     print("  atc run all [python|pypy]")
     print("  atc rerun [python|pypy]")
@@ -559,7 +560,7 @@ def main():
     if len(sys.argv) < 2: usage()
     cmd = sys.argv[1]
 
-    if cmd == "new" and len(sys.argv) >= 3:
+    if cmd in ["new", "contest", "contests"] and len(sys.argv) >= 3:
         lang = sys.argv[3] if len(sys.argv) == 4 else "cpp"
         cmd_new(sys.argv[2], lang)
     elif cmd in ["run", "r", "test", "t"] and len(sys.argv) >= 3:
