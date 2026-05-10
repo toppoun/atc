@@ -229,7 +229,7 @@ async function openContestTerminalsFromCurrentContestOrInput() {
     if (!contestDir) {
         const input = await vscode.window.showInputBox({
             prompt: "contestDir",
-            placeHolder: "abc336 or D:\\atcoder\\ABC(Atcoder Beginner Contest)\\abc336",
+            placeHolder: "abc336 or path/to/abc336",
             ignoreFocusOut: true
         });
         const contestDirInput = input?.trim();

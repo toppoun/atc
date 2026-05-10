@@ -135,10 +135,10 @@ python -m pip install online-judge-tools
 
 ### C++ を使う場合の g++ 環境
 
-この CLI は `A.cpp` などが存在する場合、`g++` でコンパイルしてからテストします。現在のコンパイルコマンドは CLI 内で固定されており、概ね次の形です。
+この CLI は `A.cpp` などが存在する場合、`g++` でコンパイルしてからテストします。コンパイラやオプションは `config.toml` の `[runner]` で変更できます。デフォルトは概ね次の形です。
 
 ```bash
-g++ -O2 A.cpp -o _A.exe
+g++ -std=c++20 -O2 -Wall -Wextra A.cpp -o _A.exe
 ```
 
 Windows では MSYS2 UCRT64 を推奨します。
@@ -186,17 +186,93 @@ atc/templates/template.cpp
 
 CLI 内ではパッケージ内の `templates/template.py` / `templates/template.cpp` として読み込まれます。内容を変えたい場合は、上記ファイルを直接編集してください。
 
+`.atc/config.toml` または `~/.atc/config.toml` がある場合は、`[templates]` の `py` / `cpp` でテンプレートパスを指定できます。相対パスは config の場所や project root から解決されます。
+
 テンプレートが存在しない場合は、警告を表示し、空ファイルを作成します。
 
 ```text
 Warning: ... が見つかりません。空ファイルを作成します。
 ```
 
-カスタムテンプレートをコマンドラインオプションで指定する機能は、現時点では未対応です。
+カスタムテンプレートをコマンドラインオプションで指定する機能は、現時点では未対応です。config の `[templates]` を使ってください。
 
 ### 初期設定ファイル
 
-現時点では専用の初期設定ファイルはありません。
+TOML 形式の設定ファイル `config.toml` に対応しています。
+
+探索順:
+
+1. カレントディレクトリから親方向に `.atc/config.toml` を探す
+2. 見つからなければ `~/.atc/config.toml` を探す
+3. それも無ければデフォルト設定を使う
+
+設定ファイルを作成する場合:
+
+```bash
+atc config init
+```
+
+現在読み込まれている設定を確認する場合:
+
+```bash
+atc config show
+```
+
+現在、設定ファイルは以下に使われます。
+
+- `atc config show`: 読み込まれている設定の確認
+- `atc config init`: カレントディレクトリへの `.atc/config.toml` 初期生成
+- `atc contest abcxxx`: `paths.root` と `paths.abc` を使って作成・利用するディレクトリを決定
+- `atc contest arcxxx`: `paths.root` と `paths.arc` を使って作成・利用するディレクトリを決定
+- `atc contest agcxxx`: `paths.root` と `paths.agc` を使って作成・利用するディレクトリを決定
+- `.atc/current-contest.json`: `paths.root` が設定されている場合は `paths.root/.atc/current-contest.json` に保存
+- `[templates]`: `atc new`, `atc contest`, `atc manual` で作成するファイルのテンプレート
+- `[defaults].language`: `py` / `cpp` を省略した時の作成言語
+- `[defaults].problems`: `atc new`, `atc contest`, `atc manual tests`, `atc run all`, `atc watch` の対象問題一覧
+
+`atc contest` の作成・利用先は次のように決まります。
+
+- `paths.root` が空の場合、現在のカレントディレクトリ直下を使う
+- `paths.root` が設定されていて、contest ID が `abc数字` / `arc数字` / `agc数字` 形式の場合、`paths.abc` / `paths.arc` / `paths.agc` に自動振り分けする
+- `config.toml` はデフォルト設定とマージされるため、`abc` / `arc` / `agc` を書かなくてもデフォルトのカテゴリ名が使われる
+- 自動振り分けを無効化したい場合は、該当カテゴリを空文字にする
+
+例:
+
+```toml
+[paths]
+root = "D:/atcoder"
+abc = ""
+```
+
+この場合、`atc contest abc335 py` は `D:/atcoder/ABC(Atcoder Beginner Contest)/abc335` ではなく、現在のカレントディレクトリ直下の `abc335/` を使います。
+
+`runner` の設定値は実行処理に反映されます。`python`, `pypy`, `cpp_compiler`, `cpp_flags`, `timeout_seconds` を変更できます。
+
+設定例:
+
+```toml
+[paths]
+root = ""
+abc = "ABC(Atcoder Beginner Contest)"
+arc = "ARC(Atcoder Regular Contest)"
+agc = "AGC(Atcoder Grand Contest)"
+
+[templates]
+py = "templates/template.py"
+cpp = "templates/template.cpp"
+
+[defaults]
+language = "cpp"
+problems = ["A", "B", "C", "D", "E"]
+
+[runner]
+python = "python"
+pypy = "pypy"
+cpp_compiler = "g++"
+cpp_flags = ["-std=c++20", "-O2", "-Wall", "-Wextra"]
+timeout_seconds = 2.0
+```
 
 ただし、watch の再実行対象判定では以下のような設定ファイルの変更を検知します。
 
@@ -248,6 +324,45 @@ vscode/atc-helper/
 - 変更を検知したら、今開いている VS Code ワークスペース内で分割ターミナルを開く
 - 左側: `atc terminal`
 - 右側: `atc watch`
+
+### ディレクトリ構造について
+
+特定のディレクトリ構造は必須ではありません。`ABC(Atcoder Beginner Contest)` のようなカテゴリフォルダが無い環境でも利用できます。
+
+`atc contest abc335 py` は、`paths.root` が未設定なら現在のカレントディレクトリを基準に `abc335/` を作成または利用します。
+
+`paths.root` が設定されていて contest ID が `abc数字` の場合は、`paths.root / paths.abc / abc335` を使います。`arc数字` と `agc数字` も同様に `paths.arc`, `paths.agc` を使います。`abc` / `arc` / `agc` はデフォルト値を持つため、config に明示しなくても自動振り分けされます。
+
+自動振り分けを無効化したい場合は、該当カテゴリを空文字にしてください。
+
+```toml
+[paths]
+root = "D:/atcoder"
+abc = ""
+```
+
+この場合、`abc335` は現在のカレントディレクトリ直下に作成されます。
+
+例:
+
+```text
+atcoder/
+└── abc335/
+```
+
+```text
+atcoder/
+└── ABC/
+    └── abc335/
+```
+
+```text
+competitive/
+└── atcoder/
+    └── abc335/
+```
+
+`.atc/current-contest.json` の保存先 root は、`paths.root` が設定されている場合はその場所になります。未設定の場合は、現在地から親方向に `.git`, `.vscode`, `pyproject.toml` を探して推定します。見つからない場合は現在のディレクトリを root とします。`ABC(Atcoder Beginner Contest)` などのカテゴリ名は後方互換の fallback として扱いますが、必須条件ではありません。
 
 #### ローカル VSIX インストール
 
@@ -318,7 +433,7 @@ code --install-extension .\atc-helper-0.0.1.vsix --force
 PROBLEMS = ["A", "B", "C", "D", "E"]
 ```
 
-`atc/cli.py` の `PROBLEMS` を変更すれば、作成・取得・watch 対象の問題数を変えられます。
+通常は `.atc/config.toml` の `[defaults].problems` を変更すれば、作成・取得・watch 対象の問題数を変えられます。config が無い場合は、CLI 内のデフォルト値として `PROBLEMS` が使われます。
 
 サンプル取得時の URL は、現在は次の形式に依存しています。
 
@@ -334,26 +449,28 @@ https://atcoder.jp/contests/abc413/tasks/abc413_a
 
 そのため、ADT、鉄則本、特殊な練習コンテストなど、URL 形式が異なるものは制限がある可能性があります。サンプル取得は `online-judge-tools` に依存しており、AtCoder 側のページ構成変更やログイン状態、ネットワーク状態の影響を受けます。
 
-問題レベル自体に制限はありませんが、標準では A-E だけを対象にします。F 以降を扱う場合は `PROBLEMS` の変更や手動作成を検討してください。
+問題レベル自体に制限はありませんが、標準では A-E だけを対象にします。F 以降を扱う場合は `[defaults].problems` を変更してください。
 
 ## ⚙️ コマンドの詳細オプション
 
 | コマンド | 説明 | 備考 |
 | - | - | - |
-| `atc new abc413 [py|cpp]` | `abc413/` を作成し、A-E の問題ファイルとサンプルを作成 | 既存フォルダでも `cmd_new` は走るため、サンプル取得を再試行します |
-| `atc contest abc413 [py|cpp]` | なければ作成、あれば作成とサンプル取得をスキップし、`.atc/current-contest.json` を更新 | VS Code 拡張機能連携用 |
+| `atc new abc413 [py|cpp]` | `abc413/` を作成し、設定された問題ファイルとサンプルを作成 | 既存フォルダでも `cmd_new` は走るため、サンプル取得を再試行します |
+| `atc contest abc413 [py|cpp]` | なければ作成、あれば作成とサンプル取得をスキップし、`.atc/current-contest.json` を更新 | `paths.root` があれば `abc` / `arc` / `agc` を自動振り分け |
 | `atc contests abc413 [py|cpp]` | `atc contest` と同じ | 複数形エイリアス |
-| `atc run A [python|pypy|cpp]` | A 問題を詳細表示付きでテスト | `cpp` の明示指定は現時点では未対応。`A.cpp` があれば C++ が優先されます |
-| `atc r A [python|pypy|cpp]` | `atc run A` の短縮 | `cpp` の明示指定は現時点では未対応 |
-| `atc test A [python|pypy|cpp]` | `atc run A` のエイリアス | `A.cpp` があれば C++ が優先されます |
-| `atc t A [python|pypy|cpp]` | `atc run A` の短縮エイリアス | よく使う短縮形。`cpp` の明示指定は現時点では未対応 |
-| `atc run all [python|pypy|cpp]` | 検出できる全問題をまとめてテスト | `cpp` の明示指定は現時点では未対応。C++ ソースがあれば自動的に C++ 優先 |
-| `atc rerun [python|pypy|cpp]` | 直前に失敗したケースだけ再実行 | `.atc/test-runs/last_failed.txt` を使用。`cpp` の明示指定は現時点では未対応 |
+| `atc config show` | 現在読み込まれる設定を表示 | `.atc/config.toml`、ホーム設定、デフォルトの順で解決 |
+| `atc config init` | カレントディレクトリに `.atc/config.toml` を作成 | 既に存在する場合は上書きしません |
+| `atc run A [python|pypy|cpp]` | A 問題を詳細表示付きでテスト | 省略時は `[defaults].language`。指定言語のファイルが無い場合だけ別言語に fallback |
+| `atc r A [python|pypy|cpp]` | `atc run A` の短縮 | 同上 |
+| `atc test A [python|pypy|cpp]` | `atc run A` のエイリアス | 同上 |
+| `atc t A [python|pypy|cpp]` | `atc run A` の短縮エイリアス | よく使う短縮形 |
+| `atc run all [python|pypy|cpp]` | 検出できる全問題をまとめてテスト | 省略時は `[defaults].language` |
+| `atc rerun [python|pypy|cpp]` | 直前に失敗したケースだけ再実行 | `.atc/test-runs/last_failed.txt` を使用 |
 | `atc retry [python|pypy|cpp]` | `atc rerun` のエイリアス | 同上 |
-| `atc watch [A] [python|pypy|cpp]` | ファイル変更を監視して自動テスト | `cpp` 引数は現時点では未対応。C++ ソースがあれば自動的に C++ 優先 |
-| `atc manual A B C [py|cpp]` | 現在のフォルダに指定問題ファイルを作成 | デフォルトは `cpp` |
+| `atc watch [A] [python|pypy|cpp]` | ファイル変更を監視して自動テスト | 省略時は `[defaults].language` |
+| `atc manual A B C [py|cpp]` | 現在のフォルダに指定問題ファイルを作成 | デフォルトは `[defaults].language`、未設定なら `cpp` |
 | `atc manual A~E [py|cpp]` | 範囲指定で問題ファイルを作成 | `A-E` 形式も使用可能 |
-| `atc manual tests` | 現在のフォルダ名を contest ID としてサンプル取得 | A-E が対象 |
+| `atc manual tests` | 現在のフォルダ名を contest ID としてサンプル取得 | `[defaults].problems` が対象 |
 
 ### 言語指定
 
@@ -361,6 +478,8 @@ https://atcoder.jp/contests/abc413/tasks/abc413_a
 
 - `py`
 - `cpp`
+- 省略時は `[defaults].language`
+- config が無い場合の省略時デフォルトは `cpp`
 
 例:
 
@@ -373,22 +492,30 @@ atc contest abc413 cpp
 
 - `python`
 - `pypy`
-- C++ は `A.cpp` などが存在すると自動的に優先
+- `cpp`
+- 省略時は `[defaults].language`
+- 指定言語のファイルが無い場合だけ、存在する別言語に fallback
 
 例:
 
 ```bash
 atc run A
 atc run A pypy
+atc run A cpp
 ```
 
 現時点では `--lang python` のようなフラグ形式は未対応です。位置引数で指定してください。
 
 ### C++ 実行について
 
-現在の実装では、同じ問題に `A.py` と `A.cpp` がある場合、`A.cpp` が優先されます。
+同じ問題に `A.py` と `A.cpp` がある場合、実行言語の指定が優先されます。
 
-つまり、`atc run A cpp` のような明示的な `cpp` 指定は未対応ですが、`A.cpp` があれば C++ としてコンパイル・実行されます。
+- `atc t A python`: `A.py`
+- `atc t A pypy`: `A.py`
+- `atc t A cpp`: `A.cpp`
+- `atc t A`: `[defaults].language`
+
+指定した言語のファイルが無い場合だけ、存在する別言語に fallback します。
 
 ### 未対応のオプション
 
@@ -396,11 +523,9 @@ atc run A pypy
 
 - `--lang python` のようなフラグ形式
 - コマンドラインからのカスタムテンプレート指定
-- タイムアウト設定
-- C++ コンパイルオプションの設定ファイル化
-- 問題数や対象コンテスト形式の設定ファイル化
+- ABC / ARC / AGC 以外の contest ID のカテゴリ自動振り分け
 
-テンプレートを変える場合は `atc/templates/template.py` と `atc/templates/template.cpp` を直接編集してください。
+テンプレートを変える場合は `[templates]` を設定するか、`atc/templates/template.py` と `atc/templates/template.cpp` を直接編集してください。
 
 ## 📋 トラブルシューティング
 
@@ -462,7 +587,7 @@ oj login https://atcoder.jp/
 oj d https://atcoder.jp/contests/abc413/tasks/abc413_a -d tests/A
 ```
 
-現在の CLI は `oj` のダウンロード失敗時に `failed` と表示します。詳細原因を見たい場合は、まず手動で `oj d` を実行してください。
+現在の CLI は `oj` のダウンロード失敗時に `failed` と reason を表示します。さらに詳しく見たい場合は、手動で `oj d` を実行してください。
 
 ### `g++` が見つからない
 
@@ -527,7 +652,7 @@ g++ --version
 
 - 拡張機能がインストールされているか
 - VS Code を Reload したか
-- `D:\atcoder` など AtCoder ルートを VS Code で開いているか
+- AtCoder 用の root ディレクトリ、または `.atc/current-contest.json` が置かれる root ディレクトリを VS Code で開いているか
 - `.atc/current-contest.json` がワークスペース直下、または拡張機能が探索する場所に作られているか
 - `AtC: Open Contest Terminals` がコマンドパレットに出るか
 
@@ -569,7 +694,7 @@ code --install-extension .\atc-helper-0.0.1.vsix --force
 確認:
 
 - VS Code 拡張機能がインストール済みか
-- VS Code で AtCoder ルートを開いているか
+- VS Code で `paths.root`、または `.atc/current-contest.json` が作られる project root を開いているか
 - `atc contest` 実行後に `.atc/current-contest.json` の `requestId` が更新されているか
 - VS Code を Reload したか
 
@@ -580,16 +705,18 @@ code --install-extension .\atc-helper-0.0.1.vsix --force
 ### 新しいABCを始める
 
 ```powershell
-cd "D:\atcoder\ABC(Atcoder Beginner Contest)"
+cd "<atcoder-root>"
 atc contest abc413 cpp
 ```
 
 期待される動作:
 
-- `abc413/` が無ければ作成
+- `paths.root` が設定済みなら、`abc413/` は `paths.root / paths.abc` 配下に作成
+- `paths.root` が空なら、現在のディレクトリ直下に `abc413/` を作成
 - `A.cpp` から `E.cpp` を作成
 - サンプル取得
-- `D:\atcoder\.atc\current-contest.json` を更新
+- `paths.root` が設定済みなら `<paths.root>\.atc\current-contest.json` を更新
+- 未設定なら `<project-root>\.atc\current-contest.json` を更新
 - VS Code 拡張が分割ターミナルを開く
 - 左が手動用
 - 右が `atc watch` 用
@@ -597,7 +724,7 @@ atc contest abc413 cpp
 ### 既存コンテストを開く
 
 ```powershell
-cd "D:\atcoder\ABC(Atcoder Beginner Contest)"
+cd "<atcoder-root>"
 atc contest abc413 cpp
 ```
 
@@ -612,13 +739,13 @@ atc contest abc413 cpp
 
 ```text
 abc413 already exists. Skip creation and sample download.
-current contest saved: D:\atcoder\.atc\current-contest.json
+current contest saved: <project-root>\.atc\current-contest.json
 ```
 
 ### 純粋に新規作成だけ行う
 
 ```powershell
-cd "D:\atcoder\ABC(Atcoder Beginner Contest)"
+cd "<atcoder-root>"
 atc new abc413 py
 ```
 
@@ -701,7 +828,7 @@ cd abc413
 atc manual tests
 ```
 
-現在のフォルダ名 `abc413` を contest ID として、A-E のサンプルを取得します。
+現在のフォルダ名 `abc413` を contest ID として、`[defaults].problems` のサンプルを取得します。config が無い場合は A-E が対象です。
 
 ## 🏗️ プロジェクト構造
 
@@ -744,7 +871,7 @@ atc manual tests
 - `.atc/current-contest.json`: CLI と VS Code 拡張機能の連携用ファイル
 - `.atc/test-runs/`: テストログ保存用
 
-`.atc/` はリポジトリ直下だけでなく、コンテストフォルダ内や AtCoder ルート直下に作られることがあります。`atc contest` は AtCoder ルートを推定し、可能な場合は `D:\atcoder\.atc\current-contest.json` のようにルート直下へ書き込みます。
+`.atc/` は config や project root 推定結果に応じて作られます。`paths.root` が設定されている場合、`atc contest` は `paths.root/.atc/current-contest.json` に書き込みます。未設定の場合は現在地から親方向に `.git`, `.vscode`, `pyproject.toml` を探し、見つかった root の `.atc/current-contest.json` に書き込みます。特定のカテゴリフォルダ名は必須ではありません。
 
 ## 📄 ライセンス
 
@@ -852,7 +979,15 @@ VS Code Marketplace について:
 
 ### Q. テンプレートはどう変えますか？
 
-以下を編集してください。
+config を使う場合は `[templates]` を設定してください。
+
+```toml
+[templates]
+py = "templates/template.py"
+cpp = "templates/template.cpp"
+```
+
+config を使わない場合は、以下を編集してください。
 
 ```text
 atc/templates/template.py
@@ -863,15 +998,14 @@ atc/templates/template.cpp
 
 ### Q. C++ のコンパイルオプションはどこで変えますか？
 
-現在は `atc/cli.py` 内の `g++` 呼び出し部分です。
+`config.toml` の `[runner]` で変更できます。
 
-現在の例:
-
-```text
-g++ -O2 A.cpp -o _A.exe
+```toml
+[runner]
+cpp_compiler = "g++"
+cpp_flags = ["-std=c++20", "-O2", "-Wall", "-Wextra"]
+timeout_seconds = 2.0
 ```
-
-将来的には設定ファイル化する予定です。必要に応じて `-std=c++20`, `-Wall`, `-Wextra` などを追加してください。
 
 ### Q. Python のバージョンを切り替えたいです
 
@@ -922,9 +1056,7 @@ VS Code 拡張機能は起動時に `current-contest.json` の監視を登録し
 
 ### Q. `atc watch A cpp` は使えますか？
 
-現時点では `watch` の `cpp` 引数は未対応です。
-
-ただし `A.cpp` が存在する場合、実行時には C++ が自動的に優先されます。`atc watch A` を使ってください。
+使えます。`atc watch A cpp` は `A.cpp` を使います。省略時は `[defaults].language` が使われます。
 
 ## 📊 サポート情報
 

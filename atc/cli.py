@@ -4,10 +4,17 @@ import subprocess
 import shutil
 import time
 import platform
+import copy
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Set
+
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 # ===== 設定 =====
 PROBLEMS = ["A", "B", "C", "D", "E"]
@@ -26,11 +33,17 @@ CONFIG_FILES = {
     "Makefile",
     "CMakeLists.txt",
 }
-CATEGORY_DIRS = {
+LEGACY_ATCODER_CATEGORY_DIRS = {
     "ABC(Atcoder Beginner Contest)",
     "ARC(Atcoder Regular Contest)",
     "AGC(Atcoder Grand Contest)",
+    "ABS(Atcoder Beginner Selection)",
+    "ALPC(AtCoder Library Practice Contest)",
+    "EDPC",
+    "typical90",
+    "tessoku-book",
 }
+CONFIG_FILE_NAME = "config.toml"
 
 # =================
 RED    = "\033[31m"
@@ -82,9 +95,9 @@ def detect_pypy():
             return path
     return None
 
-def load_template(ext: str):
-    """templates/template.{ext} を読み込む。存在しない場合は空文字を返す"""
-    template_file = TEMPLATE_DIR / f"template.{ext}"
+def load_template(ext: str, config: Optional[dict] = None, start: Optional[Path] = None):
+    """Read a template file. If config exists, resolve [templates] from it."""
+    template_file = _resolve_template_file(ext, config, start)
     if template_file.exists():
         return template_file.read_text(encoding="utf-8")
     else:
@@ -95,40 +108,67 @@ def _download_samples(contest: str, problem_char: str, dst_dir: Path):
     tmp = dst_dir.parent / f".oj_tmp_{problem_char}"
     url = f"https://atcoder.jp/contests/{contest}/tasks/{contest}_{problem_char.lower()}"
     shutil.rmtree(tmp, ignore_errors=True)
+
+    oj = shutil.which("oj")
+    if not oj:
+        return False, "oj command not found. Install online-judge-tools: python -m pip install online-judge-tools"
+
     try:
-        subprocess.run(["oj", "d", url, "-d", str(tmp)], check=True, capture_output=True, text=True)
-        if not tmp.exists(): return False
+        subprocess.run(
+            [oj, "d", url, "-d", str(tmp)],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if not tmp.exists():
+            return False, "oj finished but did not create a download directory"
         dst_dir.mkdir(parents=True, exist_ok=True)
         for f in tmp.iterdir(): shutil.move(str(f), dst_dir / f.name)
         shutil.rmtree(tmp, ignore_errors=True)
-        return True
-    except:
+        return True, ""
+    except subprocess.CalledProcessError as e:
         shutil.rmtree(tmp, ignore_errors=True)
-        return False
+        reason = (e.stderr or e.stdout or "").strip()
+        if not reason:
+            reason = f"oj exited with status {e.returncode}"
+        return False, reason
+    except OSError as e:
+        shutil.rmtree(tmp, ignore_errors=True)
+        return False, str(e)
 
 # ---------- usage ----------
 
 def usage():
     print("使い方:")
-    print("  atc new abc413 [py|cpp]  (デフォルトは cpp)")
+    print("  atc new abc413 [py|cpp]  (デフォルトは config の defaults.language、未設定なら cpp)")
     print("  atc contest abc413 [py|cpp]")
-    print("  atc run A [python|pypy]")
-    print("  atc run all [python|pypy]")
-    print("  atc rerun [python|pypy]")
-    print("  atc watch [A] [python|pypy]")
+    print("  atc config show")
+    print("  atc config init")
+    print("  atc run A [python|pypy|cpp]")
+    print("  atc run all [python|pypy|cpp]")
+    print("  atc rerun [python|pypy|cpp]")
+    print("  atc watch [A] [python|pypy|cpp]")
     print("  atc manual A B C")
     print("  atc manual tests  (現在のフォルダ名を contest_id としてサンプル取得)")
     sys.exit(1)
 
 # ---------- new ----------
-def cmd_new(contest: str, lang: str = "cpp"):
-    base = Path(contest)
+def cmd_new(contest: str, lang: Optional[str] = None):
+    config = load_config(Path.cwd())
+    lang = lang or _default_language(config)
+    _create_contest_files(contest, Path(contest), lang, config)
+
+def _create_contest_files(contest_id: str, base: Path, lang: str, config: Optional[dict] = None):
+    config = config or load_config(Path.cwd())
+    problems = _config_problems(config)
     tests = base / "tests"
-    base.mkdir(exist_ok=True)
+    base.mkdir(parents=True, exist_ok=True)
     
-    template_content = load_template(lang)
+    template_content = load_template(lang, config, Path.cwd())
     
-    for p in PROBLEMS:
+    for p in problems:
         # ファイル作成 (A.py または A.cpp)
         source_file = base / f"{p}.{lang}"
         if not source_file.exists():
@@ -136,16 +176,21 @@ def cmd_new(contest: str, lang: str = "cpp"):
 
         # サンプル取得
         print(f"fetching {p} ...", end=" ", flush=True)
-        if _download_samples(contest, p, tests / p):
+        ok, reason = _download_samples(contest_id, p, tests / p)
+        if ok:
             print(f"{GREEN}done{RESET}")
         else:
             print(f"{RED}failed{RESET}")
+            if reason:
+                print(f"  reason: {reason}")
 
-    print(f"\n{contest} ({lang}) ready.")
+    print(f"\n{contest_id} ({lang}) ready.")
 
 # ---------- contest ----------
-def cmd_contest(contest: str, lang: str = "cpp"):
-    contest_dir = Path(contest)
+def cmd_contest(contest: str, lang: Optional[str] = None):
+    config = load_config(Path.cwd())
+    lang = lang or _default_language(config)
+    contest_dir = _resolve_contest_dir(contest, config)
 
     if contest_dir.exists():
         if not contest_dir.is_dir():
@@ -153,22 +198,46 @@ def cmd_contest(contest: str, lang: str = "cpp"):
             sys.exit(1)
         print(f"{YELLOW}{contest_dir} already exists. Skip creation and sample download.{RESET}")
     else:
-        cmd_new(contest, lang)
+        _create_contest_files(contest, contest_dir, lang, config)
 
-    current_contest_file = _write_current_contest(contest_dir.resolve())
+    current_contest_file = _write_current_contest(contest_dir.resolve(), config)
     print(f"current contest saved: {current_contest_file}")
 
-def _write_current_contest(contest_dir: Path):
-    atcoder_root = _detect_atcoder_root(Path.cwd())
-    atc_dir = atcoder_root / ".atc"
-    atc_dir.mkdir(exist_ok=True)
+def _contest_category_key(contest: str) -> Optional[str]:
+    match = re.fullmatch(r"(abc|arc|agc)\d+", contest.lower())
+    return match.group(1) if match else None
+
+def _resolve_contest_dir(contest: str, config: dict):
+    contest_path = Path(contest)
+    if contest_path.is_absolute():
+        return contest_path
+
+    paths = config.get("paths", {})
+    root = str(paths.get("root") or "").strip()
+    category_key = _contest_category_key(contest)
+    category_dir = str(paths.get(category_key) or "").strip() if category_key else ""
+
+    if root and category_dir:
+        return Path(root).expanduser() / category_dir / contest
+
+    return contest_path
+
+def _config_root(config: dict) -> Optional[Path]:
+    root = str(config.get("paths", {}).get("root") or "").strip()
+    return Path(root).expanduser() if root else None
+
+def _write_current_contest(contest_dir: Path, config: Optional[dict] = None):
+    config = config or load_config(Path.cwd())
+    project_root = _find_project_root(Path.cwd(), config)
+    atc_dir = project_root / ".atc"
+    atc_dir.mkdir(parents=True, exist_ok=True)
 
     now = datetime.now().isoformat(timespec="milliseconds")
     current_contest_file = atc_dir / "current-contest.json"
     current_contest_file.write_text(
         json.dumps(
             {
-                "contestDir": str(contest_dir),
+                "contestDir": str(contest_dir.resolve()),
                 "requestId": now,
                 "createdAt": now,
             },
@@ -179,20 +248,265 @@ def _write_current_contest(contest_dir: Path):
     )
     return current_contest_file.resolve()
 
-def _detect_atcoder_root(cwd: Path):
-    current = cwd.resolve()
-    for path in [current, *current.parents]:
-        if path.name in CATEGORY_DIRS:
-            return path.parent
-        if any((path / category).is_dir() for category in CATEGORY_DIRS):
+def _find_project_root(start: Path, config: Optional[dict] = None):
+    """Find a project root without requiring a specific AtCoder folder layout."""
+    config = config or load_config(start)
+    config_root = _config_root(config)
+    if config_root:
+        return config_root
+
+    marker_candidate = None
+    category_parent_candidate = None
+
+    start = start.resolve()
+    home = Path.home().resolve()
+    for path in [start, *start.parents]:
+        if (path / ".git").exists():
             return path
-    return current
+
+        if marker_candidate is None and (
+            (path / "pyproject.toml").exists()
+            or ((path / ".vscode").exists() and path != home)
+        ):
+            marker_candidate = path
+
+        if path.name in LEGACY_ATCODER_CATEGORY_DIRS and category_parent_candidate is None:
+            category_parent_candidate = path.parent
+
+    if marker_candidate:
+        return marker_candidate
+    if category_parent_candidate:
+        return category_parent_candidate
+    return start
+
+# ---------- config ----------
+def _default_config() -> dict:
+    return {
+        "paths": {
+            "root": "",
+            "abc": "ABC(Atcoder Beginner Contest)",
+            "arc": "ARC(Atcoder Regular Contest)",
+            "agc": "AGC(Atcoder Grand Contest)",
+            "abs": "ABS(Atcoder Beginner Selection)",
+            "alpc": "ALPC(AtCoder Library Practice Contest)",
+            "edpc": "EDPC",
+            "tessoku": "tessoku-book",
+            "typical90": "typical90",
+        },
+        "templates": {
+            "py": "templates/template.py",
+            "cpp": "templates/template.cpp",
+        },
+        "defaults": {
+            "language": "cpp",
+            "problems": ["A", "B", "C", "D", "E"],
+        },
+        "runner": {
+            "python": "python",
+            "pypy": "pypy",
+            "cpp_compiler": "g++",
+            "cpp_flags": ["-std=c++20", "-O2", "-Wall", "-Wextra"],
+            "timeout_seconds": 2.0,
+        },
+    }
+
+def _find_config_file(start: Path) -> Optional[Path]:
+    current = start.resolve()
+    for path in [current, *current.parents]:
+        config_file = path / ".atc" / CONFIG_FILE_NAME
+        if config_file.exists():
+            return config_file
+
+    home_config = Path.home() / ".atc" / CONFIG_FILE_NAME
+    if home_config.exists():
+        return home_config
+
+    return None
+
+def _deep_merge_config(defaults: dict, overrides: dict) -> dict:
+    merged = copy.deepcopy(defaults)
+    for key, value in overrides.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _deep_merge_config(merged[key], value)
+        else:
+            merged[key] = copy.deepcopy(value)
+    return merged
+
+def load_config(start: Path = Path.cwd()) -> dict:
+    config = _default_config()
+    config_file = _find_config_file(start)
+    if not config_file:
+        return config
+
+    try:
+        with config_file.open("rb") as f:
+            loaded = tomllib.load(f)
+    except tomllib.TOMLDecodeError as e:
+        print(f"{RED}Error: failed to parse config file: {config_file.resolve()}{RESET}")
+        print(f"  {e}")
+        sys.exit(1)
+    except OSError as e:
+        print(f"{RED}Error: failed to read config file: {config_file.resolve()}{RESET}")
+        print(f"  {e}")
+        sys.exit(1)
+
+    return _deep_merge_config(config, loaded)
+
+def _default_language(config: Optional[dict] = None):
+    config = config or load_config(Path.cwd())
+    lang = str(config.get("defaults", {}).get("language") or "cpp").strip().lower()
+    return lang if lang in SOURCE_EXTS else "cpp"
+
+def _runner_settings(config: Optional[dict] = None):
+    config = config or load_config(Path.cwd())
+    runner = config.get("runner", {})
+    return runner if isinstance(runner, dict) else {}
+
+def _runner_command(config: dict, key: str, default: str):
+    command = str(_runner_settings(config).get(key) or default).strip()
+    return command or default
+
+def _runner_cpp_flags(config: dict):
+    flags = _runner_settings(config).get("cpp_flags", ["-std=c++20", "-O2", "-Wall", "-Wextra"])
+    if isinstance(flags, list):
+        return [str(flag) for flag in flags]
+    if isinstance(flags, str):
+        return flags.split()
+    return ["-std=c++20", "-O2", "-Wall", "-Wextra"]
+
+def _runner_timeout(config: dict):
+    raw_timeout = _runner_settings(config).get("timeout_seconds", 2.0)
+    try:
+        timeout = float(raw_timeout)
+    except (TypeError, ValueError):
+        return 2.0
+    return timeout if timeout > 0 else None
+
+def _resolve_command(command: str):
+    path = Path(command).expanduser()
+    if path.exists():
+        return str(path)
+    return shutil.which(command)
+
+def _normalize_run_language(language: Optional[str], config: dict):
+    requested = str(language or _default_language(config)).strip().lower()
+    if requested == "py":
+        return "python"
+    if requested in ["python", "pypy", "cpp"]:
+        return requested
+    return None
+
+def _config_problems(config: Optional[dict] = None):
+    config = config or load_config(Path.cwd())
+    raw_problems = config.get("defaults", {}).get("problems", PROBLEMS)
+    if not isinstance(raw_problems, list):
+        return PROBLEMS[:]
+
+    problems = []
+    for raw_problem in raw_problems:
+        problem = str(raw_problem).strip().upper()
+        if problem and problem not in problems:
+            problems.append(problem)
+    return problems or PROBLEMS[:]
+
+def _config_project_root(config_file: Path):
+    if config_file.parent.name == ".atc":
+        return config_file.parent.parent
+    return config_file.parent
+
+def _resolve_template_file(ext: str, config: Optional[dict] = None, start: Optional[Path] = None):
+    start = start or Path.cwd()
+    config_file = _find_config_file(start)
+    if not config_file:
+        return TEMPLATE_DIR / f"template.{ext}"
+
+    config = config or load_config(start)
+    template_value = str(config.get("templates", {}).get(ext) or f"templates/template.{ext}").strip()
+    template_path = Path(template_value).expanduser()
+    if template_path.is_absolute():
+        return template_path
+
+    candidates = [
+        config_file.parent / template_path,
+        _config_project_root(config_file) / template_path,
+    ]
+
+    config_root = _config_root(config)
+    if config_root:
+        candidates.append(config_root / template_path)
+
+    candidates.append(_find_project_root(start, config) / template_path)
+
+    if template_value == f"templates/template.{ext}":
+        candidates.append(TEMPLATE_DIR / f"template.{ext}")
+
+    unique_candidates = []
+    seen = set()
+    for candidate in candidates:
+        resolved = candidate.resolve()
+        if resolved not in seen:
+            unique_candidates.append(candidate)
+            seen.add(resolved)
+
+    for candidate in unique_candidates:
+        if candidate.exists():
+            return candidate
+
+    return unique_candidates[-1]
+
+def _toml_value(value):
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False)
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, list):
+        return "[" + ", ".join(_toml_value(item) for item in value) + "]"
+    return json.dumps(value, ensure_ascii=False)
+
+def _config_to_toml(config: dict) -> str:
+    lines = []
+    for section, values in config.items():
+        if lines:
+            lines.append("")
+        lines.append(f"[{section}]")
+        if isinstance(values, dict):
+            for key, value in values.items():
+                lines.append(f"{key} = {_toml_value(value)}")
+        else:
+            lines.append(f"value = {_toml_value(values)}")
+    return "\n".join(lines) + "\n"
+
+def cmd_config(args):
+    if not args:
+        usage()
+
+    subcmd = args[0]
+    if subcmd == "show":
+        config_file = _find_config_file(Path.cwd())
+        config = load_config(Path.cwd())
+        print(f"config file: {config_file.resolve() if config_file else '(default)'}")
+        print()
+        print(_config_to_toml(config), end="")
+    elif subcmd == "init":
+        atc_dir = Path(".atc")
+        atc_dir.mkdir(parents=True, exist_ok=True)
+        config_file = atc_dir / CONFIG_FILE_NAME
+        if config_file.exists():
+            print(f"{YELLOW}already exists: {config_file.resolve()}{RESET}")
+            return
+        config_file.write_text(_config_to_toml(_default_config()), encoding="utf-8")
+        print(f"created: {config_file.resolve()}")
+    else:
+        usage()
 
 # ---------- manual ----------
 def cmd_manual(args):
     cwd = Path.cwd()
+    config = load_config(cwd)
     # 簡易的に拡張子を判別（引数に .cpp 等が含まれていればそれを使う）
-    lang = "cpp"
+    lang = _default_language(config)
     targets = []
     for arg in args:
         if arg in ["py", "cpp"]:
@@ -200,7 +514,7 @@ def cmd_manual(args):
             continue
         targets.append(arg)
 
-    template_content = load_template(lang)
+    template_content = load_template(lang, config, cwd)
     for p in targets:
         # 範囲指定 A~E などの展開
         if "~" in p or "-" in p:
@@ -221,6 +535,8 @@ def cmd_manual(args):
 # ---------- manual tests ----------
 def cmd_manual_tests():
     cwd = Path.cwd()
+    config = load_config(cwd)
+    problems = _config_problems(config)
     contest = cwd.name.lower()
     tests = cwd / "tests"
 
@@ -229,20 +545,24 @@ def cmd_manual_tests():
         sys.exit(1)
 
     print(f"contest: {contest}")
-    for p in PROBLEMS:
+    for p in problems:
         print(f"fetching {p} ...", end=" ", flush=True)
-        if _download_samples(contest, p, tests / p):
+        ok, reason = _download_samples(contest, p, tests / p)
+        if ok:
             print(f"{GREEN}done{RESET}")
         else:
             print(f"{RED}failed{RESET}")
+            if reason:
+                print(f"  reason: {reason}")
 
 def _normalize_problem(problem: str):
     return problem.upper()
 
 
-def _available_problems(cwd: Path):
+def _available_problems(cwd: Path, problems: Optional[List[str]] = None):
+    problems = problems or _config_problems(load_config(cwd))
     found = []
-    for problem in PROBLEMS:
+    for problem in problems:
         has_source = any((cwd / f"{problem}.{ext}").exists() for ext in SOURCE_EXTS)
         has_tests = (cwd / "tests" / problem).exists()
         if has_source or has_tests:
@@ -250,39 +570,84 @@ def _available_problems(cwd: Path):
     return found
 
 
-def _prepare_run_command(cwd: Path, problem: str, interpreter="python", show_compile=False):
-    py_file = cwd / f"{problem}.py"
-    cpp_file = cwd / f"{problem}.cpp"
+def _missing_cpp_compiler_message(compiler: str):
+    return (
+        f"C++ compiler not found: {compiler}\n"
+        "Install g++ and make sure it is on PATH.\n"
+        "Windows recommendation: install MSYS2 UCRT64 and add C:\\msys64\\ucrt64\\bin to PATH."
+    )
 
-    if cpp_file.exists():
-        mode = "cpp"
-        suffix = ".exe" if platform.system() == "Windows" else ".out"
-        exe_path = cwd / f"_{problem}{suffix}"
+def _prepare_cpp_run_command(cwd: Path, problem: str, cpp_file: Path, config: dict, show_compile=False):
+    compiler = _runner_command(config, "cpp_compiler", "g++")
+    compiler_path = _resolve_command(compiler)
+    if not compiler_path:
+        return "cpp", [], None, "ERROR", _missing_cpp_compiler_message(compiler)
 
-        if show_compile:
-            print(f"{YELLOW}Compiling {cpp_file.name}...{RESET}")
+    suffix = ".exe" if platform.system() == "Windows" else ".out"
+    exe_path = cwd / f"_{problem}{suffix}"
+    flags = _runner_cpp_flags(config)
+
+    if show_compile:
+        print(f"{YELLOW}Compiling {cpp_file.name}...{RESET}")
+    try:
         c_proc = subprocess.run(
-            ["g++", "-O2", str(cpp_file), "-o", str(exe_path)],
+            [compiler_path, *flags, str(cpp_file), "-o", str(exe_path)],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=_runner_timeout(config),
         )
-        if c_proc.returncode != 0:
-            return mode, [], exe_path, "CE", c_proc.stderr.strip()
-        return mode, [str(exe_path)], exe_path, None, ""
+    except subprocess.TimeoutExpired:
+        return "cpp", [], exe_path, "TLE", f"Compile timed out after {_runner_timeout(config)} seconds."
+    except OSError as e:
+        return "cpp", [], exe_path, "ERROR", str(e)
+
+    if c_proc.returncode != 0:
+        return "cpp", [], exe_path, "CE", c_proc.stderr.strip()
+    return "cpp", [str(exe_path)], exe_path, None, ""
+
+def _prepare_python_run_command(py_file: Path, run_language: str, config: dict):
+    key = "pypy" if run_language == "pypy" else "python"
+    default = "pypy" if run_language == "pypy" else "python"
+    command = _runner_command(config, key, default)
+    executable = _resolve_command(command)
+    if run_language == "pypy" and not executable and command == "pypy":
+        executable = shutil.which("pypy3")
+    if not executable:
+        if run_language == "pypy":
+            return "py", [], None, "ERROR", f"PyPy command not found: {command}. Install PyPy or update runner.pypy in config.toml."
+        return "py", [], None, "ERROR", f"Python command not found: {command}. Update runner.python in config.toml or check PATH."
+    return "py", [executable, str(py_file)], None, None, ""
+
+def _prepare_run_command(cwd: Path, problem: str, run_language: Optional[str] = None, show_compile=False, config: Optional[dict] = None):
+    config = config or load_config(cwd)
+    run_language = _normalize_run_language(run_language, config)
+    if not run_language:
+        return None, [], None, "ERROR", "Invalid language. Use python, pypy, cpp, or set defaults.language to py/cpp."
+
+    py_file = cwd / f"{problem}.py"
+    cpp_file = cwd / f"{problem}.cpp"
+
+    if run_language == "cpp":
+        if cpp_file.exists():
+            return _prepare_cpp_run_command(cwd, problem, cpp_file, config, show_compile)
+        if py_file.exists():
+            return _prepare_python_run_command(py_file, "python", config)
+        return None, [], None, "ERROR", "ファイルが見つかりません。"
 
     if py_file.exists():
-        mode = "py"
-        exe = sys.executable if interpreter != "pypy" else detect_pypy()
-        if not exe:
-            return mode, [], None, "ERROR", "PyPy が見つかりません。"
-        return mode, [exe, str(py_file)], None, None, ""
+        return _prepare_python_run_command(py_file, run_language, config)
+    if cpp_file.exists():
+        return _prepare_cpp_run_command(cwd, problem, cpp_file, config, show_compile)
 
     return None, [], None, "ERROR", "ファイルが見つかりません。"
 
 
-def run_problem_tests(problem: str, interpreter="python", show_compile=False, case_names: Optional[Set[str]] = None):
+def run_problem_tests(problem: str, run_language: Optional[str] = None, show_compile=False, case_names: Optional[Set[str]] = None):
     cwd = Path.cwd()
+    config = load_config(cwd)
     problem = _normalize_problem(problem)
     testdir = cwd / "tests" / problem
     started = time.perf_counter()
@@ -291,8 +656,9 @@ def run_problem_tests(problem: str, interpreter="python", show_compile=False, ca
     mode, run_cmd, cleanup_path, error_status, error_message = _prepare_run_command(
         cwd,
         problem,
-        interpreter,
+        run_language,
         show_compile=show_compile,
+        config=config,
     )
     result.mode = mode
     if error_status:
@@ -315,8 +681,34 @@ def run_problem_tests(problem: str, interpreter="python", show_compile=False, ca
             outfile = infile.with_suffix(".out")
             with open(infile, "r", encoding="utf-8") as fin:
                 case_started = time.perf_counter()
-                proc = subprocess.run(run_cmd, stdin=fin, capture_output=True, text=True)
-                elapsed = (time.perf_counter() - case_started) * 1000
+                try:
+                    proc = subprocess.run(
+                        run_cmd,
+                        stdin=fin,
+                        capture_output=True,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
+                        timeout=_runner_timeout(config),
+                    )
+                    elapsed = (time.perf_counter() - case_started) * 1000
+                except subprocess.TimeoutExpired as e:
+                    elapsed = (time.perf_counter() - case_started) * 1000
+                    result.cases.append(
+                        CaseResult(
+                            name=infile.name,
+                            status="TLE",
+                            elapsed_ms=elapsed,
+                            output=(e.stdout or "").strip() if isinstance(e.stdout, str) else "",
+                            stderr=f"Timed out after {_runner_timeout(config)} seconds.",
+                        )
+                    )
+                    continue
+                except OSError as e:
+                    result.error_status = "ERROR"
+                    result.error_message = str(e)
+                    result.duration_ms = (time.perf_counter() - started) * 1000
+                    return result
 
             output = proc.stdout.strip()
             stderr = proc.stderr.strip()
@@ -436,19 +828,21 @@ def _print_auto_summary(results: List[ProblemResult], log_path: Path):
 
 
 # ---------- run ----------
-def cmd_run(problem: str, interpreter="python"):
-    result = run_problem_tests(problem, interpreter, show_compile=True)
+def cmd_run(problem: str, run_language: Optional[str] = None):
+    result = run_problem_tests(problem, run_language, show_compile=True)
     _print_detailed_result(result)
     if result.error_status:
         sys.exit(1)
 
 
-def cmd_run_all(interpreter="python"):
-    problems = _available_problems(Path.cwd())
-    _run_auto_tests(problems, interpreter, reason="manual")
+def cmd_run_all(run_language: Optional[str] = None):
+    cwd = Path.cwd()
+    config = load_config(cwd)
+    problems = _available_problems(cwd, _config_problems(config))
+    _run_auto_tests(problems, run_language, reason="manual")
 
 
-def cmd_rerun(interpreter="python"):
+def cmd_rerun(run_language: Optional[str] = None):
     failed_path = LOG_DIR / "last_failed.txt"
     if not failed_path.exists():
         print(f"{YELLOW}直前の失敗記録がありません。{RESET}")
@@ -471,15 +865,15 @@ def cmd_rerun(interpreter="python"):
 
     results = []
     for problem, case_names in sorted(groups.items()):
-        results.append(run_problem_tests(problem, interpreter, show_compile=False, case_names=case_names))
+        results.append(run_problem_tests(problem, run_language, show_compile=False, case_names=case_names))
 
     log_path = _write_test_log(results)
     _print_auto_summary(results, log_path)
 
 
-def _watch_snapshot(cwd: Path):
+def _watch_snapshot(cwd: Path, problems: Optional[List[str]] = None):
     snapshot = {}
-    for path in _watch_paths(cwd):
+    for path in _watch_paths(cwd, problems):
         try:
             stat = path.stat()
         except OSError:
@@ -488,8 +882,9 @@ def _watch_snapshot(cwd: Path):
     return snapshot
 
 
-def _watch_paths(cwd: Path):
-    for problem in PROBLEMS:
+def _watch_paths(cwd: Path, problems: Optional[List[str]] = None):
+    problems = problems or _config_problems(load_config(cwd))
+    for problem in problems:
         for ext in SOURCE_EXTS:
             source = cwd / f"{problem}.{ext}"
             if source.exists():
@@ -515,7 +910,10 @@ def _changed_paths(before: Dict[Path, tuple], after: Dict[Path, tuple]):
     return changed
 
 
-def _problem_from_changed_path(cwd: Path, path: Path):
+def _problem_from_changed_path(cwd: Path, path: Path, problems: Optional[List[str]] = None):
+    problems = problems or _config_problems(load_config(cwd))
+    problem_set = set(problems)
+
     try:
         rel = path.relative_to(cwd)
     except ValueError:
@@ -525,23 +923,24 @@ def _problem_from_changed_path(cwd: Path, path: Path):
     if len(parts) == 1:
         if rel.name in CONFIG_FILES:
             return "ALL"
-        if rel.suffix in [".py", ".cpp"] and rel.stem.upper() in PROBLEMS:
+        if rel.suffix in [".py", ".cpp"] and rel.stem.upper() in problem_set:
             return rel.stem.upper()
 
-    if len(parts) >= 2 and parts[0] == "tests" and parts[1].upper() in PROBLEMS:
+    if len(parts) >= 2 and parts[0] == "tests" and parts[1].upper() in problem_set:
         return parts[1].upper()
 
     return None
 
 
-def _changed_problems(cwd: Path, paths: Set[Path], selected: List[str]):
+def _changed_problems(cwd: Path, paths: Set[Path], selected: List[str], problems: Optional[List[str]] = None):
     selected_set = set(selected)
     changed = set()
+    problems = problems or _config_problems(load_config(cwd))
 
     for path in paths:
-        problem = _problem_from_changed_path(cwd, path)
+        problem = _problem_from_changed_path(cwd, path, problems)
         if problem == "ALL":
-            return selected or _available_problems(cwd)
+            return selected or _available_problems(cwd, problems)
         if problem:
             changed.add(problem)
 
@@ -550,7 +949,7 @@ def _changed_problems(cwd: Path, paths: Set[Path], selected: List[str]):
     return sorted(changed)
 
 
-def _run_auto_tests(problems: List[str], interpreter="python", reason=""):
+def _run_auto_tests(problems: List[str], run_language: Optional[str] = None, reason=""):
     if not problems:
         print(f"{YELLOW}テスト対象が見つかりません。{RESET}")
         return
@@ -558,39 +957,42 @@ def _run_auto_tests(problems: List[str], interpreter="python", reason=""):
     label = ",".join(problems)
     prefix = f"{reason}: " if reason else ""
     print(f"{prefix}running {label} ...")
-    results = [run_problem_tests(problem, interpreter, show_compile=False) for problem in problems]
+    results = [run_problem_tests(problem, run_language, show_compile=False) for problem in problems]
     log_path = _write_test_log(results)
     _print_auto_summary(results, log_path)
 
 
 def cmd_watch(args):
     cwd = Path.cwd()
-    interpreter = "python"
+    config = load_config(cwd)
+    configured_problems = _config_problems(config)
+    run_language = None
     selected = []
 
     for arg in args:
         low = arg.lower()
-        if low in ["python", "pypy"]:
-            interpreter = low
+        if low in ["python", "py", "pypy", "cpp"]:
+            run_language = low
         elif low in ["all", "--all"]:
             selected = []
         else:
             selected.append(_normalize_problem(arg))
 
-    problems = selected or _available_problems(cwd)
+    watch_problems = selected or configured_problems
+    problems = selected or _available_problems(cwd, configured_problems)
     print(f"watching {cwd}")
     print(f"debounce: {WATCH_DEBOUNCE_SECONDS:.1f}s / log: {LOG_DIR / 'last.log'}")
     print("Ctrl+C で終了します。")
-    _run_auto_tests(problems, interpreter, reason="initial")
+    _run_auto_tests(problems, run_language, reason="initial")
 
-    snapshot = _watch_snapshot(cwd)
+    snapshot = _watch_snapshot(cwd, watch_problems)
     pending = set()
     last_change_at = None
 
     try:
         while True:
             time.sleep(WATCH_POLL_SECONDS)
-            current = _watch_snapshot(cwd)
+            current = _watch_snapshot(cwd, watch_problems)
             changed = _changed_paths(snapshot, current)
             if changed:
                 snapshot = current
@@ -599,8 +1001,8 @@ def cmd_watch(args):
                 continue
 
             if pending and last_change_at and time.perf_counter() - last_change_at >= WATCH_DEBOUNCE_SECONDS:
-                changed = _changed_problems(cwd, pending, selected)
-                _run_auto_tests(changed, interpreter, reason="changed")
+                changed = _changed_problems(cwd, pending, selected, watch_problems)
+                _run_auto_tests(changed, run_language, reason="changed")
                 pending.clear()
                 last_change_at = None
     except KeyboardInterrupt:
@@ -612,19 +1014,21 @@ def main():
     cmd = sys.argv[1]
 
     if cmd == "new" and len(sys.argv) >= 3:
-        lang = sys.argv[3] if len(sys.argv) == 4 else "cpp"
+        lang = sys.argv[3] if len(sys.argv) == 4 else None
         cmd_new(sys.argv[2], lang)
     elif cmd in ["contest", "contests"] and len(sys.argv) >= 3:
-        lang = sys.argv[3] if len(sys.argv) == 4 else "cpp"
+        lang = sys.argv[3] if len(sys.argv) == 4 else None
         cmd_contest(sys.argv[2], lang)
+    elif cmd == "config":
+        cmd_config(sys.argv[2:])
     elif cmd in ["run", "r", "test", "t"] and len(sys.argv) >= 3:
-        interp = sys.argv[3] if len(sys.argv) == 4 else "python"
+        interp = sys.argv[3] if len(sys.argv) == 4 else None
         if sys.argv[2].lower() == "all":
             cmd_run_all(interp)
         else:
             cmd_run(sys.argv[2], interp)
     elif cmd in ["rerun", "retry"]:
-        interp = sys.argv[2] if len(sys.argv) == 3 else "python"
+        interp = sys.argv[2] if len(sys.argv) == 3 else None
         cmd_rerun(interp)
     elif cmd in ["watch", "w", "auto"]:
         cmd_watch(sys.argv[2:])
