@@ -463,21 +463,21 @@ https://atcoder.jp/contests/abc413/tasks/abc413_a
 
 | コマンド | 説明 | 備考 |
 | - | - | - |
-| `atc new abc413 [py|cpp]` | `abc413/` を作成し、設定された問題ファイルとサンプルを作成 | 既存フォルダでも `cmd_new` は走るため、サンプル取得を再試行します |
-| `atc contest abc413 [py|cpp]` | なければ作成、あれば作成とサンプル取得をスキップし、`.atc/current-contest.json` を更新 | `paths.root` があれば `abc` / `arc` / `agc` を自動振り分け |
-| `atc contests abc413 [py|cpp]` | `atc contest` と同じ | 複数形エイリアス |
+| `atc new abc413 [py\|cpp]` | `abc413/` を作成し、設定された問題ファイルとサンプルを作成 | 既存フォルダでも `cmd_new` は走るため、サンプル取得を再試行します |
+| `atc contest abc413 [py\|cpp]` | なければ作成、あれば作成とサンプル取得をスキップし、`.atc/current-contest.json` を更新 | `paths.root` があれば `abc` / `arc` / `agc` を自動振り分け |
+| `atc contests abc413 [py\|cpp]` | `atc contest` と同じ | 複数形エイリアス |
 | `atc config show` | 現在読み込まれる設定を表示 | `.atc/config.toml`、ホーム設定、デフォルトの順で解決 |
 | `atc config init` | カレントディレクトリに `.atc/config.toml` を作成 | 既に存在する場合は上書きしません |
-| `atc run A [python|pypy|cpp]` | A 問題を詳細表示付きでテスト | 省略時は `[defaults].language`。指定言語のファイルが無い場合だけ別言語に fallback |
-| `atc r A [python|pypy|cpp]` | `atc run A` の短縮 | 同上 |
-| `atc test A [python|pypy|cpp]` | `atc run A` のエイリアス | 同上 |
-| `atc t A [python|pypy|cpp]` | `atc run A` の短縮エイリアス | よく使う短縮形 |
-| `atc run all [python|pypy|cpp]` | 検出できる全問題をまとめてテスト | 省略時は `[defaults].language` |
-| `atc rerun [python|pypy|cpp]` | 直前に失敗したケースだけ再実行 | `.atc/test-runs/last_failed.txt` を使用 |
-| `atc retry [python|pypy|cpp]` | `atc rerun` のエイリアス | 同上 |
-| `atc watch [A] [python|pypy|cpp]` | ファイル変更を監視して自動テスト | 省略時は `[defaults].language` |
-| `atc manual A B C [py|cpp]` | 現在のフォルダに指定問題ファイルを作成 | デフォルトは `[defaults].language`、未設定なら `cpp` |
-| `atc manual A~E [py|cpp]` | 範囲指定で問題ファイルを作成 | `A-E` 形式も使用可能 |
+| `atc run A [python\|pypy\|cpp]` | A 問題を詳細表示付きでテスト | 省略時は `[defaults].language`。指定言語のファイルが無い場合だけ別言語に fallback |
+| `atc r A [python\|pypy\|cpp]` | `atc run A` の短縮 | 同上 |
+| `atc test A [python\|pypy\|cpp]` | `atc run A` のエイリアス | 同上 |
+| `atc t A [python\|pypy\|cpp]` | `atc run A` の短縮エイリアス | よく使う短縮形 |
+| `atc run all [python\|pypy\|cpp]` | 検出できる全問題をまとめてテスト | 省略時は `[defaults].language` |
+| `atc rerun [python\|pypy\|cpp]` | 直前に失敗したケースだけ再実行 | `.atc/test-runs/last_failed.txt` を使用 |
+| `atc retry [python\|pypy\|cpp]` | `atc rerun` のエイリアス | 同上 |
+| `atc watch [A] [python\|pypy\|cpp]` | ファイル変更を監視して自動テスト | 省略時は `[defaults].language` |
+| `atc manual A B C [py\|cpp]` | 現在のフォルダに指定問題ファイルを作成 | デフォルトは `[defaults].language`、未設定なら `cpp` |
+| `atc manual A~E [py\|cpp]` | 範囲指定で問題ファイルを作成 | `A-E` 形式も使用可能 |
 | `atc manual tests` | 現在のフォルダ名を contest ID としてサンプル取得 | `[defaults].problems` が対象 |
 
 ### 言語指定
