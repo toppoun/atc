@@ -1,4 +1,5 @@
 import sys
+import json
 import subprocess
 import shutil
 import time
@@ -136,6 +137,21 @@ def cmd_new(contest: str, lang: str = "cpp"):
             print(f"{RED}failed{RESET}")
 
     print(f"\n{contest} ({lang}) ready.")
+
+# ---------- contest ----------
+def cmd_contest(contest: str, lang: str = "cpp"):
+    cmd_new(contest, lang)
+
+    contest_dir = Path(contest).resolve()
+    atc_dir = Path(".atc")
+    atc_dir.mkdir(exist_ok=True)
+
+    current_contest_file = atc_dir / "current-contest.json"
+    current_contest_file.write_text(
+        json.dumps({"contestDir": str(contest_dir)}, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8"
+    )
+    print(f"current contest saved: {current_contest_file.resolve()}")
 
 # ---------- manual ----------
 def cmd_manual(args):
@@ -560,9 +576,12 @@ def main():
     if len(sys.argv) < 2: usage()
     cmd = sys.argv[1]
 
-    if cmd in ["new", "contest", "contests"] and len(sys.argv) >= 3:
+    if cmd == "new" and len(sys.argv) >= 3:
         lang = sys.argv[3] if len(sys.argv) == 4 else "cpp"
         cmd_new(sys.argv[2], lang)
+    elif cmd in ["contest", "contests"] and len(sys.argv) >= 3:
+        lang = sys.argv[3] if len(sys.argv) == 4 else "cpp"
+        cmd_contest(sys.argv[2], lang)
     elif cmd in ["run", "r", "test", "t"] and len(sys.argv) >= 3:
         interp = sys.argv[3] if len(sys.argv) == 4 else "python"
         if sys.argv[2].lower() == "all":
