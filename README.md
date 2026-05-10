@@ -182,6 +182,20 @@ code --list-extensions --show-versions | findstr atc-helper
 
 `kouki.atc-helper@0.0.1` が表示されればインストール済みです。インストール後に VS Code を再読み込みすると、通常の VS Code で `AtC: Open Contest Terminals` が使えるようになります。
 
+## VS Code 拡張機能を変更した後の更新
+
+拡張機能のコードを変更したら、VSIX を作り直して再インストールします。
+
+```Bash
+cd vscode/atc-helper
+npm install
+npm run compile
+vsce package
+code --install-extension ./atc-helper-0.0.1.vsix --force
+```
+
+インストール後、VS Code で `Developer: Reload Window` を実行してください。同じ `0.0.1` のまま入れ直す場合も、`--force` を付ければ上書きできます。
+
 ## 注意点
 
 - `atc new` は A〜E 問題を対象にしています。

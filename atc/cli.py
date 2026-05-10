@@ -145,9 +145,20 @@ def cmd_new(contest: str, lang: str = "cpp"):
 
 # ---------- contest ----------
 def cmd_contest(contest: str, lang: str = "cpp"):
-    cmd_new(contest, lang)
+    contest_dir = Path(contest)
 
-    contest_dir = Path(contest).resolve()
+    if contest_dir.exists():
+        if not contest_dir.is_dir():
+            print(f"{RED}Error: {contest_dir} exists but is not a directory.{RESET}")
+            sys.exit(1)
+        print(f"{YELLOW}{contest_dir} already exists. Skip creation and sample download.{RESET}")
+    else:
+        cmd_new(contest, lang)
+
+    current_contest_file = _write_current_contest(contest_dir.resolve())
+    print(f"current contest saved: {current_contest_file}")
+
+def _write_current_contest(contest_dir: Path):
     atcoder_root = _detect_atcoder_root(Path.cwd())
     atc_dir = atcoder_root / ".atc"
     atc_dir.mkdir(exist_ok=True)
@@ -166,7 +177,7 @@ def cmd_contest(contest: str, lang: str = "cpp"):
         ) + "\n",
         encoding="utf-8"
     )
-    print(f"current contest saved: {current_contest_file.resolve()}")
+    return current_contest_file.resolve()
 
 def _detect_atcoder_root(cwd: Path):
     current = cwd.resolve()
