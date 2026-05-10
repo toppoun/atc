@@ -79,6 +79,12 @@ atc manual A-E
 atc manual A~E
 ```
 
+現在のコンテストフォルダ名からサンプルケースだけ取得する場合：
+
+```Bash
+atc manual tests
+```
+
 ## コマンド一覧
 | コマンド | 説明 |
 | - | - |
@@ -86,6 +92,7 @@ atc manual A~E
 | `atc run A` | A問題をテスト実行 |
 | `atc manual A B C` | A.py, B.py, C.py を手動作成 |
 | `atc manual A-E` | A.py 〜 E.cpp を手動作成 |
+| `atc manual tests` | 現在のフォルダ名をコンテストIDとしてサンプルを取得 |
 
 ## 注意点
 - `atc new` は A〜E 問題を対象にしています。

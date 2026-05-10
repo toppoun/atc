@@ -55,7 +55,7 @@ def usage():
     print("  atc new abc413 [py|cpp]  (デフォルトは cpp)")
     print("  atc run A [python|pypy]")
     print("  atc manual A B C")
-    print("  atc manual tests [contest_id]")
+    print("  atc manual tests  (現在のフォルダ名を contest_id としてサンプル取得)")
     sys.exit(1)
 
 # ---------- new ----------
@@ -110,6 +110,24 @@ def cmd_manual(args):
         if not f.exists():
             f.write_text(template_content, encoding="utf-8")
             print(f" {GREEN}Created{RESET}: {f.name}")
+
+# ---------- manual tests ----------
+def cmd_manual_tests():
+    cwd = Path.cwd()
+    contest = cwd.name.lower()
+    tests = cwd / "tests"
+
+    if not contest:
+        print(f"{RED}コンテストIDを現在のフォルダ名から取得できません。{RESET}")
+        sys.exit(1)
+
+    print(f"contest: {contest}")
+    for p in PROBLEMS:
+        print(f"fetching {p} ...", end=" ", flush=True)
+        if _download_samples(contest, p, tests / p):
+            print(f"{GREEN}done{RESET}")
+        else:
+            print(f"{RED}failed{RESET}")
 
 # ---------- run ----------
 def cmd_run(problem: str, interpreter="python"):
@@ -180,8 +198,7 @@ def main():
         cmd_run(sys.argv[2], interp)
     elif cmd == "manual":
         if len(sys.argv) >= 3 and sys.argv[2] == "tests":
-            from_folder = sys.argv[3] if len(sys.argv) >= 4 else None
-            # 前述の manual_tests 関数を呼び出し（省略）
+            cmd_manual_tests()
         else:
             cmd_manual(sys.argv[2:])
     else:
