@@ -161,6 +161,21 @@ atc manual tests
 | `atc manual A-E` | A.py 〜 E.cpp を手動作成 |
 | `atc manual tests` | 現在のフォルダ名をコンテストIDとしてサンプルを取得 |
 
+## VS Code 拡張機能のローカルインストール
+
+普段使いでは、拡張機能を VSIX としてローカルインストールします。
+
+```Bash
+cd vscode/atc-helper
+npm install
+npm run compile
+npm install -g @vscode/vsce
+vsce package
+code --install-extension ./atc-helper-0.0.1.vsix
+```
+
+インストール後に VS Code を再読み込みすると、通常の VS Code で `AtC: Open Contest Terminals` が使えるようになります。
+
 ## 注意点
 
 - `atc new` は A〜E 問題を対象にしています。

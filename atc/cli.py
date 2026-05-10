@@ -26,6 +26,11 @@ CONFIG_FILES = {
     "Makefile",
     "CMakeLists.txt",
 }
+CATEGORY_DIRS = {
+    "ABC(Atcoder Beginner Contest)",
+    "ARC(Atcoder Regular Contest)",
+    "AGC(Atcoder Grand Contest)",
+}
 
 # =================
 RED    = "\033[31m"
@@ -143,15 +148,34 @@ def cmd_contest(contest: str, lang: str = "cpp"):
     cmd_new(contest, lang)
 
     contest_dir = Path(contest).resolve()
-    atc_dir = Path(".atc")
+    atcoder_root = _detect_atcoder_root(Path.cwd())
+    atc_dir = atcoder_root / ".atc"
     atc_dir.mkdir(exist_ok=True)
 
+    now = datetime.now().isoformat(timespec="milliseconds")
     current_contest_file = atc_dir / "current-contest.json"
     current_contest_file.write_text(
-        json.dumps({"contestDir": str(contest_dir)}, ensure_ascii=False, indent=2) + "\n",
+        json.dumps(
+            {
+                "contestDir": str(contest_dir),
+                "requestId": now,
+                "createdAt": now,
+            },
+            ensure_ascii=False,
+            indent=2
+        ) + "\n",
         encoding="utf-8"
     )
     print(f"current contest saved: {current_contest_file.resolve()}")
+
+def _detect_atcoder_root(cwd: Path):
+    current = cwd.resolve()
+    for path in [current, *current.parents]:
+        if path.name in CATEGORY_DIRS:
+            return path.parent
+        if any((path / category).is_dir() for category in CATEGORY_DIRS):
+            return path
+    return current
 
 # ---------- manual ----------
 def cmd_manual(args):

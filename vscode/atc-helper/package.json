@@ -1,8 +1,10 @@
 {
   "name": "atc-helper",
+  "publisher": "kouki",
   "displayName": "AtC Helper",
   "description": "AtCoder helper commands for VS Code.",
   "version": "0.0.1",
+  "license": "UNLICENSED",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -10,6 +12,7 @@
     "Other"
   ],
   "activationEvents": [
+    "onStartupFinished",
     "onCommand:atc-helper.openContestTerminals"
   ],
   "main": "./out/extension.js",
