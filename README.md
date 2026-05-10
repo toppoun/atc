@@ -186,6 +186,13 @@ atc/templates/template.cpp
 
 CLI 内ではパッケージ内の `templates/template.py` / `templates/template.cpp` として読み込まれます。内容を変えたい場合は、上記ファイルを直接編集してください。
 
+配布後にユーザーごとのテンプレートを持つ場合は、project root の `templates/` 配下に置き、`.atc/config.toml` から参照する形を推奨します。
+
+```text
+<project-root>/templates/template.py
+<project-root>/templates/template.cpp
+```
+
 `.atc/config.toml` または `~/.atc/config.toml` がある場合は、`[templates]` の `py` / `cpp` でテンプレートパスを指定できます。相対パスは config の場所や project root から解決されます。
 
 テンプレートが存在しない場合は、警告を表示し、空ファイルを作成します。
@@ -247,7 +254,7 @@ abc = ""
 
 この場合、`atc contest abc335 py` は `D:/atcoder/ABC(Atcoder Beginner Contest)/abc335` ではなく、現在のカレントディレクトリ直下の `abc335/` を使います。
 
-`runner` の設定値は実行処理に反映されます。`python`, `pypy`, `cpp_compiler`, `cpp_flags`, `timeout_seconds` を変更できます。
+`runner` の設定値は実行処理に反映されます。`python`, `pypy`, `cpp_compiler`, `cpp_flags`, `timeout_seconds`, `compile_timeout_seconds` を変更できます。
 
 設定例:
 
@@ -272,6 +279,7 @@ pypy = "pypy"
 cpp_compiler = "g++"
 cpp_flags = ["-std=c++20", "-O2", "-Wall", "-Wextra"]
 timeout_seconds = 2.0
+compile_timeout_seconds = 10.0
 ```
 
 ただし、watch の再実行対象判定では以下のような設定ファイルの変更を検知します。
@@ -589,6 +597,27 @@ oj d https://atcoder.jp/contests/abc413/tasks/abc413_a -d tests/A
 
 現在の CLI は `oj` のダウンロード失敗時に `failed` と reason を表示します。さらに詳しく見たい場合は、手動で `oj d` を実行してください。
 
+### `config.toml` が壊れている
+
+`config.toml` の TOML 構文が壊れている場合、CLI は読み込めなかった config ファイルのパスと理由を表示して終了します。
+
+確認:
+
+```bash
+atc config show
+```
+
+よくある原因:
+
+- `[` や `]` の閉じ忘れ
+- 文字列のクォート忘れ
+- 配列のカンマ忘れ
+
+対処:
+
+- エラーに表示された `.atc/config.toml` または `~/.atc/config.toml` を修正する
+- 分からなければ一度別名に退避して `atc config init` で作り直す
+
 ### `g++` が見つからない
 
 確認:
@@ -763,7 +792,18 @@ cd abc413
 atc t A
 ```
 
-`A.cpp` があれば C++、なければ `A.py` を実行します。
+省略時は `[defaults].language` を使います。config が無い場合は `cpp` です。
+
+```powershell
+atc t A python
+atc t A pypy
+atc t A cpp
+```
+
+- `atc t A python`: `A.py` を Python で実行
+- `atc t A pypy`: `A.py` を PyPy で実行
+- `atc t A cpp`: `A.cpp` を C++ でコンパイルして実行
+- 指定した言語のファイルが無い場合だけ、存在する別言語に fallback
 
 ### 全問題をテストする
 
@@ -1005,6 +1045,7 @@ atc/templates/template.cpp
 cpp_compiler = "g++"
 cpp_flags = ["-std=c++20", "-O2", "-Wall", "-Wextra"]
 timeout_seconds = 2.0
+compile_timeout_seconds = 10.0
 ```
 
 ### Q. Python のバージョンを切り替えたいです

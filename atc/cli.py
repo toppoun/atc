@@ -168,6 +168,7 @@ def _create_contest_files(contest_id: str, base: Path, lang: str, config: Option
     
     template_content = load_template(lang, config, Path.cwd())
     
+    failed_downloads = []
     for p in problems:
         # ファイル作成 (A.py または A.cpp)
         source_file = base / f"{p}.{lang}"
@@ -183,8 +184,32 @@ def _create_contest_files(contest_id: str, base: Path, lang: str, config: Option
             print(f"{RED}failed{RESET}")
             if reason:
                 print(f"  reason: {reason}")
+            failed_downloads.append((p, reason))
 
-    print(f"\n{contest_id} ({lang}) ready.")
+    _print_sample_download_summary(problems, failed_downloads)
+
+    if failed_downloads:
+        print(f"\n{contest_id} ({lang}) files ready, but sample download incomplete.")
+    else:
+        print(f"\n{contest_id} ({lang}) ready.")
+
+def _print_sample_download_summary(problems: List[str], failed_downloads: List[tuple]):
+    if not failed_downloads:
+        return
+
+    total = len(problems)
+    failed = len(failed_downloads)
+    succeeded = total - failed
+    failed_problems = ", ".join(problem for problem, _ in failed_downloads)
+
+    print()
+    print(f"{YELLOW}Sample download summary: {succeeded}/{total} succeeded, {failed} failed.{RESET}")
+    if succeeded == 0:
+        print(f"{YELLOW}Files were created, but sample download failed for all problems.{RESET}")
+    else:
+        print(f"{YELLOW}Files were created, but sample download failed for: {failed_problems}{RESET}")
+    print("Check oj installation, AtCoder login, contest ID, and network connection.")
+    print("Try: oj login https://atcoder.jp/")
 
 # ---------- contest ----------
 def cmd_contest(contest: str, lang: Optional[str] = None):
@@ -307,6 +332,7 @@ def _default_config() -> dict:
             "cpp_compiler": "g++",
             "cpp_flags": ["-std=c++20", "-O2", "-Wall", "-Wextra"],
             "timeout_seconds": 2.0,
+            "compile_timeout_seconds": 10.0,
         },
     }
 
@@ -380,6 +406,14 @@ def _runner_timeout(config: dict):
         timeout = float(raw_timeout)
     except (TypeError, ValueError):
         return 2.0
+    return timeout if timeout > 0 else None
+
+def _runner_compile_timeout(config: dict):
+    raw_timeout = _runner_settings(config).get("compile_timeout_seconds", 10.0)
+    try:
+        timeout = float(raw_timeout)
+    except (TypeError, ValueError):
+        return 10.0
     return timeout if timeout > 0 else None
 
 def _resolve_command(command: str):
@@ -597,10 +631,10 @@ def _prepare_cpp_run_command(cwd: Path, problem: str, cpp_file: Path, config: di
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=_runner_timeout(config),
+            timeout=_runner_compile_timeout(config),
         )
     except subprocess.TimeoutExpired:
-        return "cpp", [], exe_path, "TLE", f"Compile timed out after {_runner_timeout(config)} seconds."
+        return "cpp", [], exe_path, "TLE", f"Compile timed out after {_runner_compile_timeout(config)} seconds."
     except OSError as e:
         return "cpp", [], exe_path, "ERROR", str(e)
 
@@ -615,6 +649,8 @@ def _prepare_python_run_command(py_file: Path, run_language: str, config: dict):
     executable = _resolve_command(command)
     if run_language == "pypy" and not executable and command == "pypy":
         executable = shutil.which("pypy3")
+    if run_language != "pypy" and not executable:
+        executable = sys.executable
     if not executable:
         if run_language == "pypy":
             return "py", [], None, "ERROR", f"PyPy command not found: {command}. Install PyPy or update runner.pypy in config.toml."
@@ -826,12 +862,15 @@ def _print_auto_summary(results: List[ProblemResult], log_path: Path):
         print(f"{GREEN}PASS{RESET} {problems}: {total_cases} tests in {_format_seconds(total_ms)}")
         print(f"Full log: {log_path}")
 
+def _results_passed(results: List[ProblemResult]):
+    return bool(results) and all(result.passed for result in results)
+
 
 # ---------- run ----------
 def cmd_run(problem: str, run_language: Optional[str] = None):
     result = run_problem_tests(problem, run_language, show_compile=True)
     _print_detailed_result(result)
-    if result.error_status:
+    if not result.passed:
         sys.exit(1)
 
 
@@ -839,7 +878,8 @@ def cmd_run_all(run_language: Optional[str] = None):
     cwd = Path.cwd()
     config = load_config(cwd)
     problems = _available_problems(cwd, _config_problems(config))
-    _run_auto_tests(problems, run_language, reason="manual")
+    if not _run_auto_tests(problems, run_language, reason="manual"):
+        sys.exit(1)
 
 
 def cmd_rerun(run_language: Optional[str] = None):
@@ -952,7 +992,7 @@ def _changed_problems(cwd: Path, paths: Set[Path], selected: List[str], problems
 def _run_auto_tests(problems: List[str], run_language: Optional[str] = None, reason=""):
     if not problems:
         print(f"{YELLOW}テスト対象が見つかりません。{RESET}")
-        return
+        return False
 
     label = ",".join(problems)
     prefix = f"{reason}: " if reason else ""
@@ -960,6 +1000,7 @@ def _run_auto_tests(problems: List[str], run_language: Optional[str] = None, rea
     results = [run_problem_tests(problem, run_language, show_compile=False) for problem in problems]
     log_path = _write_test_log(results)
     _print_auto_summary(results, log_path)
+    return _results_passed(results)
 
 
 def cmd_watch(args):

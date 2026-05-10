@@ -8,7 +8,7 @@ VS Code extension for opening AtCoder contest terminals from `current-contest.js
 npm install
 npm run compile
 npm install -g @vscode/vsce
-vsce package
+npx @vscode/vsce package --allow-missing-repository
 code --install-extension ./atc-helper-0.0.1.vsix --force
 ```
 
@@ -27,7 +27,7 @@ After changing the extension code, rebuild the VSIX and reinstall it:
 ```bash
 npm install
 npm run compile
-vsce package
+npx @vscode/vsce package --allow-missing-repository
 code --install-extension ./atc-helper-0.0.1.vsix --force
 ```
 
