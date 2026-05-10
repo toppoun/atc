@@ -171,10 +171,16 @@ npm install
 npm run compile
 npm install -g @vscode/vsce
 vsce package
-code --install-extension ./atc-helper-0.0.1.vsix
+code --install-extension ./atc-helper-0.0.1.vsix --force
 ```
 
-インストール後に VS Code を再読み込みすると、通常の VS Code で `AtC: Open Contest Terminals` が使えるようになります。
+インストールされたか確認する場合:
+
+```Bash
+code --list-extensions --show-versions | findstr atc-helper
+```
+
+`kouki.atc-helper@0.0.1` が表示されればインストール済みです。インストール後に VS Code を再読み込みすると、通常の VS Code で `AtC: Open Contest Terminals` が使えるようになります。
 
 ## 注意点
 

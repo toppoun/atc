@@ -9,9 +9,15 @@ npm install
 npm run compile
 npm install -g @vscode/vsce
 vsce package
-code --install-extension ./atc-helper-0.0.1.vsix
+code --install-extension ./atc-helper-0.0.1.vsix --force
 ```
 
-After installing the VSIX, reload VS Code. The extension will run in normal VS Code without using Extension Development Host.
+Check the installed extension:
+
+```bash
+code --list-extensions --show-versions | findstr atc-helper
+```
+
+If `kouki.atc-helper@0.0.1` appears, the extension is installed. After installing the VSIX, reload VS Code. The extension will run in normal VS Code without using Extension Development Host.
 
 The command `AtC: Open Contest Terminals` opens a split terminal group for the current contest. The extension also watches `.atc/current-contest.json` and opens the terminals when that file changes.
