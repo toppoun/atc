@@ -3,11 +3,28 @@ import subprocess
 import shutil
 import time
 import platform
+from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
+from typing import Dict, List, Optional, Set
 
 # ===== 設定 =====
 PROBLEMS = ["A", "B", "C", "D", "E"]
 TEMPLATE_DIR = Path(__file__).parent / "templates"
+LOG_DIR = Path(".atc") / "test-runs"
+WATCH_DEBOUNCE_SECONDS = 1.5
+WATCH_POLL_SECONDS = 0.25
+SOURCE_EXTS = ["py", "cpp"]
+CONFIG_FILES = {
+    "pyproject.toml",
+    "requirements.txt",
+    "poetry.lock",
+    "uv.lock",
+    "Pipfile",
+    "Pipfile.lock",
+    "Makefile",
+    "CMakeLists.txt",
+}
 
 # =================
 RED    = "\033[31m"
@@ -16,6 +33,41 @@ YELLOW = "\033[33m"
 RESET  = "\033[0m"
 
 # ---------- 共通・補助関数 ----------
+
+@dataclass
+class CaseResult:
+    name: str
+    status: str
+    elapsed_ms: float
+    expected: Optional[str] = None
+    output: str = ""
+    stderr: str = ""
+
+
+@dataclass
+class ProblemResult:
+    problem: str
+    mode: Optional[str] = None
+    cases: List[CaseResult] = field(default_factory=list)
+    error_status: Optional[str] = None
+    error_message: str = ""
+    duration_ms: float = 0.0
+
+    @property
+    def ok_count(self):
+        return sum(1 for case in self.cases if case.status == "AC")
+
+    @property
+    def total_count(self):
+        return len(self.cases)
+
+    @property
+    def failed_cases(self):
+        return [case for case in self.cases if case.status != "AC"]
+
+    @property
+    def passed(self):
+        return not self.error_status and self.total_count > 0 and not self.failed_cases
 
 def detect_pypy():
     for name in ["pypy3", "pypy"]:
@@ -54,6 +106,9 @@ def usage():
     print("使い方:")
     print("  atc new abc413 [py|cpp]  (デフォルトは cpp)")
     print("  atc run A [python|pypy]")
+    print("  atc run all [python|pypy]")
+    print("  atc rerun [python|pypy]")
+    print("  atc watch [A] [python|pypy]")
     print("  atc manual A B C")
     print("  atc manual tests  (現在のフォルダ名を contest_id としてサンプル取得)")
     sys.exit(1)
@@ -129,61 +184,375 @@ def cmd_manual_tests():
         else:
             print(f"{RED}failed{RESET}")
 
-# ---------- run ----------
-def cmd_run(problem: str, interpreter="python"):
-    cwd = Path.cwd()
+def _normalize_problem(problem: str):
+    return problem.upper()
+
+
+def _available_problems(cwd: Path):
+    found = []
+    for problem in PROBLEMS:
+        has_source = any((cwd / f"{problem}.{ext}").exists() for ext in SOURCE_EXTS)
+        has_tests = (cwd / "tests" / problem).exists()
+        if has_source or has_tests:
+            found.append(problem)
+    return found
+
+
+def _prepare_run_command(cwd: Path, problem: str, interpreter="python", show_compile=False):
     py_file = cwd / f"{problem}.py"
     cpp_file = cwd / f"{problem}.cpp"
-    testdir = cwd / "tests" / problem
 
-    # 言語判定と実行ファイルの準備
     if cpp_file.exists():
         mode = "cpp"
         suffix = ".exe" if platform.system() == "Windows" else ".out"
         exe_path = cwd / f"_{problem}{suffix}"
-        
-        print(f"{YELLOW}Compiling {cpp_file.name}...{RESET}")
-        c_proc = subprocess.run(["g++", "-O2", str(cpp_file), "-o", str(exe_path)], stderr=subprocess.PIPE, text=True)
+
+        if show_compile:
+            print(f"{YELLOW}Compiling {cpp_file.name}...{RESET}")
+        c_proc = subprocess.run(
+            ["g++", "-O2", str(cpp_file), "-o", str(exe_path)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
         if c_proc.returncode != 0:
-            print(f"{RED}CE{RESET}\n{c_proc.stderr.strip()}")
-            sys.exit(1)
-        run_cmd = [str(exe_path)]
-    elif py_file.exists():
+            return mode, [], exe_path, "CE", c_proc.stderr.strip()
+        return mode, [str(exe_path)], exe_path, None, ""
+
+    if py_file.exists():
         mode = "py"
         exe = sys.executable if interpreter != "pypy" else detect_pypy()
-        run_cmd = [exe, str(py_file)]
-    else:
-        print(f"{RED}ファイルが見つかりません。{RESET}")
-        sys.exit(1)
+        if not exe:
+            return mode, [], None, "ERROR", "PyPy が見つかりません。"
+        return mode, [exe, str(py_file)], None, None, ""
 
-    # テスト実行
+    return None, [], None, "ERROR", "ファイルが見つかりません。"
+
+
+def run_problem_tests(problem: str, interpreter="python", show_compile=False, case_names: Optional[Set[str]] = None):
+    cwd = Path.cwd()
+    problem = _normalize_problem(problem)
+    testdir = cwd / "tests" / problem
+    started = time.perf_counter()
+    result = ProblemResult(problem=problem)
+
+    mode, run_cmd, cleanup_path, error_status, error_message = _prepare_run_command(
+        cwd,
+        problem,
+        interpreter,
+        show_compile=show_compile,
+    )
+    result.mode = mode
+    if error_status:
+        result.error_status = error_status
+        result.error_message = error_message
+        result.duration_ms = (time.perf_counter() - started) * 1000
+        return result
+
     ins = sorted(testdir.glob("*.in")) if testdir.exists() else []
+    if case_names:
+        ins = [infile for infile in ins if infile.name in case_names]
     if not ins:
-        print(f"{RED}テストケースがありません。{RESET}")
+        result.error_status = "NO_TESTS"
+        result.error_message = "テストケースがありません。"
+        result.duration_ms = (time.perf_counter() - started) * 1000
+        return result
+
+    try:
+        for infile in ins:
+            outfile = infile.with_suffix(".out")
+            with open(infile, "r", encoding="utf-8") as fin:
+                case_started = time.perf_counter()
+                proc = subprocess.run(run_cmd, stdin=fin, capture_output=True, text=True)
+                elapsed = (time.perf_counter() - case_started) * 1000
+
+            output = proc.stdout.strip()
+            stderr = proc.stderr.strip()
+            expected = outfile.read_text(encoding="utf-8").strip() if outfile.exists() else None
+
+            if proc.returncode != 0:
+                status = "RE"
+            elif expected is not None and output == expected:
+                status = "AC"
+            else:
+                status = "WA"
+
+            result.cases.append(
+                CaseResult(
+                    name=infile.name,
+                    status=status,
+                    elapsed_ms=elapsed,
+                    expected=expected,
+                    output=output,
+                    stderr=stderr,
+                )
+            )
+    finally:
+        if mode == "cpp" and cleanup_path and cleanup_path.exists():
+            cleanup_path.unlink()
+
+    result.duration_ms = (time.perf_counter() - started) * 1000
+    return result
+
+
+def _print_detailed_result(result: ProblemResult):
+    if result.error_status:
+        print(f"{RED}{result.error_status}{RESET}")
+        if result.error_message:
+            print(result.error_message)
+        return
+
+    for case in result.cases:
+        print(f"=== {case.name} ===")
+        if case.status == "AC":
+            print(f" {GREEN}AC{RESET}")
+        elif case.status == "RE":
+            print(f" {RED}RE{RESET}\n{case.stderr}")
+        else:
+            print(f" {RED}WA{RESET}\n expected:\n{case.expected}\n output:\n{case.output}")
+        print(f" time: {case.elapsed_ms:.2f} ms")
+
+    print(f"\n結果: {result.ok_count}/{result.total_count} AC")
+
+
+def _format_seconds(ms: float):
+    return f"{ms / 1000:.2f}s"
+
+
+def _write_test_log(results: List[ProblemResult]):
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    log_path = LOG_DIR / "last.log"
+    failed_path = LOG_DIR / "last_failed.txt"
+    failed_lines = []
+    lines = [
+        f"atc test run: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        "",
+    ]
+
+    for result in results:
+        lines.append(f"[{result.problem}]")
+        if result.error_status:
+            lines.append(f"{result.error_status}: {result.error_message}")
+            failed_lines.append(f"{result.problem} *")
+            lines.append("")
+            continue
+
+        for case in result.cases:
+            lines.append(f"=== {case.name} ===")
+            lines.append(f"status: {case.status}")
+            lines.append(f"time: {case.elapsed_ms:.2f} ms")
+            if case.status != "AC":
+                failed_lines.append(f"{result.problem} {case.name}")
+                if case.expected is not None:
+                    lines.append("expected:")
+                    lines.append(case.expected)
+                lines.append("output:")
+                lines.append(case.output)
+                if case.stderr:
+                    lines.append("stderr:")
+                    lines.append(case.stderr)
+            lines.append("")
+
+    log_path.write_text("\n".join(lines), encoding="utf-8")
+    failed_path.write_text("\n".join(failed_lines), encoding="utf-8")
+    return log_path
+
+
+def _print_auto_summary(results: List[ProblemResult], log_path: Path):
+    total_cases = sum(result.total_count for result in results)
+    passed_cases = sum(result.ok_count for result in results)
+    failed_items = []
+    total_ms = sum(result.duration_ms for result in results)
+
+    for result in results:
+        if result.error_status:
+            failed_items.append((result.problem, result.error_status, result.error_message))
+        for case in result.failed_cases:
+            failed_items.append((result.problem, case.status, case.name))
+
+    problems = ",".join(result.problem for result in results)
+    if failed_items:
+        print(f"{RED}FAIL{RESET} {problems}: {passed_cases}/{total_cases} AC in {_format_seconds(total_ms)}")
+        for problem, status, detail in failed_items[:8]:
+            print(f"  {problem} - {status}: {detail}")
+        if len(failed_items) > 8:
+            print(f"  ... and {len(failed_items) - 8} more")
+        print(f"Full log: {log_path}")
+    else:
+        print(f"{GREEN}PASS{RESET} {problems}: {total_cases} tests in {_format_seconds(total_ms)}")
+        print(f"Full log: {log_path}")
+
+
+# ---------- run ----------
+def cmd_run(problem: str, interpreter="python"):
+    result = run_problem_tests(problem, interpreter, show_compile=True)
+    _print_detailed_result(result)
+    if result.error_status:
         sys.exit(1)
 
-    ok = 0
-    for infile in ins:
-        outfile = infile.with_suffix(".out")
-        with open(infile, "r") as fin:
-            start = time.perf_counter()
-            proc = subprocess.run(run_cmd, stdin=fin, capture_output=True, text=True)
-            elapsed = (time.perf_counter() - start) * 1000
 
-        print(f"=== {infile.name} ===")
-        if proc.returncode != 0:
-            print(f" {RED}RE{RESET}\n{proc.stderr.strip()}")
+def cmd_run_all(interpreter="python"):
+    problems = _available_problems(Path.cwd())
+    _run_auto_tests(problems, interpreter, reason="manual")
+
+
+def cmd_rerun(interpreter="python"):
+    failed_path = LOG_DIR / "last_failed.txt"
+    if not failed_path.exists():
+        print(f"{YELLOW}直前の失敗記録がありません。{RESET}")
+        return
+
+    groups = {}
+    for line in failed_path.read_text(encoding="utf-8").splitlines():
+        parts = line.split(maxsplit=1)
+        if len(parts) != 2:
+            continue
+        problem, case_name = parts
+        if case_name == "*":
+            groups[problem] = None
+        elif groups.get(problem) is not None:
+            groups.setdefault(problem, set()).add(case_name)
+
+    if not groups:
+        print(f"{GREEN}直前に失敗したケースはありません。{RESET}")
+        return
+
+    results = []
+    for problem, case_names in sorted(groups.items()):
+        results.append(run_problem_tests(problem, interpreter, show_compile=False, case_names=case_names))
+
+    log_path = _write_test_log(results)
+    _print_auto_summary(results, log_path)
+
+
+def _watch_snapshot(cwd: Path):
+    snapshot = {}
+    for path in _watch_paths(cwd):
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        snapshot[path] = (stat.st_mtime_ns, stat.st_size)
+    return snapshot
+
+
+def _watch_paths(cwd: Path):
+    for problem in PROBLEMS:
+        for ext in SOURCE_EXTS:
+            source = cwd / f"{problem}.{ext}"
+            if source.exists():
+                yield source
+
+        testdir = cwd / "tests" / problem
+        if testdir.exists():
+            for path in testdir.rglob("*"):
+                if path.is_file():
+                    yield path
+
+    for name in CONFIG_FILES:
+        config = cwd / name
+        if config.exists():
+            yield config
+
+
+def _changed_paths(before: Dict[Path, tuple], after: Dict[Path, tuple]):
+    changed = set()
+    for path in before.keys() | after.keys():
+        if before.get(path) != after.get(path):
+            changed.add(path)
+    return changed
+
+
+def _problem_from_changed_path(cwd: Path, path: Path):
+    try:
+        rel = path.relative_to(cwd)
+    except ValueError:
+        return None
+
+    parts = rel.parts
+    if len(parts) == 1:
+        if rel.name in CONFIG_FILES:
+            return "ALL"
+        if rel.suffix in [".py", ".cpp"] and rel.stem.upper() in PROBLEMS:
+            return rel.stem.upper()
+
+    if len(parts) >= 2 and parts[0] == "tests" and parts[1].upper() in PROBLEMS:
+        return parts[1].upper()
+
+    return None
+
+
+def _changed_problems(cwd: Path, paths: Set[Path], selected: List[str]):
+    selected_set = set(selected)
+    changed = set()
+
+    for path in paths:
+        problem = _problem_from_changed_path(cwd, path)
+        if problem == "ALL":
+            return selected or _available_problems(cwd)
+        if problem:
+            changed.add(problem)
+
+    if selected_set:
+        changed &= selected_set
+    return sorted(changed)
+
+
+def _run_auto_tests(problems: List[str], interpreter="python", reason=""):
+    if not problems:
+        print(f"{YELLOW}テスト対象が見つかりません。{RESET}")
+        return
+
+    label = ",".join(problems)
+    prefix = f"{reason}: " if reason else ""
+    print(f"{prefix}running {label} ...")
+    results = [run_problem_tests(problem, interpreter, show_compile=False) for problem in problems]
+    log_path = _write_test_log(results)
+    _print_auto_summary(results, log_path)
+
+
+def cmd_watch(args):
+    cwd = Path.cwd()
+    interpreter = "python"
+    selected = []
+
+    for arg in args:
+        low = arg.lower()
+        if low in ["python", "pypy"]:
+            interpreter = low
+        elif low in ["all", "--all"]:
+            selected = []
         else:
-            out = proc.stdout.strip()
-            exp = outfile.read_text().strip() if outfile.exists() else None
-            if out == exp:
-                print(f" {GREEN}AC{RESET}"); ok += 1
-            else:
-                print(f" {RED}WA{RESET}\n expected:\n{exp}\n output:\n{out}")
-        print(f" time: {elapsed:.2f} ms")
+            selected.append(_normalize_problem(arg))
 
-    if mode == "cpp" and exe_path.exists(): exe_path.unlink()
-    print(f"\n結果: {ok}/{len(ins)} AC")
+    problems = selected or _available_problems(cwd)
+    print(f"watching {cwd}")
+    print(f"debounce: {WATCH_DEBOUNCE_SECONDS:.1f}s / log: {LOG_DIR / 'last.log'}")
+    print("Ctrl+C で終了します。")
+    _run_auto_tests(problems, interpreter, reason="initial")
+
+    snapshot = _watch_snapshot(cwd)
+    pending = set()
+    last_change_at = None
+
+    try:
+        while True:
+            time.sleep(WATCH_POLL_SECONDS)
+            current = _watch_snapshot(cwd)
+            changed = _changed_paths(snapshot, current)
+            if changed:
+                snapshot = current
+                pending.update(changed)
+                last_change_at = time.perf_counter()
+                continue
+
+            if pending and last_change_at and time.perf_counter() - last_change_at >= WATCH_DEBOUNCE_SECONDS:
+                changed = _changed_problems(cwd, pending, selected)
+                _run_auto_tests(changed, interpreter, reason="changed")
+                pending.clear()
+                last_change_at = None
+    except KeyboardInterrupt:
+        print("\nwatch stopped.")
 
 # ---------- main ----------
 def main():
@@ -195,7 +564,15 @@ def main():
         cmd_new(sys.argv[2], lang)
     elif cmd in ["run", "r", "test", "t"] and len(sys.argv) >= 3:
         interp = sys.argv[3] if len(sys.argv) == 4 else "python"
-        cmd_run(sys.argv[2], interp)
+        if sys.argv[2].lower() == "all":
+            cmd_run_all(interp)
+        else:
+            cmd_run(sys.argv[2], interp)
+    elif cmd in ["rerun", "retry"]:
+        interp = sys.argv[2] if len(sys.argv) == 3 else "python"
+        cmd_rerun(interp)
+    elif cmd in ["watch", "w", "auto"]:
+        cmd_watch(sys.argv[2:])
     elif cmd == "manual":
         if len(sys.argv) >= 3 and sys.argv[2] == "tests":
             cmd_manual_tests()
