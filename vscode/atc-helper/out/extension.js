@@ -8,7 +8,14 @@ const CONTEST_GROUPS = {
     arc: "ARC(Atcoder Regular Contest)",
     agc: "AGC(Atcoder Grand Contest)"
 };
+const DEFAULT_PATHS = {
+    root: "",
+    ...CONTEST_GROUPS
+};
 const CONTEST_GROUP_NAMES = Object.values(CONTEST_GROUPS);
+const CONFIG_FILE_NAME = "config.toml";
+const reportedConfigErrors = new Set();
+let lastWatchedRequestKey;
 function decodeUtf8(bytes) {
     const TextDecoderCtor = globalThis.TextDecoder;
     return new TextDecoderCtor("utf-8").decode(bytes);
@@ -19,13 +26,60 @@ function logMessage(message) {
 function logCurrentContestLookup(uri) {
     logMessage(`[atc-helper] looking for current contest: ${uri.fsPath}`);
 }
+function homeDir() {
+    const processLike = globalThis.process;
+    return processLike?.env?.HOME || processLike?.env?.USERPROFILE;
+}
 function isAbsolutePath(input) {
     return /^[A-Za-z]:[\\/]/.test(input) || input.startsWith("\\\\") || input.startsWith("/");
+}
+function expandHomePath(input) {
+    const home = homeDir();
+    if (!home) {
+        return input;
+    }
+    if (input === "~") {
+        return home;
+    }
+    if (input.startsWith("~/") || input.startsWith("~\\")) {
+        return `${home}${input.slice(1)}`;
+    }
+    return input;
+}
+function splitPathInput(input) {
+    return input.split(/[\\/]+/).filter((segment) => segment && segment !== ".");
+}
+function joinUriPath(baseUri, input) {
+    const segments = splitPathInput(input);
+    return segments.length ? vscode.Uri.joinPath(baseUri, ...segments) : baseUri;
+}
+function pathSegments(uri) {
+    return uri.fsPath.split(/[\\/]+/).filter(Boolean);
+}
+function parentUri(uri) {
+    const parent = vscode.Uri.joinPath(uri, "..");
+    return parent.fsPath === uri.fsPath ? undefined : parent;
+}
+function pushUniqueUri(uris, seen, uri) {
+    const key = uri.toString();
+    if (!seen.has(key)) {
+        seen.add(key);
+        uris.push(uri);
+    }
 }
 async function isDirectory(uri) {
     try {
         const stat = await vscode.workspace.fs.stat(uri);
         return stat.type === vscode.FileType.Directory;
+    }
+    catch {
+        return false;
+    }
+}
+async function exists(uri) {
+    try {
+        await vscode.workspace.fs.stat(uri);
+        return true;
     }
     catch {
         return false;
@@ -40,14 +94,314 @@ async function getCurrentContestFileStatus(uri) {
         return "missing";
     }
 }
-function joinWorkspacePath(workspaceFolder, input) {
-    const segments = input.split(/[\\/]+/).filter(Boolean);
-    return vscode.Uri.joinPath(workspaceFolder.uri, ...segments);
+async function readDirectoryNames(uri) {
+    try {
+        const entries = await vscode.workspace.fs.readDirectory(uri);
+        return entries
+            .filter(([, type]) => type === vscode.FileType.Directory)
+            .map(([name]) => name)
+            .filter((name) => ![".git", ".venv", "node_modules"].includes(name));
+    }
+    catch {
+        return [];
+    }
+}
+function currentContestUri(baseUri) {
+    return vscode.Uri.joinPath(baseUri, ".atc", "current-contest.json");
+}
+function configUri(baseUri) {
+    return vscode.Uri.joinPath(baseUri, ".atc", CONFIG_FILE_NAME);
+}
+function configProjectRoot(configFileUri) {
+    const atcDir = parentUri(configFileUri);
+    const projectRoot = atcDir ? parentUri(atcDir) : undefined;
+    return projectRoot ?? configFileUri;
+}
+async function findConfigFiles() {
+    const configs = [];
+    const seen = new Set();
+    const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
+    let missingWorkspaceConfig = workspaceFolders.length === 0;
+    for (const workspaceFolder of workspaceFolders) {
+        let current = workspaceFolder.uri;
+        let foundForWorkspace = false;
+        while (current) {
+            const candidate = configUri(current);
+            if (await exists(candidate)) {
+                pushUniqueUri(configs, seen, candidate);
+                foundForWorkspace = true;
+                break;
+            }
+            current = parentUri(current);
+        }
+        if (!foundForWorkspace) {
+            missingWorkspaceConfig = true;
+        }
+    }
+    const home = homeDir();
+    if (missingWorkspaceConfig && home) {
+        const homeConfig = vscode.Uri.file(`${home}/.atc/${CONFIG_FILE_NAME}`);
+        if (await exists(homeConfig)) {
+            pushUniqueUri(configs, seen, homeConfig);
+        }
+    }
+    return configs;
+}
+function stripTomlComment(line) {
+    let quote;
+    let escaped = false;
+    for (let i = 0; i < line.length; i += 1) {
+        const char = line[i];
+        if (quote) {
+            if (quote === "\"" && char === "\\" && !escaped) {
+                escaped = true;
+                continue;
+            }
+            if (char === quote && !escaped) {
+                quote = undefined;
+            }
+            escaped = false;
+            continue;
+        }
+        if (char === "\"" || char === "'") {
+            quote = char;
+            continue;
+        }
+        if (char === "#") {
+            return line.slice(0, i);
+        }
+    }
+    if (quote) {
+        throw new Error("unterminated string");
+    }
+    return line;
+}
+function parseTomlStringValue(value, lineNumber) {
+    const trimmed = value.trim();
+    if (!trimmed) {
+        throw new Error(`line ${lineNumber}: missing value`);
+    }
+    const quote = trimmed[0];
+    if (quote !== "\"" && quote !== "'") {
+        throw new Error(`line ${lineNumber}: [paths] values must be strings`);
+    }
+    if (!trimmed.endsWith(quote)) {
+        throw new Error(`line ${lineNumber}: unterminated string`);
+    }
+    const body = trimmed.slice(1, -1);
+    if (quote === "'") {
+        return body;
+    }
+    try {
+        return JSON.parse(trimmed);
+    }
+    catch {
+        throw new Error(`line ${lineNumber}: invalid string escape`);
+    }
+}
+function parseAtcConfig(content) {
+    const paths = {};
+    let section = "";
+    const lines = content.split(/\r?\n/);
+    for (let index = 0; index < lines.length; index += 1) {
+        const lineNumber = index + 1;
+        const line = stripTomlComment(lines[index]).trim();
+        if (!line) {
+            continue;
+        }
+        const sectionMatch = /^\[([A-Za-z0-9_.-]+)\]$/.exec(line);
+        if (sectionMatch) {
+            section = sectionMatch[1];
+            continue;
+        }
+        if (section !== "paths") {
+            continue;
+        }
+        const keyValueMatch = /^([A-Za-z0-9_-]+)\s*=\s*(.+)$/.exec(line);
+        if (!keyValueMatch) {
+            throw new Error(`line ${lineNumber}: invalid [paths] syntax`);
+        }
+        paths[keyValueMatch[1]] = parseTomlStringValue(keyValueMatch[2], lineNumber);
+    }
+    return paths;
+}
+async function readAtcConfig(configFileUri) {
+    let content;
+    try {
+        content = decodeUtf8(await vscode.workspace.fs.readFile(configFileUri));
+    }
+    catch {
+        reportConfigError(configFileUri, `Failed to read config.toml: ${configFileUri.fsPath}`);
+        return undefined;
+    }
+    try {
+        return {
+            uri: configFileUri,
+            projectRoot: configProjectRoot(configFileUri),
+            paths: {
+                ...DEFAULT_PATHS,
+                ...parseAtcConfig(content)
+            }
+        };
+    }
+    catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        reportConfigError(configFileUri, `Invalid config.toml: ${configFileUri.fsPath}\n${message}`);
+        return undefined;
+    }
+}
+function reportConfigError(configFileUri, message) {
+    const key = `${configFileUri.toString()}::${message}`;
+    logMessage(`[atc-helper] ${message}`);
+    if (!reportedConfigErrors.has(key)) {
+        reportedConfigErrors.add(key);
+        vscode.window.showErrorMessage(message);
+    }
+}
+function resolvePathFromConfigRoot(config, value) {
+    const rootValue = value.trim();
+    if (!rootValue) {
+        return undefined;
+    }
+    const expanded = expandHomePath(rootValue);
+    if (isAbsolutePath(expanded)) {
+        return vscode.Uri.file(expanded);
+    }
+    return joinUriPath(config.projectRoot, expanded);
+}
+async function getAtcConfigs() {
+    const configs = [];
+    for (const configFile of await findConfigFiles()) {
+        const config = await readAtcConfig(configFile);
+        if (config) {
+            configs.push(config);
+        }
+    }
+    return configs;
+}
+async function findMarkerRoot(startUri) {
+    let markerCandidate;
+    let current = startUri;
+    while (current) {
+        if (await exists(vscode.Uri.joinPath(current, ".git"))) {
+            return current;
+        }
+        if (!markerCandidate && (await exists(vscode.Uri.joinPath(current, ".vscode")) ||
+            await exists(vscode.Uri.joinPath(current, "pyproject.toml")))) {
+            markerCandidate = current;
+        }
+        current = parentUri(current);
+    }
+    return markerCandidate;
+}
+async function getAtcoderRoots() {
+    const roots = [];
+    const seen = new Set();
+    const configs = await getAtcConfigs();
+    for (const config of configs) {
+        const root = resolvePathFromConfigRoot(config, config.paths.root ?? "");
+        if (root) {
+            logMessage(`[atc-helper] config root: ${root.fsPath} (${config.uri.fsPath})`);
+            pushUniqueUri(roots, seen, root);
+        }
+    }
+    const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
+    for (const workspaceFolder of workspaceFolders) {
+        const markerRoot = await findMarkerRoot(workspaceFolder.uri);
+        if (markerRoot) {
+            pushUniqueUri(roots, seen, markerRoot);
+        }
+        pushUniqueUri(roots, seen, workspaceFolder.uri);
+    }
+    if (!configs.length) {
+        for (const workspaceFolder of workspaceFolders) {
+            const segments = pathSegments(workspaceFolder.uri);
+            const currentName = segments[segments.length - 1];
+            const parentName = segments[segments.length - 2];
+            if (currentName && CONTEST_GROUP_NAMES.includes(currentName)) {
+                const parent = parentUri(workspaceFolder.uri);
+                if (parent) {
+                    pushUniqueUri(roots, seen, parent);
+                }
+            }
+            if (parentName && CONTEST_GROUP_NAMES.includes(parentName)) {
+                const parent = parentUri(workspaceFolder.uri);
+                const grandParent = parent ? parentUri(parent) : undefined;
+                if (grandParent) {
+                    pushUniqueUri(roots, seen, grandParent);
+                }
+            }
+        }
+    }
+    return roots;
+}
+async function getWorkspaceRootCandidates() {
+    const roots = [];
+    const seen = new Set();
+    const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
+    for (const workspaceFolder of workspaceFolders) {
+        pushUniqueUri(roots, seen, workspaceFolder.uri);
+        const parent = parentUri(workspaceFolder.uri);
+        if (parent) {
+            pushUniqueUri(roots, seen, parent);
+            const grandParent = parentUri(parent);
+            if (grandParent) {
+                pushUniqueUri(roots, seen, grandParent);
+            }
+        }
+        const firstLevelNames = await readDirectoryNames(workspaceFolder.uri);
+        for (const firstLevelName of firstLevelNames) {
+            const firstLevelUri = vscode.Uri.joinPath(workspaceFolder.uri, firstLevelName);
+            pushUniqueUri(roots, seen, firstLevelUri);
+            const secondLevelNames = await readDirectoryNames(firstLevelUri);
+            for (const secondLevelName of secondLevelNames) {
+                pushUniqueUri(roots, seen, vscode.Uri.joinPath(firstLevelUri, secondLevelName));
+            }
+        }
+    }
+    return roots;
+}
+async function getCurrentContestRootCandidates() {
+    const roots = [];
+    const seen = new Set();
+    for (const root of await getAtcoderRoots()) {
+        pushUniqueUri(roots, seen, root);
+    }
+    for (const root of await getWorkspaceRootCandidates()) {
+        pushUniqueUri(roots, seen, root);
+    }
+    return roots;
+}
+async function getCurrentContestJsonCandidates() {
+    return (await getCurrentContestRootCandidates()).map(currentContestUri);
+}
+function contestCategoryKey(contest) {
+    const match = /^(abc|arc|agc)\d+$/i.exec(contest);
+    return match?.[1].toLowerCase();
+}
+async function resolveContestDirFromConfig(input) {
+    const categoryKey = contestCategoryKey(input);
+    for (const config of await getAtcConfigs()) {
+        const root = resolvePathFromConfigRoot(config, config.paths.root ?? "");
+        if (!root) {
+            continue;
+        }
+        const categoryDir = categoryKey ? (config.paths[categoryKey] ?? "").trim() : "";
+        const contestDir = categoryDir ? joinUriPath(root, `${categoryDir}/${input}`) : joinUriPath(root, input);
+        if (await isDirectory(contestDir)) {
+            return contestDir;
+        }
+    }
+    return undefined;
 }
 async function resolveContestDir(input) {
     if (isAbsolutePath(input)) {
-        const uri = vscode.Uri.file(input);
+        const uri = vscode.Uri.file(expandHomePath(input));
         return (await isDirectory(uri)) ? uri : undefined;
+    }
+    const configResolved = await resolveContestDirFromConfig(input);
+    if (configResolved) {
+        return configResolved;
     }
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
@@ -61,75 +415,8 @@ async function resolveContestDir(input) {
             return contestGroupUri;
         }
     }
-    const workspaceRelativeUri = joinWorkspacePath(workspaceFolder, input);
+    const workspaceRelativeUri = joinUriPath(workspaceFolder.uri, input);
     return (await isDirectory(workspaceRelativeUri)) ? workspaceRelativeUri : undefined;
-}
-function currentContestUri(baseUri) {
-    return vscode.Uri.joinPath(baseUri, ".atc", "current-contest.json");
-}
-function pathSegments(uri) {
-    return uri.fsPath.split(/[\\/]+/).filter(Boolean);
-}
-function pushUniqueUri(uris, seen, uri) {
-    const key = uri.toString();
-    if (!seen.has(key)) {
-        seen.add(key);
-        uris.push(uri);
-    }
-}
-function getLikelyAtcoderRootUris() {
-    const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
-    const roots = [];
-    const seen = new Set();
-    for (const workspaceFolder of workspaceFolders) {
-        pushUniqueUri(roots, seen, workspaceFolder.uri);
-        const segments = pathSegments(workspaceFolder.uri);
-        const currentName = segments[segments.length - 1];
-        const parentName = segments[segments.length - 2];
-        if (currentName && CONTEST_GROUP_NAMES.includes(currentName)) {
-            pushUniqueUri(roots, seen, vscode.Uri.joinPath(workspaceFolder.uri, ".."));
-        }
-        if (parentName && CONTEST_GROUP_NAMES.includes(parentName)) {
-            pushUniqueUri(roots, seen, vscode.Uri.joinPath(workspaceFolder.uri, "..", ".."));
-        }
-    }
-    return roots;
-}
-async function readDirectoryNames(uri) {
-    try {
-        const entries = await vscode.workspace.fs.readDirectory(uri);
-        return entries
-            .filter(([, type]) => type === vscode.FileType.Directory)
-            .map(([name]) => name)
-            .filter((name) => ![".git", ".venv", "node_modules"].includes(name));
-    }
-    catch {
-        return [];
-    }
-}
-async function getCurrentContestCandidates() {
-    const workspaceFolders = vscode.workspace.workspaceFolders ?? [];
-    const candidates = [];
-    const seen = new Set();
-    for (const rootUri of getLikelyAtcoderRootUris()) {
-        pushUniqueUri(candidates, seen, currentContestUri(rootUri));
-    }
-    for (const workspaceFolder of workspaceFolders) {
-        for (const group of CONTEST_GROUP_NAMES) {
-            pushUniqueUri(candidates, seen, currentContestUri(vscode.Uri.joinPath(workspaceFolder.uri, group)));
-        }
-        const firstLevelNames = await readDirectoryNames(workspaceFolder.uri);
-        for (const firstLevelName of firstLevelNames) {
-            const firstLevelUri = vscode.Uri.joinPath(workspaceFolder.uri, firstLevelName);
-            pushUniqueUri(candidates, seen, currentContestUri(firstLevelUri));
-            const secondLevelNames = await readDirectoryNames(firstLevelUri);
-            for (const secondLevelName of secondLevelNames) {
-                const secondLevelUri = vscode.Uri.joinPath(firstLevelUri, secondLevelName);
-                pushUniqueUri(candidates, seen, currentContestUri(secondLevelUri));
-            }
-        }
-    }
-    return candidates;
 }
 async function readCurrentContestFile(currentContestUri) {
     const fileStatus = await getCurrentContestFileStatus(currentContestUri);
@@ -189,7 +476,7 @@ async function readCurrentContestFile(currentContestUri) {
     };
 }
 async function readCurrentContestDir() {
-    const candidates = await getCurrentContestCandidates();
+    const candidates = await getCurrentContestJsonCandidates();
     for (const currentContestUri of candidates) {
         logCurrentContestLookup(currentContestUri);
         const currentContest = await readCurrentContestFile(currentContestUri);
@@ -199,7 +486,6 @@ async function readCurrentContestDir() {
     }
     return { kind: "missing" };
 }
-let lastWatchedRequestKey;
 function currentContestRequestKey(currentContest) {
     return `${currentContest.source.toString()}::${currentContest.requestId ?? currentContest.contestDir.toString()}`;
 }
@@ -262,8 +548,8 @@ async function openContestTerminalsFromWatchedFile(currentContestUri) {
     lastWatchedRequestKey = requestKey;
     await openContestTerminals(currentContest.contestDir);
 }
-function registerCurrentContestWatchers(context) {
-    for (const rootUri of getLikelyAtcoderRootUris()) {
+async function registerCurrentContestWatchers(context) {
+    for (const rootUri of await getCurrentContestRootCandidates()) {
         const currentContest = currentContestUri(rootUri);
         logMessage(`[atc-helper] watching current contest: ${currentContest.fsPath}`);
         const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(rootUri.fsPath, ".atc/current-contest.json"));
@@ -276,7 +562,7 @@ function registerCurrentContestWatchers(context) {
     }
 }
 function activate(context) {
-    registerCurrentContestWatchers(context);
+    void registerCurrentContestWatchers(context);
     const disposable = vscode.commands.registerCommand("atc-helper.openContestTerminals", openContestTerminalsFromCurrentContestOrInput);
     context.subscriptions.push(disposable);
 }

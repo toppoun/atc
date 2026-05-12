@@ -44,6 +44,8 @@ LEGACY_ATCODER_CATEGORY_DIRS = {
     "tessoku-book",
 }
 CONFIG_FILE_NAME = "config.toml"
+CONFIG_FILE_META_KEY = "__config_file__"
+INTERNAL_CONFIG_KEYS = {CONFIG_FILE_META_KEY}
 
 # =================
 RED    = "\033[31m"
@@ -238,18 +240,35 @@ def _resolve_contest_dir(contest: str, config: dict):
         return contest_path
 
     paths = config.get("paths", {})
-    root = str(paths.get("root") or "").strip()
+    root_path = _config_root(config)
     category_key = _contest_category_key(contest)
     category_dir = str(paths.get(category_key) or "").strip() if category_key else ""
 
-    if root and category_dir:
-        return Path(root).expanduser() / category_dir / contest
+    if root_path:
+        if category_dir:
+            return root_path / category_dir / contest
+        return root_path / contest
 
     return contest_path
 
+def _config_file_path(config: dict) -> Optional[Path]:
+    config_file = config.get(CONFIG_FILE_META_KEY)
+    return Path(config_file) if config_file else None
+
 def _config_root(config: dict) -> Optional[Path]:
     root = str(config.get("paths", {}).get("root") or "").strip()
-    return Path(root).expanduser() if root else None
+    if not root:
+        return None
+
+    root_path = Path(root).expanduser()
+    if root_path.is_absolute():
+        return root_path
+
+    config_file = _config_file_path(config)
+    if config_file:
+        return (_config_project_root(config_file) / root_path).resolve()
+
+    return (Path.cwd() / root_path).resolve()
 
 def _write_current_contest(contest_dir: Path, config: Optional[dict] = None):
     config = config or load_config(Path.cwd())
@@ -376,7 +395,9 @@ def load_config(start: Path = Path.cwd()) -> dict:
         print(f"  {e}")
         sys.exit(1)
 
-    return _deep_merge_config(config, loaded)
+    merged = _deep_merge_config(config, loaded)
+    merged[CONFIG_FILE_META_KEY] = str(config_file.resolve())
+    return merged
 
 def _default_language(config: Optional[dict] = None):
     config = config or load_config(Path.cwd())
@@ -502,6 +523,8 @@ def _toml_value(value):
 def _config_to_toml(config: dict) -> str:
     lines = []
     for section, values in config.items():
+        if section in INTERNAL_CONFIG_KEYS:
+            continue
         if lines:
             lines.append("")
         lines.append(f"[{section}]")
