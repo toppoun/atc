@@ -2,6 +2,15 @@
 
 このファイルは Codex / ChatGPT に読ませるための詳細仕様です。通常ユーザーは読む必要はありません。
 
+## まず読むファイル
+
+- `README.md`: 人間向けの概要
+- `docs/AI_CONTEXT.md`: AI向け仕様
+- `docs/CONFIG.md`: config の詳細
+- `docs/DEVELOPMENT.md`: 開発手順
+- `atc/cli.py`: Python CLI 本体
+- `vscode/atc-helper/src/extension.ts`: VS Code 拡張本体
+
 ## 概要
 
 このリポジトリは AtCoder 用の Python CLI と VS Code 拡張機能です。
@@ -208,3 +217,15 @@ C++ compiler が見つからない場合は ERROR。
 - `atc submit`
 - VS Code Tasks 連携
 - Marketplace 公開
+
+## Codex に依頼するときの注意
+
+- まず `docs/AI_CONTEXT.md` を読んでから作業すること
+- 実装済みでない機能を README に実装済みとして書かないこと
+- 既存コマンドの挙動を壊さないこと
+- CLI と VS Code 拡張の root 解決がズレないようにすること
+- config が無い場合の既存動作を維持すること
+- 変更後は以下を確認すること
+  - `python -m compileall atc`
+  - `cd vscode/atc-helper && npm run compile`
+  
