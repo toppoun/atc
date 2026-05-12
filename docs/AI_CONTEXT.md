@@ -38,6 +38,7 @@
 - `atc manual tests`
 - `atc config show`
 - `atc config init`
+- `atc config doctor`
 
 未実装:
 
@@ -183,9 +184,36 @@ watcher 候補:
 
 Python 実行で `runner.python` が見つからない場合は `sys.executable` fallback。
 
-PyPy が見つからない場合は ERROR。
+PyPy 実行を指定していて見つからない場合は ERROR。
 
-C++ compiler が見つからない場合は ERROR。
+C++ 実行で compiler が見つからない場合は ERROR。
+
+## config doctor
+
+`atc config doctor` は配布先の環境確認用コマンド。
+
+確認項目:
+
+- Python executable / version
+- `atc` command が PATH にあるか
+- 読み込まれる config file
+- resolved root
+- `paths.abc` / `paths.arc` / `paths.agc`
+- Python / C++ templates
+- runner.python / runner.pypy / runner.cpp_compiler / timeouts
+- `oj`
+- VS Code `code` command
+- VS Code extension `kouki.atc-helper`
+- `<resolved-root>/.atc/current-contest.json`
+
+終了コード:
+
+- ERROR が 0 個なら exit 0
+- ERROR が 1 個以上なら exit 1
+- WARN だけなら exit 0
+
+doctor では、PyPy / C++ compiler / `oj` / VS Code `code` command が無い場合は WARN 扱い。
+実際にその runner や機能を使うコマンドでは ERROR になり得る。
 
 ## 既知の制限
 
@@ -201,7 +229,6 @@ C++ compiler が見つからない場合は ERROR。
 
 優先度高:
 
-- `atc config doctor`
 - `atc status`
 - tests 再取得コマンド
 - VS Code terminal 再利用

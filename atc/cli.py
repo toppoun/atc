@@ -6,6 +6,7 @@ import time
 import platform
 import copy
 import re
+import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -148,6 +149,7 @@ def usage():
     print("  atc contest abc413 [py|cpp]")
     print("  atc config show")
     print("  atc config init")
+    print("  atc config doctor")
     print("  atc run A [python|pypy|cpp]")
     print("  atc run all [python|pypy|cpp]")
     print("  atc rerun [python|pypy|cpp]")
@@ -535,6 +537,350 @@ def _config_to_toml(config: dict) -> str:
             lines.append(f"value = {_toml_value(values)}")
     return "\n".join(lines) + "\n"
 
+class DoctorReport:
+    def __init__(self):
+        self.counts = {"OK": 0, "WARN": 0, "ERROR": 0, "INFO": 0}
+
+    def section(self, title: str):
+        print()
+        print(title)
+
+    def item(self, status: str, message: str, details: Optional[List[str]] = None):
+        self.counts[status] = self.counts.get(status, 0) + 1
+        print(f"  [{status}] {message}")
+        for detail in details or []:
+            print(f"       {detail}")
+
+    def summary(self):
+        print()
+        print("Summary")
+        print(f"  OK: {self.counts.get('OK', 0)}")
+        print(f"  WARN: {self.counts.get('WARN', 0)}")
+        print(f"  ERROR: {self.counts.get('ERROR', 0)}")
+        print(f"  INFO: {self.counts.get('INFO', 0)}")
+
+    @property
+    def has_error(self):
+        return self.counts.get("ERROR", 0) > 0
+
+def _load_config_for_doctor(start: Path):
+    config = _default_config()
+    config_file = _find_config_file(start)
+    if not config_file:
+        return config, None, None
+
+    try:
+        with config_file.open("rb") as f:
+            loaded = tomllib.load(f)
+    except tomllib.TOMLDecodeError as e:
+        return config, config_file, f"failed to parse config file: {e}"
+    except OSError as e:
+        return config, config_file, f"failed to read config file: {e}"
+
+    merged = _deep_merge_config(config, loaded)
+    merged[CONFIG_FILE_META_KEY] = str(config_file.resolve())
+    return merged, config_file, None
+
+def _run_doctor_command(args: List[str], timeout: float = 5.0):
+    try:
+        proc = subprocess.run(
+            args,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
+        )
+        return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return None, "", str(e)
+
+def _first_line(text: str):
+    return text.splitlines()[0] if text else ""
+
+def _display_path(path: Optional[Path]):
+    return str(path.resolve()) if path else "(none)"
+
+def _doctor_check_python(report: DoctorReport):
+    report.section("Environment")
+    report.item("OK", f"Python: {sys.executable} ({platform.python_version()})")
+
+    atc = shutil.which("atc")
+    if atc:
+        report.item("OK", f"atc command: {atc}")
+    else:
+        report.item(
+            "WARN",
+            "atc command was not found in PATH.",
+            ["Try reopening your terminal, or check your pip scripts path."],
+        )
+
+def _doctor_check_config(report: DoctorReport, config: dict, config_file: Optional[Path], config_error: Optional[str]):
+    report.section("Config")
+    if config_error:
+        report.item("ERROR", f"Config file: {_display_path(config_file)}", [config_error])
+    elif config_file:
+        report.item("OK", f"Config file: {config_file.resolve()}")
+    else:
+        report.item("INFO", "Config file: (default config)")
+
+    paths = config.get("paths", {})
+    root_value = str(paths.get("root") or "").strip()
+    root = _config_root(config)
+    if root_value:
+        if root and root.exists():
+            report.item("OK", f"Resolved root: {root}")
+        elif root:
+            report.item("WARN", f"Resolved root does not exist: {root}")
+    else:
+        report.item("INFO", "paths.root is empty. atc contest will use the current directory.")
+
+    for key, label in [("abc", "ABC"), ("arc", "ARC"), ("agc", "AGC")]:
+        value = str(paths.get(key) or "")
+        if value:
+            report.item("OK", f"paths.{key}: {value}")
+        else:
+            report.item("INFO", f"paths.{key} is empty. {label} contests will be created directly under root.")
+
+def _doctor_check_templates(report: DoctorReport, config: dict, cwd: Path):
+    report.section("Templates")
+    for ext, label in [("py", "Python"), ("cpp", "C++")]:
+        template = _resolve_template_file(ext, config, cwd)
+        if template.exists():
+            report.item("OK", f"{label} template: {template.resolve()}")
+        else:
+            report.item(
+                "WARN",
+                f"{label} template not found: {template}",
+                [f"Empty files will be created for {label}."],
+            )
+
+def _doctor_check_runner(report: DoctorReport, config: dict):
+    report.section("Runner")
+    python_cmd = _runner_command(config, "python", "python")
+    python_runner = _resolve_command(python_cmd)
+    if python_runner:
+        report.item("OK", f"Python runner: {python_runner}")
+    else:
+        report.item("OK", f"Python runner: {sys.executable}", [f"Configured runner.python was not found: {python_cmd}", "Using current Python as fallback."])
+
+    pypy_cmd = _runner_command(config, "pypy", "pypy")
+    pypy_runner = _resolve_command(pypy_cmd)
+    if not pypy_runner and pypy_cmd == "pypy":
+        pypy_runner = shutil.which("pypy3")
+    if pypy_runner:
+        report.item("OK", f"PyPy: {pypy_runner}")
+    else:
+        report.item("WARN", "PyPy: not found. Python mode still works.")
+
+    compiler_cmd = _runner_command(config, "cpp_compiler", "g++")
+    compiler = _resolve_command(compiler_cmd)
+    if compiler:
+        report.item("OK", f"C++ compiler: {compiler}")
+    else:
+        fallback_compiler = shutil.which("clang++") or shutil.which("g++")
+        if fallback_compiler:
+            report.item(
+                "WARN",
+                f"Configured C++ compiler not found: {compiler_cmd}",
+                [f"Available compiler: {fallback_compiler}", "Update runner.cpp_compiler in config.toml if you use C++."],
+            )
+        else:
+            report.item(
+                "WARN",
+                "C++ compiler not found.",
+                ["If you use C++, install Xcode Command Line Tools:", "xcode-select --install"],
+            )
+
+    report.item("OK", f"C++ flags: {' '.join(_runner_cpp_flags(config))}")
+    run_timeout = _runner_timeout(config)
+    compile_timeout = _runner_compile_timeout(config)
+    report.item("OK", f"Run timeout: {run_timeout}s" if run_timeout else "Run timeout: disabled")
+    report.item("OK", f"Compile timeout: {compile_timeout}s" if compile_timeout else "Compile timeout: disabled")
+
+def _doctor_check_tools(report: DoctorReport):
+    report.section("Tools")
+    oj = shutil.which("oj")
+    if oj:
+        code, stdout, stderr = _run_doctor_command([oj, "--version"])
+        version = _first_line(stdout or stderr)
+        if code == 0:
+            report.item("OK", f"oj: {oj}" + (f" ({version})" if version else ""))
+        else:
+            report.item("WARN", f"oj command exists but failed: {oj}", [stderr or stdout or "oj --version failed"])
+    else:
+        report.item(
+            "WARN",
+            "oj was not found.",
+            ["Sample download will not work.", "Install: python3 -m pip install online-judge-tools", "Login: oj login https://atcoder.jp/"],
+        )
+
+def _vscode_extension_id():
+    package_json = Path(__file__).resolve().parent.parent / "vscode" / "atc-helper" / "package.json"
+    if package_json.exists():
+        try:
+            data = json.loads(package_json.read_text(encoding="utf-8"))
+            publisher = data.get("publisher") or "kouki"
+            name = data.get("name") or "atc-helper"
+            return f"{publisher}.{name}"
+        except (OSError, json.JSONDecodeError):
+            pass
+    return "kouki.atc-helper"
+
+def _resolve_vscode_cli():
+    candidates: List[Path] = []
+
+    for command in ["code", "code.cmd"]:
+        found = shutil.which(command)
+        if found:
+            candidates.append(Path(found))
+
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        candidates.append(Path(local_app_data) / "Programs" / "Microsoft VS Code" / "bin" / "code.cmd")
+
+    program_files = os.environ.get("ProgramFiles")
+    if program_files:
+        candidates.append(Path(program_files) / "Microsoft VS Code" / "bin" / "code.cmd")
+
+    program_files_x86 = os.environ.get("ProgramFiles(x86)")
+    if program_files_x86:
+        candidates.append(Path(program_files_x86) / "Microsoft VS Code" / "bin" / "code.cmd")
+
+    seen: Set[str] = set()
+    for candidate in candidates:
+        try:
+            resolved = str(candidate.expanduser())
+            key = resolved.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            if candidate.exists():
+                return resolved
+        except OSError:
+            continue
+    return None
+
+def _normalize_vscode_extension_id(raw: str):
+    extension_id = raw.strip()
+    if not extension_id:
+        return ""
+    if "@" in extension_id:
+        extension_id = extension_id.split("@", 1)[0]
+    return extension_id.strip().lower()
+
+def _related_vscode_extensions(lines: List[str]):
+    related: List[str] = []
+    seen: Set[str] = set()
+    for line in lines:
+        extension_id = _normalize_vscode_extension_id(line)
+        if not extension_id:
+            continue
+        if "atc" not in extension_id:
+            continue
+        if extension_id in seen:
+            continue
+        seen.add(extension_id)
+        related.append(extension_id)
+    return related
+
+def _doctor_check_vscode(report: DoctorReport):
+    report.section("VS Code")
+    code_cmd = _resolve_vscode_cli()
+    extension_id = _vscode_extension_id()
+    if not code_cmd:
+        report.item(
+            "WARN",
+            "VS Code CLI was not found.",
+            [
+                "Could not verify whether the VS Code extension is installed.",
+                "If VS Code is installed, add the `code` command to PATH.",
+                "In VS Code, run: Shell Command: Install 'code' command in PATH",
+            ],
+        )
+        return
+
+    code, stdout, stderr = _run_doctor_command([code_cmd, "--version"])
+    version = _first_line(stdout or stderr)
+    if code == 0:
+        report.item("OK", f"VS Code CLI: {code_cmd}" + (f" ({version})" if version else ""))
+    else:
+        report.item("WARN", f"VS Code CLI exists but failed: {code_cmd}", [stderr or stdout or "code --version failed"])
+
+    code, stdout, stderr = _run_doctor_command([code_cmd, "--list-extensions"])
+    if code != 0:
+        report.item(
+            "WARN",
+            "Could not verify whether the VS Code extension is installed.",
+            [stderr or stdout or "code --list-extensions failed"],
+        )
+        return
+
+    lines = stdout.splitlines()
+    installed = {_normalize_vscode_extension_id(line) for line in lines}
+    expected = extension_id.lower()
+    if expected in installed:
+        report.item("OK", f"VS Code extension: {extension_id}")
+    else:
+        details = [f"Expected: {extension_id}"]
+        related = _related_vscode_extensions(lines)
+        if related:
+            details.append("Found related extensions:")
+            details.extend([f"  - {item}" for item in related])
+        details.append("Run ./install.sh or ./update.sh")
+        report.item("WARN", "VS Code extension is not installed.", details)
+
+def _doctor_current_contest_root(config: dict, cwd: Path):
+    root = _config_root(config)
+    return root if root else _find_project_root(cwd, config)
+
+def _doctor_check_current_contest(report: DoctorReport, config: dict, cwd: Path):
+    report.section("Current contest")
+    root = _doctor_current_contest_root(config, cwd)
+    current_file = root / ".atc" / "current-contest.json"
+    if not current_file.exists():
+        report.item("INFO", "current-contest.json not found yet.", ["Run: atc contest abc335 cpp", f"Expected path: {current_file}"])
+        return
+
+    try:
+        data = json.loads(current_file.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        report.item("WARN", f"current-contest.json is invalid JSON: {current_file}", [str(e)])
+        return
+    except OSError as e:
+        report.item("WARN", f"Failed to read current-contest.json: {current_file}", [str(e)])
+        return
+
+    contest_dir_value = data.get("contestDir")
+    if not isinstance(contest_dir_value, str) or not contest_dir_value.strip():
+        report.item("WARN", f"current-contest.json does not contain contestDir: {current_file}")
+        return
+
+    contest_dir = Path(contest_dir_value)
+    if contest_dir.exists():
+        report.item("OK", f"current-contest.json: {current_file}")
+        report.item("OK", f"contestDir: {contest_dir}")
+    else:
+        report.item("WARN", f"contestDir does not exist: {contest_dir}", [f"Source: {current_file}"])
+
+def cmd_config_doctor():
+    cwd = Path.cwd()
+    report = DoctorReport()
+    config, config_file, config_error = _load_config_for_doctor(cwd)
+
+    print("AtC Doctor")
+    _doctor_check_python(report)
+    _doctor_check_config(report, config, config_file, config_error)
+    _doctor_check_templates(report, config, cwd)
+    _doctor_check_runner(report, config)
+    _doctor_check_tools(report)
+    _doctor_check_vscode(report)
+    _doctor_check_current_contest(report, config, cwd)
+    report.summary()
+
+    if report.has_error:
+        sys.exit(1)
+
 def cmd_config(args):
     if not args:
         usage()
@@ -555,6 +901,8 @@ def cmd_config(args):
             return
         config_file.write_text(_config_to_toml(_default_config()), encoding="utf-8")
         print(f"created: {config_file.resolve()}")
+    elif subcmd == "doctor":
+        cmd_config_doctor()
     else:
         usage()
 

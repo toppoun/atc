@@ -2,13 +2,21 @@
 
 困ったときの確認ポイントです。
 
+まず診断結果を確認します。
+
+```bash
+atc config doctor
+```
+
+出力をそのまま共有すると、Python / `oj` / C++ compiler / VS Code 連携 / config / `current-contest.json` のどこで詰まっているか分かりやすくなります。
+
 ## `atc` が見つからない
 
 確認:
 
 ```bash
 which atc
-atc config show
+atc config doctor
 ```
 
 対処:
@@ -86,6 +94,18 @@ Shell Command: Install 'code' command in PATH
 
 ```bash
 code --version
+```
+
+Windows で VS Code 拡張機能が入っているか確認する例:
+
+```powershell
+code.cmd --list-extensions | Select-String -Pattern "atc"
+```
+
+または:
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\Microsoft VS Code\bin\code.cmd" --list-extensions | Select-String -Pattern "atc"
 ```
 
 ## `config.toml` が壊れている

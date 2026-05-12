@@ -36,6 +36,12 @@ chmod +x install.sh update.sh uninstall.sh
 
 インストール後は VS Code で `Developer: Reload Window` を実行するか、VS Code を再起動してください。
 
+環境確認:
+
+```bash
+atc config doctor
+```
+
 ## 更新
 
 ```bash

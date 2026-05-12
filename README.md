@@ -65,10 +65,11 @@ AtCoder 用の root ディレクトリ、またはその配下を VS Code で開
 
 ```bash
 atc config init
+atc config doctor
 atc contest abc335 cpp
 ```
 
-`atc config init` は `.atc/config.toml` を作ります。必要なら `paths.root` や `paths.abc` を編集してください。
+`atc config init` は `.atc/config.toml` を作ります。`atc config doctor` は Python、`oj`、C++ compiler、VS Code 連携などを確認します。必要なら `paths.root` や `paths.abc` を編集してください。
 
 ## よく使うコマンド
 
@@ -85,6 +86,7 @@ atc contest abc335 cpp
 | `atc manual A B C cpp` | 問題ファイルを手動作成 |
 | `atc manual tests` | 現在のフォルダ名を contest ID としてサンプル取得 |
 | `atc config show` | 現在の設定を表示 |
+| `atc config doctor` | 環境と設定を診断 |
 
 詳しい使い方は [docs/USAGE.md](docs/USAGE.md) を見てください。
 

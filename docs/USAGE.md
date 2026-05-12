@@ -117,10 +117,12 @@ atc manual tests
 ```bash
 atc config init
 atc config show
+atc config doctor
 ```
 
 - `init`: カレントディレクトリに `.atc/config.toml` を作成
 - `show`: 現在読み込まれる config を表示
+- `doctor`: Python、config、templates、runner、`oj`、VS Code 連携、`current-contest.json` を診断
 
 config の詳細は [CONFIG.md](CONFIG.md) を見てください。
 
