@@ -108,6 +108,18 @@ code.cmd --list-extensions | Select-String -Pattern "atc"
 & "$env:LOCALAPPDATA\Programs\Microsoft VS Code\bin\code.cmd" --list-extensions | Select-String -Pattern "atc"
 ```
 
+## `atc config doctor` で VS Code が開く
+
+現在の `doctor` は、VS Code のウィンドウやタブを開かないように、`code --list-extensions` を自動実行しません。
+
+もし古いバージョンの `doctor` 実行時に VS Code が開く場合は、VS Code extension check の結果を信用しすぎず、VS Code の Extensions 画面で `AtC Helper` / `atc-helper` を確認してください。
+
+手動確認する場合だけ、次のコマンドを実行してください。
+
+```powershell
+code.cmd --list-extensions | Select-String -Pattern "atc"
+```
+
 ## `config.toml` が壊れている
 
 確認:

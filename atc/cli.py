@@ -581,11 +581,12 @@ def _load_config_for_doctor(start: Path):
     merged[CONFIG_FILE_META_KEY] = str(config_file.resolve())
     return merged, config_file, None
 
-def _run_doctor_command(args: List[str], timeout: float = 5.0):
+def _run_doctor_command(args: List[str], timeout: float = 3.0):
     try:
         proc = subprocess.run(
             args,
             capture_output=True,
+            stdin=subprocess.DEVNULL,
             text=True,
             encoding="utf-8",
             errors="replace",
@@ -730,7 +731,7 @@ def _vscode_extension_id():
 def _resolve_vscode_cli():
     candidates: List[Path] = []
 
-    for command in ["code", "code.cmd"]:
+    for command in ["code.cmd", "code"]:
         found = shutil.which(command)
         if found:
             candidates.append(Path(found))
@@ -761,28 +762,63 @@ def _resolve_vscode_cli():
             continue
     return None
 
-def _normalize_vscode_extension_id(raw: str):
-    extension_id = raw.strip()
-    if not extension_id:
-        return ""
-    if "@" in extension_id:
-        extension_id = extension_id.split("@", 1)[0]
-    return extension_id.strip().lower()
+def _vscode_extension_dirs():
+    dirs = [
+        Path.home() / ".vscode" / "extensions",
+        Path.home() / ".vscode-insiders" / "extensions",
+    ]
+    portable_root = os.environ.get("VSCODE_PORTABLE")
+    if portable_root:
+        dirs.append(Path(portable_root) / "data" / "extensions")
+    return dirs
 
-def _related_vscode_extensions(lines: List[str]):
+def _extension_id_from_package_json(extension_dir: Path):
+    package_json = extension_dir / "package.json"
+    if not package_json.exists():
+        return None
+    try:
+        data = json.loads(package_json.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    publisher = str(data.get("publisher") or "").strip()
+    name = str(data.get("name") or "").strip()
+    if not publisher or not name:
+        return None
+    return f"{publisher}.{name}".lower()
+
+def _extension_dir_matches(extension_dir: Path, expected: str):
+    package_id = _extension_id_from_package_json(extension_dir)
+    if package_id:
+        return package_id == expected
+
+    name = extension_dir.name.lower()
+    return name == expected or name.startswith(expected + "-") or name.startswith(expected + "@")
+
+def _find_vscode_extension_on_disk(extension_id: str):
+    expected = extension_id.lower()
     related: List[str] = []
-    seen: Set[str] = set()
-    for line in lines:
-        extension_id = _normalize_vscode_extension_id(line)
-        if not extension_id:
+    seen_related: Set[str] = set()
+    searched: List[Path] = []
+
+    for extensions_dir in _vscode_extension_dirs():
+        searched.append(extensions_dir)
+        if not extensions_dir.exists():
             continue
-        if "atc" not in extension_id:
+        try:
+            children = [path for path in extensions_dir.iterdir() if path.is_dir()]
+        except OSError:
             continue
-        if extension_id in seen:
-            continue
-        seen.add(extension_id)
-        related.append(extension_id)
-    return related
+        for child in children:
+            if _extension_dir_matches(child, expected):
+                return child, related, searched
+
+            package_id = _extension_id_from_package_json(child)
+            related_id = package_id or child.name.lower()
+            if "atc" in related_id and related_id not in seen_related:
+                seen_related.add(related_id)
+                related.append(related_id)
+
+    return None, related, searched
 
 def _doctor_check_vscode(report: DoctorReport):
     report.section("VS Code")
@@ -793,42 +829,36 @@ def _doctor_check_vscode(report: DoctorReport):
             "WARN",
             "VS Code CLI was not found.",
             [
-                "Could not verify whether the VS Code extension is installed.",
+                "Could not verify the VS Code extension from the CLI.",
+                "This does not mean the extension is not installed.",
                 "If VS Code is installed, add the `code` command to PATH.",
                 "In VS Code, run: Shell Command: Install 'code' command in PATH",
             ],
         )
-        return
-
-    code, stdout, stderr = _run_doctor_command([code_cmd, "--version"])
-    version = _first_line(stdout or stderr)
-    if code == 0:
-        report.item("OK", f"VS Code CLI: {code_cmd}" + (f" ({version})" if version else ""))
     else:
-        report.item("WARN", f"VS Code CLI exists but failed: {code_cmd}", [stderr or stdout or "code --version failed"])
-
-    code, stdout, stderr = _run_doctor_command([code_cmd, "--list-extensions"])
-    if code != 0:
         report.item(
-            "WARN",
-            "Could not verify whether the VS Code extension is installed.",
-            [stderr or stdout or "code --list-extensions failed"],
+            "INFO",
+            f"VS Code CLI candidate: {code_cmd}",
+            ["Not executed by doctor to avoid opening VS Code."],
         )
-        return
 
-    lines = stdout.splitlines()
-    installed = {_normalize_vscode_extension_id(line) for line in lines}
-    expected = extension_id.lower()
-    if expected in installed:
-        report.item("OK", f"VS Code extension: {extension_id}")
+    installed_path, related, searched = _find_vscode_extension_on_disk(extension_id)
+    if installed_path:
+        report.item("OK", f"VS Code extension: {extension_id}", [f"Found: {installed_path}"])
     else:
-        details = [f"Expected: {extension_id}"]
-        related = _related_vscode_extensions(lines)
+        details = [
+            "Could not verify the VS Code extension without running VS Code CLI.",
+            "This does not mean the extension is not installed.",
+            f"Expected: {extension_id}",
+        ]
         if related:
             details.append("Found related extensions:")
             details.extend([f"  - {item}" for item in related])
-        details.append("Run ./install.sh or ./update.sh")
-        report.item("WARN", "VS Code extension is not installed.", details)
+        if searched:
+            details.append("Searched extension directories:")
+            details.extend([f"  - {path}" for path in searched])
+        details.append("You can verify manually from VS Code Extensions.")
+        report.item("WARN", "VS Code extension: could not verify", details)
 
 def _doctor_current_contest_root(config: dict, cwd: Path):
     root = _config_root(config)
