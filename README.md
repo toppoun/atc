@@ -40,6 +40,55 @@ AtCoder のコンテスト準備、サンプル取得、ローカルテスト、
 
 `pyproject.toml` 上の `requires-python` は `>=3.8` ですが、開発・利用環境としては Python 3.10 以上を推奨します。
 
+### macOS かんたんインストール
+
+macOS では、リポジトリを clone して `install.sh` を実行すると、Python CLI と VS Code 拡張機能をまとめてインストールできます。
+
+```bash
+git clone <repo>
+cd <repo>
+chmod +x install.sh update.sh uninstall.sh
+./install.sh
+```
+
+必要なもの:
+
+- Python 3
+- Node.js / npm
+- VS Code
+- VS Code の `code` コマンド
+- Git
+- online-judge-tools
+- C++ を使う場合は Xcode Command Line Tools
+
+`code` コマンドが無い場合は、VS Code で Command Palette を開き、次を実行してください。
+
+```text
+Shell Command: Install 'code' command in PATH
+```
+
+C++ コンパイラが無い場合は、Xcode Command Line Tools を入れてください。
+
+```bash
+xcode-select --install
+```
+
+インストール後、VS Code で `Developer: Reload Window` を実行するか、VS Code を再起動してください。VS Code 連携を使う場合は、AtCoder の root ディレクトリ、または `.atc/current-contest.json` が作られる project root を VS Code で開くことを推奨します。
+
+更新:
+
+```bash
+./update.sh
+```
+
+アンインストール:
+
+```bash
+./uninstall.sh
+```
+
+`install.sh` / `update.sh` / `uninstall.sh` の実行には実行権限が必要です。権限がない場合は、もう一度 `chmod +x install.sh update.sh uninstall.sh` を実行してください。
+
 ### Python CLI のインストール
 
 リポジトリ直下で以下を実行します。
