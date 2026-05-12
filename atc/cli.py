@@ -788,6 +788,12 @@ def _print_detailed_result(result: ProblemResult):
             print(f" {GREEN}AC{RESET}")
         elif case.status == "RE":
             print(f" {RED}RE{RESET}\n{case.stderr}")
+        elif case.status == "TLE":
+            print(f" {RED}TLE{RESET}")
+            if case.stderr:
+                print(case.stderr)
+            if case.output:
+                print(f" output:\n{case.output}")
         else:
             print(f" {RED}WA{RESET}\n expected:\n{case.expected}\n output:\n{case.output}")
         print(f" time: {case.elapsed_ms:.2f} ms")
@@ -909,6 +915,8 @@ def cmd_rerun(run_language: Optional[str] = None):
 
     log_path = _write_test_log(results)
     _print_auto_summary(results, log_path)
+    if not _results_passed(results):
+        sys.exit(1)
 
 
 def _watch_snapshot(cwd: Path, problems: Optional[List[str]] = None):

@@ -186,7 +186,9 @@ atc/templates/template.cpp
 
 CLI 内ではパッケージ内の `templates/template.py` / `templates/template.cpp` として読み込まれます。内容を変えたい場合は、上記ファイルを直接編集してください。
 
-配布後にユーザーごとのテンプレートを持つ場合は、project root の `templates/` 配下に置き、`.atc/config.toml` から参照する形を推奨します。
+`pip install .` でインストールした場合も、パッケージ内の標準テンプレートは同梱されます。
+
+ユーザーごとのテンプレートを持つ場合は、project root の `templates/` 配下に置き、`.atc/config.toml` から参照する形を推奨します。
 
 ```text
 <project-root>/templates/template.py
@@ -333,6 +335,10 @@ vscode/atc-helper/
 - 左側: `atc terminal`
 - 右側: `atc watch`
 
+VS Code 連携を使う場合は、AtCoder 用の root ディレクトリ、または `.atc/current-contest.json` が作られる project root を VS Code で開くことを推奨します。
+
+現時点の VS Code 拡張機能は `config.toml` を直接読みません。CLI が更新する `.atc/current-contest.json` を監視して動作します。
+
 ### ディレクトリ構造について
 
 特定のディレクトリ構造は必須ではありません。`ABC(Atcoder Beginner Contest)` のようなカテゴリフォルダが無い環境でも利用できます。
@@ -435,13 +441,13 @@ code --install-extension .\atc-helper-0.0.1.vsix --force
 - ARC: AtCoder Regular Contest
 - AGC: AtCoder Grand Contest
 
-現在の標準問題セットは `A`, `B`, `C`, `D`, `E` です。
+デフォルトの標準問題セットは `A`, `B`, `C`, `D`, `E` です。
 
 ```python
 PROBLEMS = ["A", "B", "C", "D", "E"]
 ```
 
-通常は `.atc/config.toml` の `[defaults].problems` を変更すれば、作成・取得・watch 対象の問題数を変えられます。config が無い場合は、CLI 内のデフォルト値として `PROBLEMS` が使われます。
+通常は `.atc/config.toml` の `[defaults].problems` を変更すれば、作成・取得・watch 対象の問題リストを変えられます。config が無い場合は、CLI 内のデフォルト値として `PROBLEMS` が使われます。
 
 サンプル取得時の URL は、現在は次の形式に依存しています。
 
@@ -685,6 +691,8 @@ g++ --version
 - `.atc/current-contest.json` がワークスペース直下、または拡張機能が探索する場所に作られているか
 - `AtC: Open Contest Terminals` がコマンドパレットに出るか
 
+VS Code 拡張機能は現時点では `.atc/config.toml` を直接読みません。`atc contest` によって更新された `.atc/current-contest.json` を見て動作します。
+
 インストール確認:
 
 ```powershell
@@ -728,6 +736,7 @@ code --install-extension .\atc-helper-0.0.1.vsix --force
 - VS Code を Reload したか
 
 `atc contest` は VS Code の `code` コマンドを直接起動しません。CLI が `.atc/current-contest.json` を更新し、VS Code 拡張機能がそれを監視して反応します。
+VS Code 拡張機能は `config.toml` を直接読まないため、VS Code 連携を使う場合は `.atc/current-contest.json` が作られる AtCoder root / project root を VS Code で開く運用を推奨します。
 
 ## 📝 使用例
 
@@ -742,7 +751,8 @@ atc contest abc413 cpp
 
 - `paths.root` が設定済みなら、`abc413/` は `paths.root / paths.abc` 配下に作成
 - `paths.root` が空なら、現在のディレクトリ直下に `abc413/` を作成
-- `A.cpp` から `E.cpp` を作成
+- デフォルトでは `A.cpp` から `E.cpp` を作成
+- 作成する問題リストは `[defaults].problems` で変更可能
 - サンプル取得
 - `paths.root` が設定済みなら `<paths.root>\.atc\current-contest.json` を更新
 - 未設定なら `<project-root>\.atc\current-contest.json` を更新
@@ -781,7 +791,8 @@ atc new abc413 py
 期待される動作:
 
 - `abc413/` を作成
-- `A.py` から `E.py` を作成
+- デフォルトでは `A.py` から `E.py` を作成
+- 作成する問題リストは `[defaults].problems` で変更可能
 - サンプル取得
 - VS Code 拡張機能用の `current-contest.json` は更新しない
 

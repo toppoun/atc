@@ -15,3 +15,12 @@ dependencies = [
 
 [project.scripts]
 atc = "atc.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["atc*"]
+
+[tool.setuptools.package-data]
+atc = [
+  "templates/template.py",
+  "templates/template.cpp"
+]
