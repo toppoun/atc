@@ -89,6 +89,23 @@ root:
 /Users/friend/atcoder
 ```
 
+## watch config
+
+`[watch]` は任意設定。既存ユーザーの `.atc/config.toml` に無くても、`load_config()` の default config と deep merge で補完される。
+
+デフォルト:
+
+```toml
+[watch]
+poll_seconds = 0.25
+debounce_seconds = 1.5
+```
+
+- `poll_seconds`: 推奨範囲 `0.1` 〜 `5.0`
+- `debounce_seconds`: 推奨範囲 `0.0` 〜 `10.0`
+
+一部だけ指定された場合、未指定キーは default で補完する。値が不正な場合は `atc config doctor` で WARN を出し、`atc watch` 実行時は安全な default に fallback する。既存 config を勝手に書き換えない。
+
 ```toml
 root = "contests"
 ```

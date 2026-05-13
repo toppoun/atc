@@ -23,6 +23,10 @@ TEMPLATE_DIR = Path(__file__).parent / "templates"
 LOG_DIR = Path(".atc") / "test-runs"
 WATCH_DEBOUNCE_SECONDS = 1.5
 WATCH_POLL_SECONDS = 0.25
+WATCH_POLL_SECONDS_MIN = 0.1
+WATCH_POLL_SECONDS_MAX = 5.0
+WATCH_DEBOUNCE_SECONDS_MIN = 0.0
+WATCH_DEBOUNCE_SECONDS_MAX = 10.0
 SOURCE_EXTS = ["py", "cpp"]
 CONFIG_FILES = {
     "pyproject.toml",
@@ -355,6 +359,10 @@ def _default_config() -> dict:
             "timeout_seconds": 2.0,
             "compile_timeout_seconds": 10.0,
         },
+        "watch": {
+            "poll_seconds": WATCH_POLL_SECONDS,
+            "debounce_seconds": WATCH_DEBOUNCE_SECONDS,
+        },
     }
 
 def _find_config_file(start: Path) -> Optional[Path]:
@@ -438,6 +446,45 @@ def _runner_compile_timeout(config: dict):
     except (TypeError, ValueError):
         return 10.0
     return timeout if timeout > 0 else None
+
+def _watch_settings(config: Optional[dict] = None):
+    config = config or load_config(Path.cwd())
+    raw_watch = config.get("watch", {})
+    defaults = _default_config()["watch"]
+    warnings = []
+
+    if not isinstance(raw_watch, dict):
+        return defaults["poll_seconds"], defaults["debounce_seconds"], ["[watch] must be a table. Using default watch settings."]
+
+    def read_seconds(key: str, default: float, min_value: float, max_value: float):
+        if key not in raw_watch:
+            return default
+
+        raw_value = raw_watch.get(key)
+        if isinstance(raw_value, bool) or not isinstance(raw_value, (int, float)):
+            warnings.append(f"watch.{key} must be a number. Using default: {default}")
+            return default
+
+        value = float(raw_value)
+        if not (min_value <= value <= max_value):
+            warnings.append(f"watch.{key} must be between {min_value} and {max_value}. Using default: {default}")
+            return default
+
+        return value
+
+    poll_seconds = read_seconds(
+        "poll_seconds",
+        defaults["poll_seconds"],
+        WATCH_POLL_SECONDS_MIN,
+        WATCH_POLL_SECONDS_MAX,
+    )
+    debounce_seconds = read_seconds(
+        "debounce_seconds",
+        defaults["debounce_seconds"],
+        WATCH_DEBOUNCE_SECONDS_MIN,
+        WATCH_DEBOUNCE_SECONDS_MAX,
+    )
+    return poll_seconds, debounce_seconds, warnings
 
 def _resolve_command(command: str):
     path = Path(command).expanduser()
@@ -699,6 +746,14 @@ def _doctor_check_runner(report: DoctorReport, config: dict):
     report.item("OK", f"Run timeout: {run_timeout}s" if run_timeout else "Run timeout: disabled")
     report.item("OK", f"Compile timeout: {compile_timeout}s" if compile_timeout else "Compile timeout: disabled")
 
+def _doctor_check_watch(report: DoctorReport, config: dict):
+    report.section("Watch")
+    poll_seconds, debounce_seconds, warnings = _watch_settings(config)
+    if warnings:
+        report.item("WARN", "Watch settings: invalid values were ignored.", warnings)
+    report.item("OK", f"poll_seconds: {poll_seconds}")
+    report.item("OK", f"debounce_seconds: {debounce_seconds}")
+
 def _doctor_check_tools(report: DoctorReport):
     report.section("Tools")
     oj = shutil.which("oj")
@@ -903,6 +958,7 @@ def cmd_config_doctor():
     _doctor_check_config(report, config, config_file, config_error)
     _doctor_check_templates(report, config, cwd)
     _doctor_check_runner(report, config)
+    _doctor_check_watch(report, config)
     _doctor_check_tools(report)
     _doctor_check_vscode(report)
     _doctor_check_current_contest(report, config, cwd)
@@ -1416,6 +1472,7 @@ def cmd_watch(args):
     cwd = Path.cwd()
     config = load_config(cwd)
     configured_problems = _config_problems(config)
+    poll_seconds, debounce_seconds, _watch_warnings = _watch_settings(config)
     run_language = None
     selected = []
 
@@ -1431,7 +1488,7 @@ def cmd_watch(args):
     watch_problems = selected or configured_problems
     problems = selected or _available_problems(cwd, configured_problems)
     print(f"watching {cwd}")
-    print(f"debounce: {WATCH_DEBOUNCE_SECONDS:.1f}s / log: {LOG_DIR / 'last.log'}")
+    print(f"poll: {poll_seconds:.2f}s / debounce: {debounce_seconds:.2f}s / log: {LOG_DIR / 'last.log'}")
     print("Ctrl+C で終了します。")
     _run_auto_tests(problems, run_language, reason="initial")
 
@@ -1441,7 +1498,7 @@ def cmd_watch(args):
 
     try:
         while True:
-            time.sleep(WATCH_POLL_SECONDS)
+            time.sleep(poll_seconds)
             current = _watch_snapshot(cwd, watch_problems)
             changed = _changed_paths(snapshot, current)
             if changed:
@@ -1450,7 +1507,7 @@ def cmd_watch(args):
                 last_change_at = time.perf_counter()
                 continue
 
-            if pending and last_change_at and time.perf_counter() - last_change_at >= WATCH_DEBOUNCE_SECONDS:
+            if pending and last_change_at and time.perf_counter() - last_change_at >= debounce_seconds:
                 changed = _changed_problems(cwd, pending, selected, watch_problems)
                 _run_auto_tests(changed, run_language, reason="changed")
                 pending.clear()

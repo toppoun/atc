@@ -203,6 +203,32 @@ compile_timeout_seconds = 10.0
 - `python` が見つからない場合、CLI は `sys.executable` fallback を使います
 - `pypy` が見つからない場合は分かりやすい ERROR を返します
 
+## `[watch]`
+
+`atc watch` の監視間隔です。任意設定なので、省略した場合はデフォルト値が使われます。
+
+既に `.atc/config.toml` を作成済みの場合も、必ず追記する必要はありません。必要になった時だけ手動で `[watch]` を追記してください。
+
+```toml
+[watch]
+poll_seconds = 0.25
+debounce_seconds = 1.5
+```
+
+- `poll_seconds`: ファイル変更を確認する間隔です。推奨範囲は `0.1` 〜 `5.0` です。
+- `debounce_seconds`: 変更検知後にテスト実行を待つ時間です。推奨範囲は `0.0` 〜 `10.0` です。
+
+一部だけ指定した場合、指定していない値はデフォルトで補完されます。
+
+```toml
+[watch]
+debounce_seconds = 2.0
+```
+
+この場合、`poll_seconds` はデフォルトの `0.25`、`debounce_seconds` は `2.0` になります。
+
+値が不正な場合、`atc config doctor` で WARN を表示し、実行時は安全なデフォルト値に fallback します。
+
 ## VS Code 拡張機能との関係
 
 VS Code 拡張機能は主に `[paths]` を読み、`.atc/current-contest.json` の場所を決めます。

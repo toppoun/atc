@@ -71,6 +71,8 @@ atc contest abc335 cpp
 
 `atc config init` は `.atc/config.toml` を作ります。`atc config doctor` は Python、`oj`、C++ compiler、VS Code 連携などを確認します。必要なら `paths.root` や `paths.abc` を編集してください。
 
+既に `.atc/config.toml` を作成済みでも、追加された任意設定はデフォルト値で補完されます。たとえば `[watch]` は追記しなくても `poll_seconds = 0.25`、`debounce_seconds = 1.5` で動きます。
+
 ## よく使うコマンド
 
 | コマンド | 用途 |
