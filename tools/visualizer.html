@@ -1,0 +1,1584 @@
+<!doctype html>
+<html lang="ja" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AtCoder Visualizer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101217;
+      --panel: #171a21;
+      --panel-2: #1d222b;
+      --panel-3: #242a35;
+      --border: #343b48;
+      --text: #edf1f7;
+      --muted: #aab3c2;
+      --subtle: #778295;
+      --accent: #4cc9f0;
+      --accent-2: #72e4a6;
+      --danger: #ff7a7a;
+      --warning: #f7c873;
+      --control-bg: #0c0f14;
+      --button-hover: #2c3442;
+      --button-hover-border: #586273;
+      --primary: #13647a;
+      --primary-hover: #197994;
+      --primary-text: #f4fbff;
+      --output-bg: #0c0f14;
+      --svg-bg: #0f131a;
+      --svg-border: #202733;
+      --node: #222a38;
+      --node-stroke: #69d2ff;
+      --edge: #8793a6;
+      --label-bg: #11151c;
+      --label-stroke: #394251;
+      --grid-line: #3a4250;
+      --grid-open: #242a33;
+      --grid-wall: #11151c;
+      --grid-start: #146c43;
+      --grid-goal: #8a3a2f;
+      --grid-digit: #284b7d;
+      --grid-alpha: #58407a;
+      --grid-other: #514b3b;
+      --grid-text: #edf1f7;
+      --grid-dot-text: #aeb7c6;
+      --error-text: #ffd4d4;
+      --warning-text: #ffe3a6;
+      --ok-text: #c9f7dc;
+      --focus-shadow: rgba(76, 201, 240, 0.16);
+    }
+
+    :root[data-theme="light"] {
+      color-scheme: light;
+      --bg: #f6f8fb;
+      --panel: #ffffff;
+      --panel-2: #eef2f7;
+      --panel-3: #f7f9fc;
+      --border: #cfd7e3;
+      --text: #17202c;
+      --muted: #4c5b6f;
+      --subtle: #66758a;
+      --accent: #1677b8;
+      --accent-2: #178a55;
+      --danger: #c0393f;
+      --warning: #8a5a00;
+      --control-bg: #ffffff;
+      --button-hover: #e7edf5;
+      --button-hover-border: #9dafc4;
+      --primary: #176b9f;
+      --primary-hover: #125a87;
+      --primary-text: #ffffff;
+      --output-bg: #f9fbfd;
+      --svg-bg: #ffffff;
+      --svg-border: #d7dfeb;
+      --node: #eef8ff;
+      --node-stroke: #1b83c1;
+      --edge: #667384;
+      --label-bg: #fff7d6;
+      --label-stroke: #d6bd62;
+      --grid-line: #bdc8d6;
+      --grid-open: #ffffff;
+      --grid-wall: #4b5563;
+      --grid-start: #2e9d62;
+      --grid-goal: #d65a4a;
+      --grid-digit: #8fbef0;
+      --grid-alpha: #b59be6;
+      --grid-other: #d5c58c;
+      --grid-text: #17202c;
+      --grid-dot-text: #5f6f82;
+      --error-text: #8f2529;
+      --warning-text: #6f4b00;
+      --ok-text: #11633c;
+      --focus-shadow: rgba(22, 119, 184, 0.18);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    .app-shell {
+      display: grid;
+      gap: 14px;
+      width: min(1440px, 100%);
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 12px 14px;
+    }
+
+    .brand {
+      font-size: 22px;
+      font-weight: 800;
+    }
+
+    .topbar-note {
+      color: var(--muted);
+      font-size: 13px;
+      text-align: right;
+    }
+
+    .main-layout {
+      display: grid;
+      grid-template-columns: minmax(340px, 0.92fr) minmax(420px, 1.08fr);
+      gap: 14px;
+      align-items: stretch;
+      min-height: 470px;
+    }
+
+    .editor-panel,
+    .visual-panel,
+    .settings-panel,
+    .actions-panel {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    .editor-panel,
+    .visual-panel {
+      display: grid;
+      min-height: 470px;
+      overflow: hidden;
+    }
+
+    .editor-panel {
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+
+    .visual-panel {
+      grid-template-rows: auto auto minmax(0, 1fr);
+    }
+
+    .panel-heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel-2);
+      padding: 10px 12px;
+    }
+
+    .panel-heading h2,
+    .panel-heading-title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .panel-meta {
+      color: var(--muted);
+      font-size: 12px;
+      text-align: right;
+    }
+
+    .editor-body {
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) auto;
+      min-height: 0;
+    }
+
+    .editor-wrapper {
+      display: grid;
+      grid-template-columns: 48px minmax(0, 1fr);
+      min-height: 0;
+      background: var(--control-bg);
+    }
+
+    .line-numbers {
+      overflow: hidden;
+      border-right: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--subtle);
+      padding: 12px 8px 12px 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 13px;
+      line-height: 1.55;
+      text-align: right;
+      user-select: none;
+    }
+
+    .line-numbers span {
+      display: block;
+      height: 20.15px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 0;
+      resize: none;
+      border: 0;
+      border-radius: 0;
+      background: var(--control-bg);
+      color: var(--text);
+      padding: 12px;
+      line-height: 1.55;
+      outline: none;
+      tab-size: 2;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 13px;
+    }
+
+    textarea:focus,
+    input:focus,
+    select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--focus-shadow);
+    }
+
+    textarea:focus {
+      box-shadow: inset 0 0 0 2px var(--accent);
+    }
+
+    .checks {
+      display: grid;
+      gap: 8px;
+    }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: fit-content;
+      color: var(--text);
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .check-row input {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+    }
+
+    .number-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .number-field label {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    input[type="number"] {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--control-bg);
+      color: var(--text);
+      padding: 10px 12px;
+      outline: none;
+    }
+
+    select {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--control-bg);
+      color: var(--text);
+      padding: 10px 12px;
+      outline: none;
+    }
+
+    .input-help {
+      margin: 8px 0 0;
+      color: var(--subtle);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .editor-help {
+      border-top: 1px solid var(--border);
+      background: var(--panel);
+      padding: 10px 12px;
+    }
+
+    .settings-panel {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+      gap: 10px;
+      align-items: end;
+      padding: 12px;
+    }
+
+    .setting-group label {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .actions-panel {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      padding: 12px;
+    }
+
+    .actions-panel .spacer {
+      flex: 1 1 auto;
+    }
+
+    .button-row,
+    .sample-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    button {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel-3);
+      color: var(--text);
+      padding: 10px 12px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: var(--button-hover-border);
+      background: var(--button-hover);
+    }
+
+    .primary {
+      border-color: rgba(76, 201, 240, 0.72);
+      background: var(--primary);
+      color: var(--primary-text);
+      font-weight: 700;
+    }
+
+    .primary:hover {
+      background: var(--primary-hover);
+    }
+
+    .status {
+      display: none;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel-2);
+      padding: 10px 12px;
+      color: var(--muted);
+      white-space: pre-wrap;
+      margin: 12px 12px 0;
+    }
+
+    .status.is-visible {
+      display: block;
+    }
+
+    .status.is-error {
+      border-color: rgba(255, 122, 122, 0.45);
+      color: var(--error-text);
+    }
+
+    .status.is-warning {
+      border-color: rgba(247, 200, 115, 0.45);
+      color: var(--warning-text);
+    }
+
+    .status.is-ok {
+      border-color: rgba(114, 228, 166, 0.35);
+      color: var(--ok-text);
+    }
+
+    .visual-output {
+      display: grid;
+      place-items: start center;
+      align-content: start;
+      overflow: auto;
+      background: var(--output-bg);
+      padding: 14px;
+      min-height: 0;
+    }
+
+    .empty {
+      display: grid;
+      place-items: center;
+      min-height: 240px;
+      color: var(--subtle);
+      text-align: center;
+      align-self: center;
+      justify-self: center;
+    }
+
+    .section-error {
+      padding: 14px;
+      color: var(--error-text);
+      white-space: pre-wrap;
+      align-self: start;
+      justify-self: stretch;
+    }
+
+    .visual-svg {
+      display: block;
+      background: var(--svg-bg);
+      border: 1px solid var(--svg-border);
+      border-radius: 8px;
+    }
+
+    .visual-svg.fit-width {
+      width: auto;
+      max-width: min(100%, var(--fit-max-width, 860px));
+      height: auto;
+    }
+
+    .edge,
+    .tree-edge {
+      stroke: var(--edge);
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .arrowhead {
+      fill: var(--edge);
+    }
+
+    .node circle {
+      fill: var(--node);
+      stroke: var(--node-stroke);
+      stroke-width: 2;
+    }
+
+    .node text {
+      fill: var(--text);
+      font-size: 13px;
+      font-weight: 700;
+      pointer-events: none;
+    }
+
+    .weight-label rect {
+      fill: var(--label-bg);
+      stroke: var(--label-stroke);
+      stroke-width: 1;
+    }
+
+    .weight-label text {
+      fill: var(--warning);
+      font-size: 12px;
+      font-weight: 700;
+      pointer-events: none;
+    }
+
+    .grid-cell {
+      stroke: var(--grid-line);
+      stroke-width: 1;
+    }
+
+    .grid-open {
+      fill: var(--grid-open);
+    }
+
+    .grid-wall {
+      fill: var(--grid-wall);
+    }
+
+    .grid-start {
+      fill: var(--grid-start);
+    }
+
+    .grid-goal {
+      fill: var(--grid-goal);
+    }
+
+    .grid-digit {
+      fill: var(--grid-digit);
+    }
+
+    .grid-alpha {
+      fill: var(--grid-alpha);
+    }
+
+    .grid-other {
+      fill: var(--grid-other);
+    }
+
+    .grid-text {
+      fill: var(--grid-text);
+      font-weight: 800;
+      pointer-events: none;
+    }
+
+    .grid-text.is-dot {
+      fill: var(--grid-dot-text);
+      font-weight: 700;
+    }
+
+    @media (max-width: 900px) {
+      .app-shell {
+        padding: 10px;
+      }
+
+      .topbar {
+        display: block;
+      }
+
+      .topbar-note {
+        margin-top: 4px;
+        text-align: left;
+      }
+
+      .main-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .editor-panel,
+      .visual-panel {
+        min-height: 360px;
+      }
+
+      .settings-panel {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">AtCoder Visualizer</div>
+      <div class="topbar-note">Single-file SVG visualizer for graphs, trees, and grids.</div>
+    </header>
+
+    <main class="main-layout">
+      <section class="editor-panel">
+        <div class="panel-heading">
+          <h2>Input</h2>
+          <div class="panel-meta">Paste AtCoder input directly</div>
+        </div>
+        <div class="editor-body">
+          <div class="editor-wrapper">
+            <div id="lineNumbers" class="line-numbers" aria-hidden="true"><span>1</span></div>
+            <textarea id="inputText" spellcheck="false" placeholder="N M&#10;u v&#10;u v w"></textarea>
+          </div>
+          <div class="editor-help">
+            <p class="input-help">
+              Graph: N M + edges. 3rd edge token is shown as weight.<br>
+              Tree: N + N-1 edges or N M + edges.<br>
+              Grid: H W + rows.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="visual-panel">
+        <div class="panel-heading">
+          <h2 id="visualTitle">Graph</h2>
+          <div id="visualMeta" class="panel-meta"></div>
+        </div>
+        <div id="status" class="status" role="status" aria-live="polite"></div>
+        <div id="output" class="visual-output">
+          <div class="empty">No visualization yet.</div>
+        </div>
+      </section>
+    </main>
+
+    <section class="settings-panel">
+      <div class="setting-group">
+        <label for="vizType">Type</label>
+        <select id="vizType">
+          <option value="graph" selected>Graph</option>
+          <option value="tree">Tree</option>
+          <option value="grid">Grid</option>
+        </select>
+      </div>
+      <div class="setting-group">
+        <label for="indexMode">Index</label>
+        <select id="indexMode">
+          <option value="auto" selected>Auto</option>
+          <option value="one">1-indexed</option>
+          <option value="zero">0-indexed</option>
+        </select>
+      </div>
+      <div class="setting-group">
+        <label for="directionMode">Direction</label>
+        <select id="directionMode">
+          <option value="undirected" selected>Undirected</option>
+          <option value="directed">Directed</option>
+        </select>
+      </div>
+      <div class="setting-group">
+        <label for="viewMode">View</label>
+        <select id="viewMode">
+          <option value="fit" selected>Fit</option>
+          <option value="actual">Actual</option>
+        </select>
+      </div>
+      <div class="setting-group">
+        <label for="fitMaxWidth">Fit max</label>
+        <select id="fitMaxWidth">
+          <option value="640">640</option>
+          <option value="860" selected>860</option>
+          <option value="1000">1000</option>
+          <option value="1200">1200</option>
+        </select>
+      </div>
+      <div class="setting-group">
+        <label for="themeSelect">Theme</label>
+        <select id="themeSelect">
+          <option value="dark" selected>Dark</option>
+          <option value="light">Light</option>
+        </select>
+      </div>
+      <div class="setting-group">
+        <label for="rootInput">Root</label>
+        <input id="rootInput" type="number" value="1" step="1">
+      </div>
+      <div class="setting-group">
+        <label for="cellSizeInput">Cell</label>
+        <input id="cellSizeInput" type="number" value="32" min="12" max="96" step="1">
+      </div>
+    </section>
+
+    <section class="actions-panel">
+      <button id="visualizeBtn" class="primary" type="button">Visualize</button>
+      <button id="clearBtn" type="button">Clear</button>
+      <span class="spacer"></span>
+      <button type="button" data-sample="graph">Graph sample</button>
+      <button type="button" data-sample="tree">Tree sample</button>
+      <button type="button" data-sample="grid">Grid sample</button>
+    </section>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const typeLabels = {
+        graph: "Graph",
+        tree: "Tree",
+        grid: "Grid"
+      };
+      const indexLabels = {
+        one: "1-indexed",
+        zero: "0-indexed"
+      };
+
+      const samples = {
+        graph: [
+          "5 6",
+          "1 2 4",
+          "1 3",
+          "2 4 7",
+          "3 4 2",
+          "4 5",
+          "2 5 9"
+        ].join("\n"),
+        tree: [
+          "8",
+          "1 2 3",
+          "1 3",
+          "2 4",
+          "2 5 8",
+          "3 6",
+          "6 7",
+          "6 8"
+        ].join("\n"),
+        grid: [
+          "5 7",
+          "S..#..1",
+          ".##.#..",
+          "..2..#.",
+          ".#..A..",
+          "...#..G"
+        ].join("\n")
+      };
+
+      function $(id) {
+        return document.getElementById(id);
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function fmt(value) {
+        return Number(value.toFixed(2)).toString();
+      }
+
+      function normalizeLines(input) {
+        return input
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter((line) => line.length > 0);
+      }
+
+      function splitTokens(line) {
+        return line.trim().split(/\s+/).filter(Boolean);
+      }
+
+      function parseInteger(token, label) {
+        if (!/^-?\d+$/.test(String(token))) {
+          throw new Error(label + " must be an integer: " + token);
+        }
+        const value = Number(token);
+        if (!Number.isSafeInteger(value)) {
+          throw new Error(label + " is outside the safe integer range: " + token);
+        }
+        return value;
+      }
+
+      function parseNonNegativeInteger(token, label) {
+        const value = parseInteger(token, label);
+        if (value < 0) {
+          throw new Error(label + " must be non-negative.");
+        }
+        return value;
+      }
+
+      function parsePositiveInteger(token, label) {
+        const value = parseInteger(token, label);
+        if (value <= 0) {
+          throw new Error(label + " must be positive.");
+        }
+        return value;
+      }
+
+      function parseEdge(parts, lineNumber) {
+        if (parts.length < 2) {
+          throw new Error("Line " + lineNumber + " must contain at least u and v.");
+        }
+        return {
+          u: parseInteger(parts[0], "u on line " + lineNumber),
+          v: parseInteger(parts[1], "v on line " + lineNumber),
+          weight: parts.length >= 3 ? parts[2] : null
+        };
+      }
+
+      function resolveIndexMode(edges, root, indexMode) {
+        if (indexMode === "zero" || indexMode === "one") {
+          return indexMode;
+        }
+
+        const hasZero = edges.some((edge) => edge.u === 0 || edge.v === 0) || root === 0;
+        return hasZero ? "zero" : "one";
+      }
+
+      function indexMetaLabel(indexMode, resolvedMode) {
+        const label = indexLabels[resolvedMode];
+        return indexMode === "auto" ? "Auto \u2192 " + label : label;
+      }
+
+      function edgeNodeValues(edges) {
+        const values = new Set();
+        edges.forEach((edge) => {
+          values.add(edge.u);
+          values.add(edge.v);
+        });
+        return Array.from(values).sort((a, b) => a - b);
+      }
+
+      function collectIndexWarnings(n, edges, indexMode) {
+        const warnings = [];
+        const values = edgeNodeValues(edges);
+
+        if (indexMode === "one") {
+          if (values.includes(0)) {
+            warnings.push("Warning: node 0 appears while 1-indexed mode is selected.");
+          }
+
+          values.forEach((node) => {
+            if (node !== 0 && (node < 1 || node > n)) {
+              warnings.push("Warning: node " + node + " is outside 1.." + n + ".");
+            }
+          });
+        }
+
+        if (indexMode === "zero") {
+          values.forEach((node) => {
+            if (node < 0 || node >= n) {
+              warnings.push("Warning: node " + node + " is outside 0.." + (n - 1) + ".");
+            }
+          });
+        }
+
+        return warnings;
+      }
+
+      function buildNodeList(n, edges, root, indexMode) {
+        const resolvedMode = resolveIndexMode(edges, root, indexMode);
+        const start = resolvedMode === "zero" ? 0 : 1;
+        const nodes = new Set();
+
+        for (let i = 0; i < n; i += 1) {
+          nodes.add(start + i);
+        }
+
+        edges.forEach((edge) => {
+          nodes.add(edge.u);
+          nodes.add(edge.v);
+        });
+
+        if (root !== undefined && root !== null) {
+          nodes.add(root);
+        }
+
+        return Array.from(nodes).sort((a, b) => a - b);
+      }
+
+      function parseGraph(lines) {
+        if (lines.length === 0) {
+          throw new Error("Input is empty.");
+        }
+
+        const head = splitTokens(lines[0]);
+        if (head.length < 2) {
+          throw new Error("First line must be N M.");
+        }
+
+        const n = parseNonNegativeInteger(head[0], "N");
+        const m = parseNonNegativeInteger(head[1], "M");
+        if (lines.length - 1 < m) {
+          throw new Error("Expected " + m + " edge lines, got " + (lines.length - 1) + ".");
+        }
+
+        const edges = [];
+        for (let i = 0; i < m; i += 1) {
+          edges.push(parseEdge(splitTokens(lines[i + 1]), i + 2));
+        }
+
+        return { n, m, edges };
+      }
+
+      function parseTree(lines) {
+        if (lines.length === 0) {
+          throw new Error("Input is empty.");
+        }
+
+        const head = splitTokens(lines[0]);
+        if (head.length < 1) {
+          throw new Error("First line must be N or N M.");
+        }
+
+        const n = parseNonNegativeInteger(head[0], "N");
+        const m = head.length >= 2 ? parseNonNegativeInteger(head[1], "M") : Math.max(0, n - 1);
+
+        if (lines.length - 1 < m) {
+          throw new Error("Expected " + m + " edge lines, got " + (lines.length - 1) + ".");
+        }
+
+        const edges = [];
+        for (let i = 0; i < m; i += 1) {
+          edges.push(parseEdge(splitTokens(lines[i + 1]), i + 2));
+        }
+
+        return { n, m, edges };
+      }
+
+      function parseGrid(lines) {
+        if (lines.length === 0) {
+          throw new Error("Input is empty.");
+        }
+
+        const head = splitTokens(lines[0]);
+        if (head.length < 2) {
+          throw new Error("First line must be H W.");
+        }
+
+        const h = parsePositiveInteger(head[0], "H");
+        const w = parsePositiveInteger(head[1], "W");
+        if (lines.length - 1 < h) {
+          throw new Error("Expected " + h + " grid rows, got " + (lines.length - 1) + ".");
+        }
+
+        const rows = [];
+        for (let r = 0; r < h; r += 1) {
+          const raw = lines[r + 1];
+          const row = /\s/.test(raw) ? splitTokens(raw).join("") : raw;
+          if (row.length !== w) {
+            throw new Error("Grid row " + (r + 1) + " length must be " + w + ", got " + row.length + ".");
+          }
+          rows.push(row);
+        }
+
+        return { h, w, rows };
+      }
+
+      function renderWeightLabel(x, y, label) {
+        if (label === null || label === undefined) {
+          return "";
+        }
+
+        const text = String(label);
+        const width = Math.max(20, text.length * 7 + 12);
+        const height = 18;
+        return [
+          '<g class="weight-label">',
+          '<rect x="' + fmt(x - width / 2) + '" y="' + fmt(y - height / 2) + '" width="' + fmt(width) + '" height="' + height + '" rx="5"></rect>',
+          '<text x="' + fmt(x) + '" y="' + fmt(y + 4) + '" text-anchor="middle">' + escapeHtml(text) + "</text>",
+          "</g>"
+        ].join("");
+      }
+
+      function visualSvgClass(viewMode) {
+        return viewMode === "actual" ? "visual-svg" : "visual-svg fit-width";
+      }
+
+      function visualSvgStyle(viewMode, intrinsicWidth, fitMaxWidth) {
+        if (viewMode === "actual") {
+          return "";
+        }
+        const maxWidth = Number.isFinite(fitMaxWidth) ? fitMaxWidth : 860;
+        return ' style="--fit-max-width: ' + maxWidth + 'px"';
+      }
+
+      function renderGraphSvg(parsed, options) {
+        const indexMode = options.indexMode;
+        const directed = options.directed;
+        const viewMode = options.viewMode;
+        const fitMaxWidth = options.fitMaxWidth;
+        const nodes = buildNodeList(parsed.n, parsed.edges, null, indexMode);
+        const count = Math.max(nodes.length, 1);
+        const nodeRadius = 18;
+        const outer = 58;
+        const radius = count === 1 ? 0 : Math.max(105, count * 20);
+        const width = Math.max(360, radius * 2 + outer * 2);
+        const height = Math.max(320, radius * 2 + outer * 2);
+        const cx = width / 2;
+        const cy = height / 2;
+        const positions = new Map();
+
+        nodes.forEach((node, index) => {
+          if (count === 1) {
+            positions.set(node, { x: cx, y: cy });
+            return;
+          }
+
+          const angle = -Math.PI / 2 + (Math.PI * 2 * index) / count;
+          positions.set(node, {
+            x: cx + Math.cos(angle) * radius,
+            y: cy + Math.sin(angle) * radius
+          });
+        });
+
+        const edgeParts = [];
+        const labelParts = [];
+        const markerEnd = directed ? ' marker-end="url(#arrowhead)"' : "";
+
+        parsed.edges.forEach((edge) => {
+          const from = positions.get(edge.u);
+          const to = positions.get(edge.v);
+          if (!from || !to) {
+            return;
+          }
+
+          if (edge.u === edge.v) {
+            const x = from.x;
+            const y = from.y;
+            edgeParts.push(
+              '<path class="edge" d="M ' + fmt(x + nodeRadius * 0.5) + " " + fmt(y - nodeRadius * 0.7) +
+              " C " + fmt(x + nodeRadius * 2.4) + " " + fmt(y - nodeRadius * 2.7) +
+              " " + fmt(x - nodeRadius * 2.4) + " " + fmt(y - nodeRadius * 2.7) +
+              " " + fmt(x - nodeRadius * 0.5) + " " + fmt(y - nodeRadius * 0.7) + '"' + markerEnd + "></path>"
+            );
+            labelParts.push(renderWeightLabel(x, y - nodeRadius * 2.75, edge.weight));
+            return;
+          }
+
+          const dx = to.x - from.x;
+          const dy = to.y - from.y;
+          const len = Math.max(1, Math.hypot(dx, dy));
+          const sx = from.x + (dx / len) * nodeRadius;
+          const sy = from.y + (dy / len) * nodeRadius;
+          const tx = to.x - (dx / len) * nodeRadius;
+          const ty = to.y - (dy / len) * nodeRadius;
+          edgeParts.push('<line class="edge" x1="' + fmt(sx) + '" y1="' + fmt(sy) + '" x2="' + fmt(tx) + '" y2="' + fmt(ty) + '"' + markerEnd + "></line>");
+
+          const nx = -dy / len;
+          const ny = dx / len;
+          labelParts.push(renderWeightLabel((from.x + to.x) / 2 + nx * 12, (from.y + to.y) / 2 + ny * 12, edge.weight));
+        });
+
+        const nodeParts = nodes.map((node) => {
+          const pos = positions.get(node);
+          return [
+            '<g class="node">',
+            '<circle cx="' + fmt(pos.x) + '" cy="' + fmt(pos.y) + '" r="' + nodeRadius + '"></circle>',
+            '<text x="' + fmt(pos.x) + '" y="' + fmt(pos.y + 4) + '" text-anchor="middle">' + escapeHtml(node) + "</text>",
+            "</g>"
+          ].join("");
+        });
+
+        return [
+          '<svg class="' + visualSvgClass(viewMode) + '"' + visualSvgStyle(viewMode, width, fitMaxWidth) + ' xmlns="http://www.w3.org/2000/svg" width="' + fmt(width) + '" height="' + fmt(height) + '" viewBox="0 0 ' + fmt(width) + " " + fmt(height) + '" role="img" aria-label="Graph visualization">',
+          directed ? '<defs><marker id="arrowhead" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"><path class="arrowhead" d="M 0 1 L 8 5 L 0 9 z"></path></marker></defs>' : "",
+          edgeParts.join(""),
+          labelParts.join(""),
+          nodeParts.join(""),
+          "</svg>"
+        ].join("");
+      }
+
+      function buildTree(parsed, root, indexMode) {
+        const nodes = buildNodeList(parsed.n, parsed.edges, root, indexMode);
+        const adjacency = new Map(nodes.map((node) => [node, []]));
+
+        parsed.edges.forEach((edge) => {
+          if (!adjacency.has(edge.u)) adjacency.set(edge.u, []);
+          if (!adjacency.has(edge.v)) adjacency.set(edge.v, []);
+          adjacency.get(edge.u).push({ to: edge.v, weight: edge.weight });
+          adjacency.get(edge.v).push({ to: edge.u, weight: edge.weight });
+        });
+
+        adjacency.forEach((items) => {
+          items.sort((a, b) => a.to - b.to);
+        });
+
+        if (!adjacency.has(root)) {
+          adjacency.set(root, []);
+          nodes.push(root);
+          nodes.sort((a, b) => a - b);
+        }
+
+        const visited = new Set([root]);
+        const depth = new Map([[root, 0]]);
+        const children = new Map(nodes.map((node) => [node, []]));
+        const edgeWeight = new Map();
+        const order = [];
+        const queue = [root];
+
+        for (let head = 0; head < queue.length; head += 1) {
+          const current = queue[head];
+          order.push(current);
+          const nextItems = adjacency.get(current) || [];
+
+          nextItems.forEach((item) => {
+            if (visited.has(item.to)) {
+              return;
+            }
+
+            visited.add(item.to);
+            depth.set(item.to, (depth.get(current) || 0) + 1);
+            children.get(current).push(item.to);
+            edgeWeight.set(current + "->" + item.to, item.weight);
+            queue.push(item.to);
+          });
+        }
+
+        return { nodes, visited, depth, children, edgeWeight, order };
+      }
+
+      function renderTreeSvg(parsed, root, options) {
+        const indexMode = options.indexMode;
+        const viewMode = options.viewMode;
+        const fitMaxWidth = options.fitMaxWidth;
+        const tree = buildTree(parsed, root, indexMode);
+        const xUnit = new Map();
+        let leafCursor = 0;
+
+        for (let i = tree.order.length - 1; i >= 0; i -= 1) {
+          const node = tree.order[i];
+          const kids = tree.children.get(node) || [];
+
+          if (kids.length === 0) {
+            xUnit.set(node, leafCursor);
+            leafCursor += 1;
+          } else {
+            const sum = kids.reduce((acc, child) => acc + xUnit.get(child), 0);
+            xUnit.set(node, sum / kids.length);
+          }
+        }
+
+        const leafCount = Math.max(leafCursor, 1);
+        const xGap = 88;
+        const yGap = 92;
+        const marginX = 64;
+        const marginTop = 56;
+        const marginBottom = 64;
+        const nodeRadius = 18;
+        const maxDepth = Math.max(0, ...Array.from(tree.depth.values()));
+        const width = leafCount === 1 ? 360 : Math.max(360, (leafCount - 1) * xGap + marginX * 2);
+        const height = Math.max(220, marginTop + maxDepth * yGap + marginBottom);
+        const positions = new Map();
+
+        tree.order.forEach((node) => {
+          const unit = xUnit.get(node) || 0;
+          positions.set(node, {
+            x: leafCount === 1 ? width / 2 : marginX + unit * xGap,
+            y: marginTop + (tree.depth.get(node) || 0) * yGap
+          });
+        });
+
+        const edgeParts = [];
+        const labelParts = [];
+
+        tree.order.forEach((node) => {
+          const from = positions.get(node);
+          const kids = tree.children.get(node) || [];
+
+          kids.forEach((child) => {
+            const to = positions.get(child);
+            if (!from || !to) {
+              return;
+            }
+
+            const dx = to.x - from.x;
+            const dy = to.y - from.y;
+            const len = Math.max(1, Math.hypot(dx, dy));
+            const sx = from.x + (dx / len) * nodeRadius;
+            const sy = from.y + (dy / len) * nodeRadius;
+            const tx = to.x - (dx / len) * nodeRadius;
+            const ty = to.y - (dy / len) * nodeRadius;
+            edgeParts.push('<line class="tree-edge" x1="' + fmt(sx) + '" y1="' + fmt(sy) + '" x2="' + fmt(tx) + '" y2="' + fmt(ty) + '"></line>');
+            labelParts.push(renderWeightLabel((from.x + to.x) / 2 + 12, (from.y + to.y) / 2, tree.edgeWeight.get(node + "->" + child)));
+          });
+        });
+
+        const nodeParts = tree.order.map((node) => {
+          const pos = positions.get(node);
+          return [
+            '<g class="node">',
+            '<circle cx="' + fmt(pos.x) + '" cy="' + fmt(pos.y) + '" r="' + nodeRadius + '"></circle>',
+            '<text x="' + fmt(pos.x) + '" y="' + fmt(pos.y + 4) + '" text-anchor="middle">' + escapeHtml(node) + "</text>",
+            "</g>"
+          ].join("");
+        });
+
+        const unreached = tree.nodes.length - tree.visited.size;
+        const note = unreached > 0
+          ? '<text x="12" y="' + fmt(height - 14) + '" fill="#aab3c2" font-size="12">unreached: ' + unreached + "</text>"
+          : "";
+
+        return {
+          svg: [
+            '<svg class="' + visualSvgClass(viewMode) + '"' + visualSvgStyle(viewMode, width, fitMaxWidth) + ' xmlns="http://www.w3.org/2000/svg" width="' + fmt(width) + '" height="' + fmt(height) + '" viewBox="0 0 ' + fmt(width) + " " + fmt(height) + '" role="img" aria-label="Tree visualization">',
+            edgeParts.join(""),
+            labelParts.join(""),
+            nodeParts.join(""),
+            note,
+            "</svg>"
+          ].join(""),
+          reached: tree.visited.size,
+          total: tree.nodes.length
+        };
+      }
+
+      function gridClassFor(char) {
+        if (char === "#") return "grid-wall";
+        if (char === ".") return "grid-open";
+        if (char === "S") return "grid-start";
+        if (char === "G") return "grid-goal";
+        if (/^[0-9]$/.test(char)) return "grid-digit";
+        if (/^[A-Za-z]$/.test(char)) return "grid-alpha";
+        return "grid-other";
+      }
+
+      function renderGridSvg(parsed, cellSize, options) {
+        const viewMode = options.viewMode;
+        const fitMaxWidth = options.fitMaxWidth;
+        const width = parsed.w * cellSize;
+        const height = parsed.h * cellSize;
+        const fontSize = Math.max(10, Math.min(18, cellSize * 0.48));
+        const parts = [];
+
+        for (let r = 0; r < parsed.h; r += 1) {
+          for (let c = 0; c < parsed.w; c += 1) {
+            const char = parsed.rows[r][c];
+            const x = c * cellSize;
+            const y = r * cellSize;
+            const textClass = char === "." ? "grid-text is-dot" : "grid-text";
+            parts.push(
+              '<rect class="grid-cell ' + gridClassFor(char) + '" x="' + x + '" y="' + y + '" width="' + cellSize + '" height="' + cellSize + '"></rect>'
+            );
+            parts.push(
+              '<text class="' + textClass + '" x="' + fmt(x + cellSize / 2) + '" y="' + fmt(y + cellSize / 2 + fontSize * 0.35) + '" font-size="' + fmt(fontSize) + '" text-anchor="middle">' + escapeHtml(char) + "</text>"
+            );
+          }
+        }
+
+        return [
+          '<svg class="' + visualSvgClass(viewMode) + '"' + visualSvgStyle(viewMode, width, fitMaxWidth) + ' xmlns="http://www.w3.org/2000/svg" width="' + fmt(width) + '" height="' + fmt(height) + '" viewBox="0 0 ' + fmt(width) + " " + fmt(height) + '" role="img" aria-label="Grid visualization">',
+          parts.join(""),
+          "</svg>"
+        ].join("");
+      }
+
+      function setStatus(message, kind) {
+        const status = $("status");
+        status.textContent = message || "";
+        status.className = "status";
+        if (message) {
+          status.classList.add("is-visible");
+        }
+        if (kind === "error") {
+          status.classList.add("is-error");
+        }
+        if (kind === "warning") {
+          status.classList.add("is-warning");
+        }
+        if (kind === "ok") {
+          status.classList.add("is-ok");
+        }
+      }
+
+      function setVisualHeader(title, meta) {
+        $("visualTitle").textContent = title || "";
+        $("visualMeta").textContent = meta || "";
+      }
+
+      function renderError(message) {
+        $("output").innerHTML = '<div class="section-error">' + escapeHtml(message) + "</div>";
+      }
+
+      function renderEmpty(message) {
+        $("output").innerHTML = '<div class="empty">' + escapeHtml(message) + "</div>";
+      }
+
+      function readVizType() {
+        const value = $("vizType").value;
+        return typeLabels[value] ? value : "graph";
+      }
+
+      function readIndexMode() {
+        return $("indexMode").value;
+      }
+
+      function readDirected() {
+        return $("directionMode").value === "directed";
+      }
+
+      function readViewMode() {
+        return $("viewMode").value;
+      }
+
+      function readFitMaxWidth() {
+        return normalizeFitMaxWidth($("fitMaxWidth").value);
+      }
+
+      function readRoot(indexMode) {
+        const value = $("rootInput").value.trim();
+        if (value !== "") {
+          return parseInteger(value, "Root");
+        }
+        return indexMode === "zero" ? 0 : 1;
+      }
+
+      function readCellSize() {
+        const value = $("cellSizeInput").value.trim();
+        const size = value === "" ? 32 : parseInteger(value, "Cell size");
+        if (size < 8 || size > 160) {
+          throw new Error("Cell size must be between 8 and 160.");
+        }
+        return size;
+      }
+
+      const themeStorageKey = "atcoder-visualizer-theme";
+      const viewModeStorageKey = "atcoder-visualizer-view-mode";
+      const fitMaxWidthStorageKey = "atcoder-visualizer-fit-max-width";
+
+      function normalizeTheme(theme) {
+        return theme === "light" ? "light" : "dark";
+      }
+
+      function normalizeViewMode(viewMode) {
+        return viewMode === "actual" ? "actual" : "fit";
+      }
+
+      function normalizeFitMaxWidth(value) {
+        const width = Number(value);
+        return [640, 860, 1000, 1200].includes(width) ? width : 860;
+      }
+
+      function loadStoredTheme() {
+        try {
+          const stored = localStorage.getItem(themeStorageKey);
+          if (stored === "light" || stored === "dark") {
+            return stored;
+          }
+        } catch (error) {
+          return "dark";
+        }
+        return "dark";
+      }
+
+      function saveTheme(theme) {
+        try {
+          localStorage.setItem(themeStorageKey, theme);
+        } catch (error) {
+          // Some local file or private browsing contexts disable storage.
+        }
+      }
+
+      function loadStoredViewMode() {
+        try {
+          const stored = localStorage.getItem(viewModeStorageKey);
+          if (stored === "fit" || stored === "actual") {
+            return stored;
+          }
+        } catch (error) {
+          return "fit";
+        }
+        return "fit";
+      }
+
+      function saveViewMode(viewMode) {
+        try {
+          localStorage.setItem(viewModeStorageKey, viewMode);
+        } catch (error) {
+          // Some local file or private browsing contexts disable storage.
+        }
+      }
+
+      function loadStoredFitMaxWidth() {
+        try {
+          return normalizeFitMaxWidth(localStorage.getItem(fitMaxWidthStorageKey));
+        } catch (error) {
+          return 860;
+        }
+      }
+
+      function saveFitMaxWidth(width) {
+        try {
+          localStorage.setItem(fitMaxWidthStorageKey, String(width));
+        } catch (error) {
+          // Some local file or private browsing contexts disable storage.
+        }
+      }
+
+      function applyTheme(theme, shouldSave) {
+        const normalized = normalizeTheme(theme);
+        document.documentElement.setAttribute("data-theme", normalized);
+        $("themeSelect").value = normalized;
+        if (shouldSave) {
+          saveTheme(normalized);
+        }
+      }
+
+      function applyViewMode(viewMode, shouldSave) {
+        const normalized = normalizeViewMode(viewMode);
+        $("viewMode").value = normalized;
+        if (shouldSave) {
+          saveViewMode(normalized);
+        }
+      }
+
+      function applyFitMaxWidth(width, shouldSave) {
+        const normalized = normalizeFitMaxWidth(width);
+        $("fitMaxWidth").value = String(normalized);
+        if (shouldSave) {
+          saveFitMaxWidth(normalized);
+        }
+      }
+
+      function uniqueMessages(messages) {
+        const seen = new Set();
+        return messages.filter((message) => {
+          if (seen.has(message)) {
+            return false;
+          }
+          seen.add(message);
+          return true;
+        });
+      }
+
+      function visualize() {
+        const lines = normalizeLines($("inputText").value);
+        const output = $("output");
+        const type = readVizType();
+        const indexMode = readIndexMode();
+        const directed = readDirected();
+        const viewMode = readViewMode();
+        const fitMaxWidth = readFitMaxWidth();
+        const warnings = [];
+
+        setVisualHeader(typeLabels[type], "");
+
+        if (lines.length === 0) {
+          renderEmpty("Input is empty.");
+          setStatus("Input is empty.", "error");
+          return;
+        }
+
+        try {
+          if (type === "graph") {
+            const parsed = parseGraph(lines);
+            const resolvedMode = resolveIndexMode(parsed.edges, null, indexMode);
+            warnings.push(...collectIndexWarnings(parsed.n, parsed.edges, indexMode));
+            const svg = renderGraphSvg(parsed, { indexMode, directed, viewMode, fitMaxWidth });
+            const nodeCount = buildNodeList(parsed.n, parsed.edges, null, indexMode).length;
+            const meta = nodeCount + " nodes / " + parsed.edges.length + " edges / " + (directed ? "directed" : "undirected") + " / " + indexMetaLabel(indexMode, resolvedMode);
+            setVisualHeader("Graph", meta);
+            output.innerHTML = svg;
+          }
+
+          if (type === "tree") {
+            const root = readRoot(indexMode);
+            const parsed = parseTree(lines);
+            const resolvedMode = resolveIndexMode(parsed.edges, root, indexMode);
+            warnings.push(...collectIndexWarnings(parsed.n, parsed.edges, indexMode));
+            const result = renderTreeSvg(parsed, root, { indexMode, viewMode, fitMaxWidth });
+            const meta = "root " + root + " / " + result.reached + " of " + result.total + " nodes / " + indexMetaLabel(indexMode, resolvedMode);
+            setVisualHeader("Tree", meta);
+            output.innerHTML = result.svg;
+          }
+
+          if (type === "grid") {
+            const cellSize = readCellSize();
+            const parsed = parseGrid(lines);
+            const svg = renderGridSvg(parsed, cellSize, { viewMode, fitMaxWidth });
+            setVisualHeader("Grid", parsed.h + " x " + parsed.w + " / cell " + cellSize + "px");
+            output.innerHTML = svg;
+          }
+        } catch (error) {
+          const message = error && error.message ? error.message : String(error);
+          setVisualHeader(typeLabels[type], "error");
+          renderError(message);
+          setStatus(typeLabels[type] + ": " + message, "error");
+          return;
+        }
+
+        const uniqueWarnings = uniqueMessages(warnings);
+        if (uniqueWarnings.length > 0) {
+          setStatus("1 visualization rendered.\n" + uniqueWarnings.join("\n"), "warning");
+          return;
+        }
+
+        setStatus("1 visualization rendered.", "ok");
+      }
+
+      function setSample(type) {
+        $("inputText").value = samples[type];
+        $("vizType").value = type;
+        $("indexMode").value = "auto";
+        rootDefaultValue = "1";
+        if (type === "tree") {
+          $("rootInput").value = "1";
+        }
+        if (type === "grid") {
+          $("cellSizeInput").value = "32";
+        }
+        updateLineNumbers();
+        visualize();
+      }
+
+      function updateLineNumbers() {
+        const value = $("inputText").value;
+        const lineCount = Math.max(1, value.split(/\r?\n/).length);
+        const numbers = [];
+        for (let i = 1; i <= lineCount; i += 1) {
+          numbers.push("<span>" + i + "</span>");
+        }
+        $("lineNumbers").innerHTML = numbers.join("");
+        syncLineNumberScroll();
+      }
+
+      function syncLineNumberScroll() {
+        $("lineNumbers").scrollTop = $("inputText").scrollTop;
+      }
+
+      let visualizeTimer = null;
+
+      function scheduleVisualize() {
+        if (visualizeTimer !== null) {
+          clearTimeout(visualizeTimer);
+        }
+        if (normalizeLines($("inputText").value).length === 0) {
+          return;
+        }
+        visualizeTimer = setTimeout(() => {
+          visualizeTimer = null;
+          visualize();
+        }, 300);
+      }
+
+      let rootDefaultValue = "1";
+
+      function syncRootDefaultForIndexMode() {
+        const indexMode = readIndexMode();
+        const rootInput = $("rootInput");
+        const current = rootInput.value.trim();
+        let nextDefault = null;
+
+        if (indexMode === "zero") {
+          nextDefault = "0";
+        }
+        if (indexMode === "one") {
+          nextDefault = "1";
+        }
+
+        if (nextDefault !== null && (current === "" || current === rootDefaultValue)) {
+          rootInput.value = nextDefault;
+          rootDefaultValue = nextDefault;
+        }
+      }
+
+      applyTheme(loadStoredTheme(), false);
+      applyViewMode(loadStoredViewMode(), false);
+      applyFitMaxWidth(loadStoredFitMaxWidth(), false);
+      updateLineNumbers();
+
+      $("visualizeBtn").addEventListener("click", visualize);
+      $("inputText").addEventListener("input", () => {
+        updateLineNumbers();
+        scheduleVisualize();
+      });
+      $("inputText").addEventListener("scroll", syncLineNumberScroll);
+      $("vizType").addEventListener("change", scheduleVisualize);
+      $("directionMode").addEventListener("change", scheduleVisualize);
+      $("rootInput").addEventListener("input", scheduleVisualize);
+      $("cellSizeInput").addEventListener("input", scheduleVisualize);
+      $("indexMode").addEventListener("change", () => {
+        syncRootDefaultForIndexMode();
+        scheduleVisualize();
+      });
+      $("themeSelect").addEventListener("change", () => applyTheme($("themeSelect").value, true));
+      $("viewMode").addEventListener("change", () => {
+        applyViewMode($("viewMode").value, true);
+        scheduleVisualize();
+      });
+      $("fitMaxWidth").addEventListener("change", () => {
+        applyFitMaxWidth($("fitMaxWidth").value, true);
+        scheduleVisualize();
+      });
+      $("clearBtn").addEventListener("click", () => {
+        $("inputText").value = "";
+        updateLineNumbers();
+        setVisualHeader(readVizType() ? typeLabels[readVizType()] : "Graph", "");
+        renderEmpty("No visualization yet.");
+        setStatus("", "");
+      });
+
+      document.querySelectorAll("[data-sample]").forEach((button) => {
+        button.addEventListener("click", () => setSample(button.dataset.sample));
+      });
+    }());
+  </script>
+</body>
+</html>

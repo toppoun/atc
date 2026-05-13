@@ -158,6 +158,7 @@ def usage():
     print("  atc run all [python|pypy|cpp]")
     print("  atc rerun [python|pypy|cpp]")
     print("  atc watch [A] [python|pypy|cpp]")
+    print("  atc visual [--port 8765] [--no-open]")
     print("  atc manual A B C")
     print("  atc manual tests  (現在のフォルダ名を contest_id としてサンプル取得)")
     sys.exit(1)
@@ -1539,6 +1540,16 @@ def main():
         cmd_rerun(interp)
     elif cmd in ["watch", "w", "auto"]:
         cmd_watch(sys.argv[2:])
+    elif cmd in ["visual", "vis", "vizui"]:
+        from .visual import cmd_visual, parse_visual_args
+
+        try:
+            port, open_browser = parse_visual_args(sys.argv[2:])
+        except ValueError as e:
+            print(f"{RED}Error: {e}{RESET}")
+            print("Usage: atc visual [--port 8765] [--no-open]")
+            sys.exit(1)
+        sys.exit(cmd_visual(port=port, open_browser=open_browser))
     elif cmd == "manual":
         if len(sys.argv) >= 3 and sys.argv[2] == "tests":
             cmd_manual_tests()

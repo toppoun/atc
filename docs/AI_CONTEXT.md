@@ -33,6 +33,9 @@
 - `atc rerun [python|pypy|cpp]`
 - `atc retry [python|pypy|cpp]`
 - `atc watch [A] [python|pypy|cpp]`
+- `atc visual [--port PORT] [--no-open]`
+- `atc vis [--port PORT] [--no-open]`
+- `atc vizui [--port PORT] [--no-open]`
 - `atc manual A B C [py|cpp]`
 - `atc manual A~E [py|cpp]`
 - `atc manual tests`

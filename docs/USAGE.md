@@ -84,6 +84,25 @@ atc watch A cpp
 
 終了は `Ctrl+C` です。
 
+## `atc visual` / `atc vis`
+
+```bash
+atc visual
+atc visual --port 8000
+atc visual --no-open
+atc vis --no-open
+```
+
+`tools/visualizer.html` をローカルHTTPサーバーで開きます。グラフ、木、グリッドの入力をブラウザで可視化できます。
+
+- デフォルトは `http://127.0.0.1:8765/visualizer.html`
+- `--port` で開始ポートを指定
+- 指定ポートが使用中なら、近い空きポートに fallback
+- `--no-open` を付けるとブラウザを自動で開かず、URLだけ表示
+- 停止は `Ctrl+C`
+
+`file://` 直開きで `ERR_BLOCKED_BY_CLIENT` が出る環境では、`atc visual` で表示してください。
+
 ## `atc rerun`
 
 ```bash
