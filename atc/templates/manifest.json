@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "default": {
+    "python": "default",
+    "cpp": "default"
+  },
+  "python": {
+    "default": {
+      "path": "python/default.py",
+      "description": "Standard Python template"
+    },
+    "fast": {
+      "path": "python/fast.py",
+      "description": "Python template with fast input helpers"
+    },
+    "debug": {
+      "path": "python/debug.py",
+      "description": "Python template with a debug helper"
+    }
+  },
+  "cpp": {
+    "default": {
+      "path": "cpp/default.cpp",
+      "description": "Standard C++ template"
+    },
+    "acl": {
+      "path": "cpp/acl.cpp",
+      "description": "C++ template with atcoder/all include"
+    },
+    "debug": {
+      "path": "cpp/debug.cpp",
+      "description": "C++ template with debug helpers"
+    }
+  }
+}
