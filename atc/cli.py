@@ -2,12 +2,10 @@ import sys
 import json
 import subprocess
 import shutil
-import time
 import platform
 import os
-from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import List, Optional, Set
 
 try:
     import tomllib
@@ -18,15 +16,13 @@ try:
     from .config import (
         CONFIG_FILE_META_KEY,
         CONFIG_FILE_NAME,
-        SOURCE_EXTS,
-        _config_problems,
         _config_root,
         _config_to_toml,
         _deep_merge_config,
         _default_config,
-        _default_language,
         _find_config_file,
         _find_project_root,
+        _resolve_command,
         _runner_command,
         _runner_compile_timeout,
         _runner_cpp_flags,
@@ -34,24 +30,23 @@ try:
         _watch_settings,
         load_config,
     )
-    from .console import GREEN, RED, RESET, color_text, error, ok, warn
+    from .console import error, warn
     from .contest import cmd_contest, cmd_new
     from .manual import cmd_manual, cmd_manual_tests
-    from .models import CaseResult, ProblemResult
+    from .runner import cmd_rerun, cmd_run, cmd_run_all
     from .templates import TemplateError, resolve_template_file as _resolve_template_file
+    from .watch import cmd_watch
 except ImportError:
     from config import (
         CONFIG_FILE_META_KEY,
         CONFIG_FILE_NAME,
-        SOURCE_EXTS,
-        _config_problems,
         _config_root,
         _config_to_toml,
         _deep_merge_config,
         _default_config,
-        _default_language,
         _find_config_file,
         _find_project_root,
+        _resolve_command,
         _runner_command,
         _runner_compile_timeout,
         _runner_cpp_flags,
@@ -59,25 +54,14 @@ except ImportError:
         _watch_settings,
         load_config,
     )
-    from console import GREEN, RED, RESET, color_text, error, ok, warn
+    from console import error, warn
     from contest import cmd_contest, cmd_new
     from manual import cmd_manual, cmd_manual_tests
-    from models import CaseResult, ProblemResult
+    from runner import cmd_rerun, cmd_run, cmd_run_all
     from templates import TemplateError, resolve_template_file as _resolve_template_file
+    from watch import cmd_watch
 
 # ===== 設定 =====
-LOG_DIR = Path(".atc") / "test-runs"
-CONFIG_FILES = {
-    "pyproject.toml",
-    "requirements.txt",
-    "poetry.lock",
-    "uv.lock",
-    "Pipfile",
-    "Pipfile.lock",
-    "Makefile",
-    "CMakeLists.txt",
-}
-
 # ---------- 共通・補助関数 ----------
 
 def detect_pypy():
@@ -104,20 +88,6 @@ def usage():
     print("  atc manual A B C")
     print("  atc manual tests  (現在のフォルダ名を contest_id としてサンプル取得)")
     sys.exit(1)
-
-def _resolve_command(command: str):
-    path = Path(command).expanduser()
-    if path.exists():
-        return str(path)
-    return shutil.which(command)
-
-def _normalize_run_language(language: Optional[str], config: dict):
-    requested = str(language or _default_language(config)).strip().lower()
-    if requested == "py":
-        return "python"
-    if requested in ["python", "pypy", "cpp"]:
-        return requested
-    return None
 
 class DoctorReport:
     def __init__(self):
@@ -530,475 +500,6 @@ def cmd_config(args):
         cmd_config_doctor()
     else:
         usage()
-
-def _normalize_problem(problem: str):
-    return problem.upper()
-
-
-def _available_problems(cwd: Path, problems: Optional[List[str]] = None):
-    problems = problems or _config_problems(load_config(cwd))
-    found = []
-    for problem in problems:
-        has_source = any((cwd / f"{problem}.{ext}").exists() for ext in SOURCE_EXTS)
-        has_tests = (cwd / "tests" / problem).exists()
-        if has_source or has_tests:
-            found.append(problem)
-    return found
-
-
-def _missing_cpp_compiler_message(compiler: str):
-    return (
-        f"C++ compiler not found: {compiler}\n"
-        "Install g++ and make sure it is on PATH.\n"
-        "Windows recommendation: install MSYS2 UCRT64 and add C:\\msys64\\ucrt64\\bin to PATH."
-    )
-
-def _prepare_cpp_run_command(cwd: Path, problem: str, cpp_file: Path, config: dict, show_compile=False):
-    compiler = _runner_command(config, "cpp_compiler", "g++")
-    compiler_path = _resolve_command(compiler)
-    if not compiler_path:
-        return "cpp", [], None, "ERROR", _missing_cpp_compiler_message(compiler)
-
-    suffix = ".exe" if platform.system() == "Windows" else ".out"
-    exe_path = cwd / f"_{problem}{suffix}"
-    flags = _runner_cpp_flags(config)
-
-    if show_compile:
-        warn(f"Compiling {cpp_file.name}...")
-    try:
-        c_proc = subprocess.run(
-            [compiler_path, *flags, str(cpp_file), "-o", str(exe_path)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=_runner_compile_timeout(config),
-        )
-    except subprocess.TimeoutExpired:
-        return "cpp", [], exe_path, "TLE", f"Compile timed out after {_runner_compile_timeout(config)} seconds."
-    except OSError as e:
-        return "cpp", [], exe_path, "ERROR", str(e)
-
-    if c_proc.returncode != 0:
-        return "cpp", [], exe_path, "CE", c_proc.stderr.strip()
-    return "cpp", [str(exe_path)], exe_path, None, ""
-
-def _prepare_python_run_command(py_file: Path, run_language: str, config: dict):
-    key = "pypy" if run_language == "pypy" else "python"
-    default = "pypy" if run_language == "pypy" else "python"
-    command = _runner_command(config, key, default)
-    executable = _resolve_command(command)
-    if run_language == "pypy" and not executable and command == "pypy":
-        executable = shutil.which("pypy3")
-    if run_language != "pypy" and not executable:
-        executable = sys.executable
-    if not executable:
-        if run_language == "pypy":
-            return "py", [], None, "ERROR", f"PyPy command not found: {command}. Install PyPy or update runner.pypy in config.toml."
-        return "py", [], None, "ERROR", f"Python command not found: {command}. Update runner.python in config.toml or check PATH."
-    return "py", [executable, str(py_file)], None, None, ""
-
-def _prepare_run_command(cwd: Path, problem: str, run_language: Optional[str] = None, show_compile=False, config: Optional[dict] = None):
-    config = config or load_config(cwd)
-    run_language = _normalize_run_language(run_language, config)
-    if not run_language:
-        return None, [], None, "ERROR", "Invalid language. Use python, pypy, cpp, or set defaults.language to py/cpp."
-
-    py_file = cwd / f"{problem}.py"
-    cpp_file = cwd / f"{problem}.cpp"
-
-    if run_language == "cpp":
-        if cpp_file.exists():
-            return _prepare_cpp_run_command(cwd, problem, cpp_file, config, show_compile)
-        if py_file.exists():
-            return _prepare_python_run_command(py_file, "python", config)
-        return None, [], None, "ERROR", "ファイルが見つかりません。"
-
-    if py_file.exists():
-        return _prepare_python_run_command(py_file, run_language, config)
-    if cpp_file.exists():
-        return _prepare_cpp_run_command(cwd, problem, cpp_file, config, show_compile)
-
-    return None, [], None, "ERROR", "ファイルが見つかりません。"
-
-
-def run_problem_tests(problem: str, run_language: Optional[str] = None, show_compile=False, case_names: Optional[Set[str]] = None):
-    cwd = Path.cwd()
-    config = load_config(cwd)
-    problem = _normalize_problem(problem)
-    testdir = cwd / "tests" / problem
-    started = time.perf_counter()
-    result = ProblemResult(problem=problem)
-
-    mode, run_cmd, cleanup_path, error_status, error_message = _prepare_run_command(
-        cwd,
-        problem,
-        run_language,
-        show_compile=show_compile,
-        config=config,
-    )
-    result.mode = mode
-    if error_status:
-        result.error_status = error_status
-        result.error_message = error_message
-        result.duration_ms = (time.perf_counter() - started) * 1000
-        return result
-
-    ins = sorted(testdir.glob("*.in")) if testdir.exists() else []
-    if case_names:
-        ins = [infile for infile in ins if infile.name in case_names]
-    if not ins:
-        result.error_status = "NO_TESTS"
-        result.error_message = "テストケースがありません。"
-        result.duration_ms = (time.perf_counter() - started) * 1000
-        return result
-
-    try:
-        for infile in ins:
-            outfile = infile.with_suffix(".out")
-            with open(infile, "r", encoding="utf-8") as fin:
-                case_started = time.perf_counter()
-                try:
-                    proc = subprocess.run(
-                        run_cmd,
-                        stdin=fin,
-                        capture_output=True,
-                        text=True,
-                        encoding="utf-8",
-                        errors="replace",
-                        timeout=_runner_timeout(config),
-                    )
-                    elapsed = (time.perf_counter() - case_started) * 1000
-                except subprocess.TimeoutExpired as e:
-                    elapsed = (time.perf_counter() - case_started) * 1000
-                    result.cases.append(
-                        CaseResult(
-                            name=infile.name,
-                            status="TLE",
-                            elapsed_ms=elapsed,
-                            output=(e.stdout or "").strip() if isinstance(e.stdout, str) else "",
-                            stderr=f"Timed out after {_runner_timeout(config)} seconds.",
-                        )
-                    )
-                    continue
-                except OSError as e:
-                    result.error_status = "ERROR"
-                    result.error_message = str(e)
-                    result.duration_ms = (time.perf_counter() - started) * 1000
-                    return result
-
-            output = proc.stdout.strip()
-            stderr = proc.stderr.strip()
-            expected = outfile.read_text(encoding="utf-8").strip() if outfile.exists() else None
-
-            if proc.returncode != 0:
-                status = "RE"
-            elif expected is not None and output == expected:
-                status = "AC"
-            else:
-                status = "WA"
-
-            result.cases.append(
-                CaseResult(
-                    name=infile.name,
-                    status=status,
-                    elapsed_ms=elapsed,
-                    expected=expected,
-                    output=output,
-                    stderr=stderr,
-                )
-            )
-    finally:
-        if mode == "cpp" and cleanup_path and cleanup_path.exists():
-            cleanup_path.unlink()
-
-    result.duration_ms = (time.perf_counter() - started) * 1000
-    return result
-
-
-def _print_detailed_result(result: ProblemResult):
-    if result.error_status:
-        error(result.error_status)
-        if result.error_message:
-            print(result.error_message)
-        return
-
-    for case in result.cases:
-        print(f"=== {case.name} ===")
-        if case.status == "AC":
-            print(f" {color_text('AC', GREEN)}")
-        elif case.status == "RE":
-            print(f" {RED}RE{RESET}\n{case.stderr}")
-        elif case.status == "TLE":
-            print(f" {RED}TLE{RESET}")
-            if case.stderr:
-                print(case.stderr)
-            if case.output:
-                print(f" output:\n{case.output}")
-        else:
-            print(f" {RED}WA{RESET}\n expected:\n{case.expected}\n output:\n{case.output}")
-        print(f" time: {case.elapsed_ms:.2f} ms")
-
-    print(f"\n結果: {result.ok_count}/{result.total_count} AC")
-
-
-def _format_seconds(ms: float):
-    return f"{ms / 1000:.2f}s"
-
-
-def _write_test_log(results: List[ProblemResult]):
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    log_path = LOG_DIR / "last.log"
-    failed_path = LOG_DIR / "last_failed.txt"
-    failed_lines = []
-    lines = [
-        f"atc test run: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-        "",
-    ]
-
-    for result in results:
-        lines.append(f"[{result.problem}]")
-        if result.error_status:
-            lines.append(f"{result.error_status}: {result.error_message}")
-            failed_lines.append(f"{result.problem} *")
-            lines.append("")
-            continue
-
-        for case in result.cases:
-            lines.append(f"=== {case.name} ===")
-            lines.append(f"status: {case.status}")
-            lines.append(f"time: {case.elapsed_ms:.2f} ms")
-            if case.status != "AC":
-                failed_lines.append(f"{result.problem} {case.name}")
-                if case.expected is not None:
-                    lines.append("expected:")
-                    lines.append(case.expected)
-                lines.append("output:")
-                lines.append(case.output)
-                if case.stderr:
-                    lines.append("stderr:")
-                    lines.append(case.stderr)
-            lines.append("")
-
-    log_path.write_text("\n".join(lines), encoding="utf-8")
-    failed_path.write_text("\n".join(failed_lines), encoding="utf-8")
-    return log_path
-
-
-def _print_auto_summary(results: List[ProblemResult], log_path: Path):
-    total_cases = sum(result.total_count for result in results)
-    passed_cases = sum(result.ok_count for result in results)
-    failed_items = []
-    total_ms = sum(result.duration_ms for result in results)
-
-    for result in results:
-        if result.error_status:
-            failed_items.append((result.problem, result.error_status, result.error_message))
-        for case in result.failed_cases:
-            failed_items.append((result.problem, case.status, case.name))
-
-    problems = ",".join(result.problem for result in results)
-    if failed_items:
-        print(f"{RED}FAIL{RESET} {problems}: {passed_cases}/{total_cases} AC in {_format_seconds(total_ms)}")
-        for problem, status, detail in failed_items[:8]:
-            print(f"  {problem} - {status}: {detail}")
-        if len(failed_items) > 8:
-            print(f"  ... and {len(failed_items) - 8} more")
-        print(f"Full log: {log_path}")
-    else:
-        print(f"{GREEN}PASS{RESET} {problems}: {total_cases} tests in {_format_seconds(total_ms)}")
-        print(f"Full log: {log_path}")
-
-def _results_passed(results: List[ProblemResult]):
-    return bool(results) and all(result.passed for result in results)
-
-
-# ---------- run ----------
-def cmd_run(problem: str, run_language: Optional[str] = None):
-    result = run_problem_tests(problem, run_language, show_compile=True)
-    _print_detailed_result(result)
-    if not result.passed:
-        sys.exit(1)
-
-
-def cmd_run_all(run_language: Optional[str] = None):
-    cwd = Path.cwd()
-    config = load_config(cwd)
-    problems = _available_problems(cwd, _config_problems(config))
-    if not _run_auto_tests(problems, run_language, reason="manual"):
-        sys.exit(1)
-
-
-def cmd_rerun(run_language: Optional[str] = None):
-    failed_path = LOG_DIR / "last_failed.txt"
-    if not failed_path.exists():
-        warn("直前の失敗記録がありません。")
-        return
-
-    groups = {}
-    for line in failed_path.read_text(encoding="utf-8").splitlines():
-        parts = line.split(maxsplit=1)
-        if len(parts) != 2:
-            continue
-        problem, case_name = parts
-        if case_name == "*":
-            groups[problem] = None
-        elif groups.get(problem) is not None:
-            groups.setdefault(problem, set()).add(case_name)
-
-    if not groups:
-        ok("直前に失敗したケースはありません。")
-        return
-
-    results = []
-    for problem, case_names in sorted(groups.items()):
-        results.append(run_problem_tests(problem, run_language, show_compile=False, case_names=case_names))
-
-    log_path = _write_test_log(results)
-    _print_auto_summary(results, log_path)
-    if not _results_passed(results):
-        sys.exit(1)
-
-
-def _watch_snapshot(cwd: Path, problems: Optional[List[str]] = None):
-    snapshot = {}
-    for path in _watch_paths(cwd, problems):
-        try:
-            stat = path.stat()
-        except OSError:
-            continue
-        snapshot[path] = (stat.st_mtime_ns, stat.st_size)
-    return snapshot
-
-
-def _watch_paths(cwd: Path, problems: Optional[List[str]] = None):
-    problems = problems or _config_problems(load_config(cwd))
-    for problem in problems:
-        for ext in SOURCE_EXTS:
-            source = cwd / f"{problem}.{ext}"
-            if source.exists():
-                yield source
-
-        testdir = cwd / "tests" / problem
-        if testdir.exists():
-            for path in testdir.rglob("*"):
-                if path.is_file():
-                    yield path
-
-    for name in CONFIG_FILES:
-        config = cwd / name
-        if config.exists():
-            yield config
-
-
-def _changed_paths(before: Dict[Path, tuple], after: Dict[Path, tuple]):
-    changed = set()
-    for path in before.keys() | after.keys():
-        if before.get(path) != after.get(path):
-            changed.add(path)
-    return changed
-
-
-def _problem_from_changed_path(cwd: Path, path: Path, problems: Optional[List[str]] = None):
-    problems = problems or _config_problems(load_config(cwd))
-    problem_set = set(problems)
-
-    try:
-        rel = path.relative_to(cwd)
-    except ValueError:
-        return None
-
-    parts = rel.parts
-    if len(parts) == 1:
-        if rel.name in CONFIG_FILES:
-            return "ALL"
-        if rel.suffix in [".py", ".cpp"] and rel.stem.upper() in problem_set:
-            return rel.stem.upper()
-
-    if len(parts) >= 2 and parts[0] == "tests" and parts[1].upper() in problem_set:
-        return parts[1].upper()
-
-    return None
-
-
-def _changed_problems(cwd: Path, paths: Set[Path], selected: List[str], problems: Optional[List[str]] = None):
-    selected_set = set(selected)
-    changed = set()
-    problems = problems or _config_problems(load_config(cwd))
-
-    for path in paths:
-        problem = _problem_from_changed_path(cwd, path, problems)
-        if problem == "ALL":
-            return selected or _available_problems(cwd, problems)
-        if problem:
-            changed.add(problem)
-
-    if selected_set:
-        changed &= selected_set
-    return sorted(changed)
-
-
-def _run_auto_tests(problems: List[str], run_language: Optional[str] = None, reason=""):
-    if not problems:
-        warn("テスト対象が見つかりません。")
-        return False
-
-    label = ",".join(problems)
-    prefix = f"{reason}: " if reason else ""
-    print(f"{prefix}running {label} ...")
-    results = [run_problem_tests(problem, run_language, show_compile=False) for problem in problems]
-    log_path = _write_test_log(results)
-    _print_auto_summary(results, log_path)
-    return _results_passed(results)
-
-
-def cmd_watch(args):
-    cwd = Path.cwd()
-    config = load_config(cwd)
-    configured_problems = _config_problems(config)
-    poll_seconds, debounce_seconds, _watch_warnings = _watch_settings(config)
-    run_language = None
-    selected = []
-
-    for arg in args:
-        low = arg.lower()
-        if low in ["python", "py", "pypy", "cpp"]:
-            run_language = low
-        elif low in ["all", "--all"]:
-            selected = []
-        else:
-            selected.append(_normalize_problem(arg))
-
-    watch_problems = selected or configured_problems
-    problems = selected or _available_problems(cwd, configured_problems)
-    print(f"watching {cwd}")
-    print(f"poll: {poll_seconds:.2f}s / debounce: {debounce_seconds:.2f}s / log: {LOG_DIR / 'last.log'}")
-    print("Ctrl+C で終了します。")
-    _run_auto_tests(problems, run_language, reason="initial")
-
-    snapshot = _watch_snapshot(cwd, watch_problems)
-    pending = set()
-    last_change_at = None
-
-    try:
-        while True:
-            time.sleep(poll_seconds)
-            current = _watch_snapshot(cwd, watch_problems)
-            changed = _changed_paths(snapshot, current)
-            if changed:
-                snapshot = current
-                pending.update(changed)
-                last_change_at = time.perf_counter()
-                continue
-
-            if pending and last_change_at and time.perf_counter() - last_change_at >= debounce_seconds:
-                changed = _changed_problems(cwd, pending, selected, watch_problems)
-                _run_auto_tests(changed, run_language, reason="changed")
-                pending.clear()
-                last_change_at = None
-    except KeyboardInterrupt:
-        print("\nwatch stopped.")
 
 # ---------- main ----------
 def main():

@@ -1,5 +1,6 @@
 import copy
 import json
+import shutil
 import sys
 from pathlib import Path
 from typing import Optional
@@ -202,6 +203,22 @@ def _default_language(config: Optional[dict] = None):
     return lang if lang in SOURCE_EXTS else "cpp"
 
 
+def _resolve_command(command: str):
+    path = Path(command).expanduser()
+    if path.exists():
+        return str(path)
+    return shutil.which(command)
+
+
+def _normalize_run_language(language: Optional[str], config: dict):
+    requested = str(language or _default_language(config)).strip().lower()
+    if requested == "py":
+        return "python"
+    if requested in ["python", "pypy", "cpp"]:
+        return requested
+    return None
+
+
 def _runner_settings(config: Optional[dict] = None):
     config = config or load_config(Path.cwd())
     runner = config.get("runner", {})
@@ -314,6 +331,8 @@ config_project_root = _config_project_root
 find_project_root = _find_project_root
 config_problems = _config_problems
 default_language = _default_language
+resolve_command = _resolve_command
+normalize_run_language = _normalize_run_language
 runner_settings = _runner_settings
 runner_command = _runner_command
 runner_cpp_flags = _runner_cpp_flags
