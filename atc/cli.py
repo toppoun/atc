@@ -158,7 +158,7 @@ def usage():
     print("  atc run all [python|pypy|cpp]")
     print("  atc rerun [python|pypy|cpp]")
     print("  atc watch [A] [python|pypy|cpp]")
-    print("  atc visual [--port 8765] [--no-open]")
+    print("  atc visual [--live-preview|--no-live-preview] [--live-preview-url URL] [--no-fallback] [--port 8765] [--no-open]")
     print("  atc manual A B C")
     print("  atc manual tests  (現在のフォルダ名を contest_id としてサンプル取得)")
     sys.exit(1)
@@ -1544,12 +1544,20 @@ def main():
         from .visual import cmd_visual, parse_visual_args
 
         try:
-            port, open_browser = parse_visual_args(sys.argv[2:])
+            visual_args = parse_visual_args(sys.argv[2:])
         except ValueError as e:
             print(f"{RED}Error: {e}{RESET}")
-            print("Usage: atc visual [--port 8765] [--no-open]")
+            print("Usage: atc visual [--live-preview|--no-live-preview] [--live-preview-url URL] [--no-fallback] [--port 8765] [--no-open]")
             sys.exit(1)
-        sys.exit(cmd_visual(port=port, open_browser=open_browser))
+        sys.exit(
+            cmd_visual(
+                port=visual_args.port,
+                open_browser=visual_args.open_browser,
+                live_preview=visual_args.live_preview,
+                live_preview_url=visual_args.live_preview_url,
+                fallback=visual_args.fallback,
+            )
+        )
     elif cmd == "manual":
         if len(sys.argv) >= 3 and sys.argv[2] == "tests":
             cmd_manual_tests()
