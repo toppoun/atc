@@ -117,12 +117,18 @@ def handle_watch(args: List[str]):
 
 def handle_visual(args: List[str]):
     try:
-        port, open_browser = parse_visual_args(args)
+        visual_args = parse_visual_args(args)
     except ValueError as e:
         error(f"Error: {e}")
-        print("Usage: atc visual [--port 8765] [--no-open]")
+        print("Usage: atc visual [--live-preview|--no-live-preview] [--live-preview-url URL] [--no-fallback] [--port 8765] [--no-open]")
         return 1
-    return cmd_visual(port=port, open_browser=open_browser)
+    return cmd_visual(
+        port=visual_args.port,
+        open_browser=visual_args.open_browser,
+        live_preview=visual_args.live_preview,
+        live_preview_url=visual_args.live_preview_url,
+        fallback=visual_args.fallback,
+    )
 
 
 def handle_manual(args: List[str]):
@@ -179,7 +185,7 @@ COMMANDS: Tuple[CommandSpec, ...] = (
     CommandSpec(
         name="visual",
         aliases=("vis", "vizui"),
-        usage=("atc visual [--port 8765] [--no-open]",),
+        usage=("atc visual [--live-preview|--no-live-preview] [--live-preview-url URL] [--no-fallback] [--port 8765] [--no-open]",),
         description="Start the local visualizer server.",
         handler=handle_visual,
     ),

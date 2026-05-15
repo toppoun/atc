@@ -155,6 +155,28 @@ VS Code 拡張機能は `config.toml` の `[paths]` を読み、`<paths.root>/.a
 
 config を変更した場合は `Developer: Reload Window` を実行してください。
 
+## `atc visual` で Live Preview が使われない
+
+`atc visual` / `atc vis` は、まず VS Code Live Preview の URL を確認します。Live Preview が起動していない、または接続できない場合は、自前のローカルHTTPサーバーに fallback します。
+
+Live Preview を使いたくない場合:
+
+```bash
+atc vis --no-live-preview
+```
+
+自前サーバーを使う場合の URL は次の形式です。
+
+```text
+http://127.0.0.1:<port>/visualizer.html
+```
+
+たとえばデフォルトポートでは:
+
+```text
+http://127.0.0.1:8765/visualizer.html
+```
+
 ## watch が頻繁に走る
 
 `atc watch` は polling 方式です。
