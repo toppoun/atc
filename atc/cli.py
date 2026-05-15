@@ -4,10 +4,7 @@ import subprocess
 import shutil
 import time
 import platform
-import copy
-import re
 import os
-from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Set
@@ -17,17 +14,59 @@ try:
 except ModuleNotFoundError:
     import tomli as tomllib
 
+try:
+    from .config import (
+        CONFIG_FILE_META_KEY,
+        CONFIG_FILE_NAME,
+        SOURCE_EXTS,
+        _config_problems,
+        _config_root,
+        _config_to_toml,
+        _deep_merge_config,
+        _default_config,
+        _default_language,
+        _find_config_file,
+        _find_project_root,
+        _runner_command,
+        _runner_compile_timeout,
+        _runner_cpp_flags,
+        _runner_timeout,
+        _watch_settings,
+        load_config,
+    )
+    from .console import GREEN, RED, RESET, YELLOW
+    from .contest import cmd_contest, cmd_new
+    from .models import CaseResult, ProblemResult
+    from .samples import download_samples
+    from .templates import TemplateError, load_template, resolve_template_file as _resolve_template_file
+except ImportError:
+    from config import (
+        CONFIG_FILE_META_KEY,
+        CONFIG_FILE_NAME,
+        SOURCE_EXTS,
+        _config_problems,
+        _config_root,
+        _config_to_toml,
+        _deep_merge_config,
+        _default_config,
+        _default_language,
+        _find_config_file,
+        _find_project_root,
+        _runner_command,
+        _runner_compile_timeout,
+        _runner_cpp_flags,
+        _runner_timeout,
+        _watch_settings,
+        load_config,
+    )
+    from console import GREEN, RED, RESET, YELLOW
+    from contest import cmd_contest, cmd_new
+    from models import CaseResult, ProblemResult
+    from samples import download_samples
+    from templates import TemplateError, load_template, resolve_template_file as _resolve_template_file
+
 # ===== 設定 =====
-PROBLEMS = ["A", "B", "C", "D", "E"]
-TEMPLATE_DIR = Path(__file__).parent / "templates"
 LOG_DIR = Path(".atc") / "test-runs"
-WATCH_DEBOUNCE_SECONDS = 1.5
-WATCH_POLL_SECONDS = 0.25
-WATCH_POLL_SECONDS_MIN = 0.1
-WATCH_POLL_SECONDS_MAX = 5.0
-WATCH_DEBOUNCE_SECONDS_MIN = 0.0
-WATCH_DEBOUNCE_SECONDS_MAX = 10.0
-SOURCE_EXTS = ["py", "cpp"]
 CONFIG_FILES = {
     "pyproject.toml",
     "requirements.txt",
@@ -38,62 +77,8 @@ CONFIG_FILES = {
     "Makefile",
     "CMakeLists.txt",
 }
-LEGACY_ATCODER_CATEGORY_DIRS = {
-    "ABC(Atcoder Beginner Contest)",
-    "ARC(Atcoder Regular Contest)",
-    "AGC(Atcoder Grand Contest)",
-    "ABS(Atcoder Beginner Selection)",
-    "ALPC(AtCoder Library Practice Contest)",
-    "EDPC",
-    "typical90",
-    "tessoku-book",
-}
-CONFIG_FILE_NAME = "config.toml"
-CONFIG_FILE_META_KEY = "__config_file__"
-INTERNAL_CONFIG_KEYS = {CONFIG_FILE_META_KEY}
-
-# =================
-RED    = "\033[31m"
-GREEN  = "\033[32m"
-YELLOW = "\033[33m"
-RESET  = "\033[0m"
 
 # ---------- 共通・補助関数 ----------
-
-@dataclass
-class CaseResult:
-    name: str
-    status: str
-    elapsed_ms: float
-    expected: Optional[str] = None
-    output: str = ""
-    stderr: str = ""
-
-
-@dataclass
-class ProblemResult:
-    problem: str
-    mode: Optional[str] = None
-    cases: List[CaseResult] = field(default_factory=list)
-    error_status: Optional[str] = None
-    error_message: str = ""
-    duration_ms: float = 0.0
-
-    @property
-    def ok_count(self):
-        return sum(1 for case in self.cases if case.status == "AC")
-
-    @property
-    def total_count(self):
-        return len(self.cases)
-
-    @property
-    def failed_cases(self):
-        return [case for case in self.cases if case.status != "AC"]
-
-    @property
-    def passed(self):
-        return not self.error_status and self.total_count > 0 and not self.failed_cases
 
 def detect_pypy():
     for name in ["pypy3", "pypy"]:
@@ -101,49 +86,6 @@ def detect_pypy():
         if path:
             return path
     return None
-
-def load_template(ext: str, config: Optional[dict] = None, start: Optional[Path] = None):
-    """Read a template file. If config exists, resolve [templates] from it."""
-    template_file = _resolve_template_file(ext, config, start)
-    if template_file.exists():
-        return template_file.read_text(encoding="utf-8")
-    else:
-        print(f"{YELLOW}Warning: {template_file} が見つかりません。空ファイルを作成します。{RESET}")
-        return ""
-
-def _download_samples(contest: str, problem_char: str, dst_dir: Path):
-    tmp = dst_dir.parent / f".oj_tmp_{problem_char}"
-    url = f"https://atcoder.jp/contests/{contest}/tasks/{contest}_{problem_char.lower()}"
-    shutil.rmtree(tmp, ignore_errors=True)
-
-    oj = shutil.which("oj")
-    if not oj:
-        return False, "oj command not found. Install online-judge-tools: python -m pip install online-judge-tools"
-
-    try:
-        subprocess.run(
-            [oj, "d", url, "-d", str(tmp)],
-            check=True,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
-        if not tmp.exists():
-            return False, "oj finished but did not create a download directory"
-        dst_dir.mkdir(parents=True, exist_ok=True)
-        for f in tmp.iterdir(): shutil.move(str(f), dst_dir / f.name)
-        shutil.rmtree(tmp, ignore_errors=True)
-        return True, ""
-    except subprocess.CalledProcessError as e:
-        shutil.rmtree(tmp, ignore_errors=True)
-        reason = (e.stderr or e.stdout or "").strip()
-        if not reason:
-            reason = f"oj exited with status {e.returncode}"
-        return False, reason
-    except OSError as e:
-        shutil.rmtree(tmp, ignore_errors=True)
-        return False, str(e)
 
 # ---------- usage ----------
 
@@ -163,330 +105,6 @@ def usage():
     print("  atc manual tests  (現在のフォルダ名を contest_id としてサンプル取得)")
     sys.exit(1)
 
-# ---------- new ----------
-def cmd_new(contest: str, lang: Optional[str] = None):
-    config = load_config(Path.cwd())
-    lang = lang or _default_language(config)
-    _create_contest_files(contest, Path(contest), lang, config)
-
-def _create_contest_files(contest_id: str, base: Path, lang: str, config: Optional[dict] = None):
-    config = config or load_config(Path.cwd())
-    problems = _config_problems(config)
-    tests = base / "tests"
-    base.mkdir(parents=True, exist_ok=True)
-    
-    template_content = load_template(lang, config, Path.cwd())
-    
-    failed_downloads = []
-    for p in problems:
-        # ファイル作成 (A.py または A.cpp)
-        source_file = base / f"{p}.{lang}"
-        if not source_file.exists():
-            source_file.write_text(template_content, encoding="utf-8")
-
-        # サンプル取得
-        print(f"fetching {p} ...", end=" ", flush=True)
-        ok, reason = _download_samples(contest_id, p, tests / p)
-        if ok:
-            print(f"{GREEN}done{RESET}")
-        else:
-            print(f"{RED}failed{RESET}")
-            if reason:
-                print(f"  reason: {reason}")
-            failed_downloads.append((p, reason))
-
-    _print_sample_download_summary(problems, failed_downloads)
-
-    if failed_downloads:
-        print(f"\n{contest_id} ({lang}) files ready, but sample download incomplete.")
-    else:
-        print(f"\n{contest_id} ({lang}) ready.")
-
-def _print_sample_download_summary(problems: List[str], failed_downloads: List[tuple]):
-    if not failed_downloads:
-        return
-
-    total = len(problems)
-    failed = len(failed_downloads)
-    succeeded = total - failed
-    failed_problems = ", ".join(problem for problem, _ in failed_downloads)
-
-    print()
-    print(f"{YELLOW}Sample download summary: {succeeded}/{total} succeeded, {failed} failed.{RESET}")
-    if succeeded == 0:
-        print(f"{YELLOW}Files were created, but sample download failed for all problems.{RESET}")
-    else:
-        print(f"{YELLOW}Files were created, but sample download failed for: {failed_problems}{RESET}")
-    print("Check oj installation, AtCoder login, contest ID, and network connection.")
-    print("Try: oj login https://atcoder.jp/")
-
-# ---------- contest ----------
-def cmd_contest(contest: str, lang: Optional[str] = None):
-    config = load_config(Path.cwd())
-    lang = lang or _default_language(config)
-    contest_dir = _resolve_contest_dir(contest, config)
-
-    if contest_dir.exists():
-        if not contest_dir.is_dir():
-            print(f"{RED}Error: {contest_dir} exists but is not a directory.{RESET}")
-            sys.exit(1)
-        print(f"{YELLOW}{contest_dir} already exists. Skip creation and sample download.{RESET}")
-    else:
-        _create_contest_files(contest, contest_dir, lang, config)
-
-    current_contest_file = _write_current_contest(contest_dir.resolve(), config)
-    print(f"current contest saved: {current_contest_file}")
-
-def _contest_category_key(contest: str) -> Optional[str]:
-    match = re.fullmatch(r"(abc|arc|agc)\d+", contest.lower())
-    return match.group(1) if match else None
-
-def _resolve_contest_dir(contest: str, config: dict):
-    contest_path = Path(contest)
-    if contest_path.is_absolute():
-        return contest_path
-
-    paths = config.get("paths", {})
-    root_path = _config_root(config)
-    category_key = _contest_category_key(contest)
-    category_dir = str(paths.get(category_key) or "").strip() if category_key else ""
-
-    if root_path:
-        if category_dir:
-            return root_path / category_dir / contest
-        return root_path / contest
-
-    return contest_path
-
-def _config_file_path(config: dict) -> Optional[Path]:
-    config_file = config.get(CONFIG_FILE_META_KEY)
-    return Path(config_file) if config_file else None
-
-def _config_root(config: dict) -> Optional[Path]:
-    root = str(config.get("paths", {}).get("root") or "").strip()
-    if not root:
-        return None
-
-    root_path = Path(root).expanduser()
-    if root_path.is_absolute():
-        return root_path
-
-    config_file = _config_file_path(config)
-    if config_file:
-        return (_config_project_root(config_file) / root_path).resolve()
-
-    return (Path.cwd() / root_path).resolve()
-
-def _write_current_contest(contest_dir: Path, config: Optional[dict] = None):
-    config = config or load_config(Path.cwd())
-    project_root = _find_project_root(Path.cwd(), config)
-    atc_dir = project_root / ".atc"
-    atc_dir.mkdir(parents=True, exist_ok=True)
-
-    now = datetime.now().isoformat(timespec="milliseconds")
-    current_contest_file = atc_dir / "current-contest.json"
-    current_contest_file.write_text(
-        json.dumps(
-            {
-                "contestDir": str(contest_dir.resolve()),
-                "requestId": now,
-                "createdAt": now,
-            },
-            ensure_ascii=False,
-            indent=2
-        ) + "\n",
-        encoding="utf-8"
-    )
-    return current_contest_file.resolve()
-
-def _find_project_root(start: Path, config: Optional[dict] = None):
-    """Find a project root without requiring a specific AtCoder folder layout."""
-    config = config or load_config(start)
-    config_root = _config_root(config)
-    if config_root:
-        return config_root
-
-    marker_candidate = None
-    category_parent_candidate = None
-
-    start = start.resolve()
-    home = Path.home().resolve()
-    for path in [start, *start.parents]:
-        if (path / ".git").exists():
-            return path
-
-        if marker_candidate is None and (
-            (path / "pyproject.toml").exists()
-            or ((path / ".vscode").exists() and path != home)
-        ):
-            marker_candidate = path
-
-        if path.name in LEGACY_ATCODER_CATEGORY_DIRS and category_parent_candidate is None:
-            category_parent_candidate = path.parent
-
-    if marker_candidate:
-        return marker_candidate
-    if category_parent_candidate:
-        return category_parent_candidate
-    return start
-
-# ---------- config ----------
-def _default_config() -> dict:
-    return {
-        "paths": {
-            "root": "",
-            "abc": "ABC(Atcoder Beginner Contest)",
-            "arc": "ARC(Atcoder Regular Contest)",
-            "agc": "AGC(Atcoder Grand Contest)",
-            "abs": "ABS(Atcoder Beginner Selection)",
-            "alpc": "ALPC(AtCoder Library Practice Contest)",
-            "edpc": "EDPC",
-            "tessoku": "tessoku-book",
-            "typical90": "typical90",
-        },
-        "templates": {
-            "py": "templates/template.py",
-            "cpp": "templates/template.cpp",
-        },
-        "defaults": {
-            "language": "cpp",
-            "problems": ["A", "B", "C", "D", "E"],
-        },
-        "runner": {
-            "python": "python",
-            "pypy": "pypy",
-            "cpp_compiler": "g++",
-            "cpp_flags": ["-std=c++20", "-O2", "-Wall", "-Wextra"],
-            "timeout_seconds": 2.0,
-            "compile_timeout_seconds": 10.0,
-        },
-        "watch": {
-            "poll_seconds": WATCH_POLL_SECONDS,
-            "debounce_seconds": WATCH_DEBOUNCE_SECONDS,
-        },
-    }
-
-def _find_config_file(start: Path) -> Optional[Path]:
-    current = start.resolve()
-    for path in [current, *current.parents]:
-        config_file = path / ".atc" / CONFIG_FILE_NAME
-        if config_file.exists():
-            return config_file
-
-    home_config = Path.home() / ".atc" / CONFIG_FILE_NAME
-    if home_config.exists():
-        return home_config
-
-    return None
-
-def _deep_merge_config(defaults: dict, overrides: dict) -> dict:
-    merged = copy.deepcopy(defaults)
-    for key, value in overrides.items():
-        if isinstance(value, dict) and isinstance(merged.get(key), dict):
-            merged[key] = _deep_merge_config(merged[key], value)
-        else:
-            merged[key] = copy.deepcopy(value)
-    return merged
-
-def load_config(start: Path = Path.cwd()) -> dict:
-    config = _default_config()
-    config_file = _find_config_file(start)
-    if not config_file:
-        return config
-
-    try:
-        with config_file.open("rb") as f:
-            loaded = tomllib.load(f)
-    except tomllib.TOMLDecodeError as e:
-        print(f"{RED}Error: failed to parse config file: {config_file.resolve()}{RESET}")
-        print(f"  {e}")
-        sys.exit(1)
-    except OSError as e:
-        print(f"{RED}Error: failed to read config file: {config_file.resolve()}{RESET}")
-        print(f"  {e}")
-        sys.exit(1)
-
-    merged = _deep_merge_config(config, loaded)
-    merged[CONFIG_FILE_META_KEY] = str(config_file.resolve())
-    return merged
-
-def _default_language(config: Optional[dict] = None):
-    config = config or load_config(Path.cwd())
-    lang = str(config.get("defaults", {}).get("language") or "cpp").strip().lower()
-    return lang if lang in SOURCE_EXTS else "cpp"
-
-def _runner_settings(config: Optional[dict] = None):
-    config = config or load_config(Path.cwd())
-    runner = config.get("runner", {})
-    return runner if isinstance(runner, dict) else {}
-
-def _runner_command(config: dict, key: str, default: str):
-    command = str(_runner_settings(config).get(key) or default).strip()
-    return command or default
-
-def _runner_cpp_flags(config: dict):
-    flags = _runner_settings(config).get("cpp_flags", ["-std=c++20", "-O2", "-Wall", "-Wextra"])
-    if isinstance(flags, list):
-        return [str(flag) for flag in flags]
-    if isinstance(flags, str):
-        return flags.split()
-    return ["-std=c++20", "-O2", "-Wall", "-Wextra"]
-
-def _runner_timeout(config: dict):
-    raw_timeout = _runner_settings(config).get("timeout_seconds", 2.0)
-    try:
-        timeout = float(raw_timeout)
-    except (TypeError, ValueError):
-        return 2.0
-    return timeout if timeout > 0 else None
-
-def _runner_compile_timeout(config: dict):
-    raw_timeout = _runner_settings(config).get("compile_timeout_seconds", 10.0)
-    try:
-        timeout = float(raw_timeout)
-    except (TypeError, ValueError):
-        return 10.0
-    return timeout if timeout > 0 else None
-
-def _watch_settings(config: Optional[dict] = None):
-    config = config or load_config(Path.cwd())
-    raw_watch = config.get("watch", {})
-    defaults = _default_config()["watch"]
-    warnings = []
-
-    if not isinstance(raw_watch, dict):
-        return defaults["poll_seconds"], defaults["debounce_seconds"], ["[watch] must be a table. Using default watch settings."]
-
-    def read_seconds(key: str, default: float, min_value: float, max_value: float):
-        if key not in raw_watch:
-            return default
-
-        raw_value = raw_watch.get(key)
-        if isinstance(raw_value, bool) or not isinstance(raw_value, (int, float)):
-            warnings.append(f"watch.{key} must be a number. Using default: {default}")
-            return default
-
-        value = float(raw_value)
-        if not (min_value <= value <= max_value):
-            warnings.append(f"watch.{key} must be between {min_value} and {max_value}. Using default: {default}")
-            return default
-
-        return value
-
-    poll_seconds = read_seconds(
-        "poll_seconds",
-        defaults["poll_seconds"],
-        WATCH_POLL_SECONDS_MIN,
-        WATCH_POLL_SECONDS_MAX,
-    )
-    debounce_seconds = read_seconds(
-        "debounce_seconds",
-        defaults["debounce_seconds"],
-        WATCH_DEBOUNCE_SECONDS_MIN,
-        WATCH_DEBOUNCE_SECONDS_MAX,
-    )
-    return poll_seconds, debounce_seconds, warnings
-
 def _resolve_command(command: str):
     path = Path(command).expanduser()
     if path.exists():
@@ -500,90 +118,6 @@ def _normalize_run_language(language: Optional[str], config: dict):
     if requested in ["python", "pypy", "cpp"]:
         return requested
     return None
-
-def _config_problems(config: Optional[dict] = None):
-    config = config or load_config(Path.cwd())
-    raw_problems = config.get("defaults", {}).get("problems", PROBLEMS)
-    if not isinstance(raw_problems, list):
-        return PROBLEMS[:]
-
-    problems = []
-    for raw_problem in raw_problems:
-        problem = str(raw_problem).strip().upper()
-        if problem and problem not in problems:
-            problems.append(problem)
-    return problems or PROBLEMS[:]
-
-def _config_project_root(config_file: Path):
-    if config_file.parent.name == ".atc":
-        return config_file.parent.parent
-    return config_file.parent
-
-def _resolve_template_file(ext: str, config: Optional[dict] = None, start: Optional[Path] = None):
-    start = start or Path.cwd()
-    config_file = _find_config_file(start)
-    if not config_file:
-        return TEMPLATE_DIR / f"template.{ext}"
-
-    config = config or load_config(start)
-    template_value = str(config.get("templates", {}).get(ext) or f"templates/template.{ext}").strip()
-    template_path = Path(template_value).expanduser()
-    if template_path.is_absolute():
-        return template_path
-
-    candidates = [
-        config_file.parent / template_path,
-        _config_project_root(config_file) / template_path,
-    ]
-
-    config_root = _config_root(config)
-    if config_root:
-        candidates.append(config_root / template_path)
-
-    candidates.append(_find_project_root(start, config) / template_path)
-
-    if template_value == f"templates/template.{ext}":
-        candidates.append(TEMPLATE_DIR / f"template.{ext}")
-
-    unique_candidates = []
-    seen = set()
-    for candidate in candidates:
-        resolved = candidate.resolve()
-        if resolved not in seen:
-            unique_candidates.append(candidate)
-            seen.add(resolved)
-
-    for candidate in unique_candidates:
-        if candidate.exists():
-            return candidate
-
-    return unique_candidates[-1]
-
-def _toml_value(value):
-    if isinstance(value, str):
-        return json.dumps(value, ensure_ascii=False)
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, (int, float)):
-        return str(value)
-    if isinstance(value, list):
-        return "[" + ", ".join(_toml_value(item) for item in value) + "]"
-    return json.dumps(value, ensure_ascii=False)
-
-def _config_to_toml(config: dict) -> str:
-    lines = []
-    for section, values in config.items():
-        if section in INTERNAL_CONFIG_KEYS:
-            continue
-        if lines:
-            lines.append("")
-        lines.append(f"[{section}]")
-        if isinstance(values, dict):
-            for key, value in values.items():
-                lines.append(f"{key} = {_toml_value(value)}")
-        else:
-            lines.append(f"value = {_toml_value(values)}")
-    return "\n".join(lines) + "\n"
 
 class DoctorReport:
     def __init__(self):
@@ -694,7 +228,11 @@ def _doctor_check_config(report: DoctorReport, config: dict, config_file: Option
 def _doctor_check_templates(report: DoctorReport, config: dict, cwd: Path):
     report.section("Templates")
     for ext, label in [("py", "Python"), ("cpp", "C++")]:
-        template = _resolve_template_file(ext, config, cwd)
+        try:
+            template = _resolve_template_file(ext, config, cwd)
+        except TemplateError as e:
+            report.item("ERROR", f"{label} template could not be resolved.", [str(e)])
+            continue
         if template.exists():
             report.item("OK", f"{label} template: {template.resolve()}")
         else:
@@ -994,6 +532,7 @@ def cmd_config(args):
         usage()
 
 # ---------- manual ----------
+# TODO: manual source/test helpers are a good next candidate for atc/manual.py.
 def cmd_manual(args):
     cwd = Path.cwd()
     config = load_config(cwd)
@@ -1039,7 +578,7 @@ def cmd_manual_tests():
     print(f"contest: {contest}")
     for p in problems:
         print(f"fetching {p} ...", end=" ", flush=True)
-        ok, reason = _download_samples(contest, p, tests / p)
+        ok, reason = download_samples(contest, p, tests / p)
         if ok:
             print(f"{GREEN}done{RESET}")
         else:
