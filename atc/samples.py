@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import List
 
 try:
-    from .console import YELLOW, RESET
+    from .console import warn
 except ImportError:
-    from console import YELLOW, RESET
+    from console import warn
 
 
 def download_samples(contest: str, problem_char: str, dst_dir: Path):
@@ -55,11 +55,11 @@ def print_sample_download_summary(problems: List[str], failed_downloads: List[tu
     failed_problems = ", ".join(problem for problem, _ in failed_downloads)
 
     print()
-    print(f"{YELLOW}Sample download summary: {succeeded}/{total} succeeded, {failed} failed.{RESET}")
+    warn(f"Sample download summary: {succeeded}/{total} succeeded, {failed} failed.")
     if succeeded == 0:
-        print(f"{YELLOW}Files were created, but sample download failed for all problems.{RESET}")
+        warn("Files were created, but sample download failed for all problems.")
     else:
-        print(f"{YELLOW}Files were created, but sample download failed for: {failed_problems}{RESET}")
+        warn(f"Files were created, but sample download failed for: {failed_problems}")
     print("Check oj installation, AtCoder login, contest ID, and network connection.")
     print("Try: oj login https://atcoder.jp/")
 

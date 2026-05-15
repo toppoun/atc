@@ -13,7 +13,7 @@ try:
         _find_project_root,
         load_config,
     )
-    from .console import GREEN, RED, RESET, YELLOW
+    from .console import error, ok as print_ok, warn
     from .samples import download_samples, print_sample_download_summary
     from .templates import load_template
 except ImportError:
@@ -24,7 +24,7 @@ except ImportError:
         _find_project_root,
         load_config,
     )
-    from console import GREEN, RED, RESET, YELLOW
+    from console import error, ok as print_ok, warn
     from samples import download_samples, print_sample_download_summary
     from templates import load_template
 
@@ -42,9 +42,9 @@ def cmd_contest(contest: str, lang: Optional[str] = None):
 
     if contest_dir.exists():
         if not contest_dir.is_dir():
-            print(f"{RED}Error: {contest_dir} exists but is not a directory.{RESET}")
+            error(f"Error: {contest_dir} exists but is not a directory.")
             sys.exit(1)
-        print(f"{YELLOW}{contest_dir} already exists. Skip creation and sample download.{RESET}")
+        warn(f"{contest_dir} already exists. Skip creation and sample download.")
     else:
         create_contest_files(contest, contest_dir, lang, config)
 
@@ -67,11 +67,11 @@ def create_contest_files(contest_id: str, base: Path, lang: str, config: Optiona
             source_file.write_text(template_content, encoding="utf-8")
 
         print(f"fetching {p} ...", end=" ", flush=True)
-        ok, reason = download_samples(contest_id, p, tests / p)
-        if ok:
-            print(f"{GREEN}done{RESET}")
+        sample_ok, reason = download_samples(contest_id, p, tests / p)
+        if sample_ok:
+            print_ok("done")
         else:
-            print(f"{RED}failed{RESET}")
+            error("failed")
             if reason:
                 print(f"  reason: {reason}")
             failed_downloads.append((p, reason))

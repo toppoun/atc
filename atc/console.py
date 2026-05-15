@@ -4,13 +4,17 @@ YELLOW = "\033[33m"
 RESET = "\033[0m"
 
 
+def color_text(message: str, color: str) -> str:
+    return f"{color}{message}{RESET}"
+
+
 def ok(message: str) -> None:
-    print(f"{GREEN}{message}{RESET}")
+    print(color_text(message, GREEN))
 
 
 def warn(message: str) -> None:
-    print(f"{YELLOW}{message}{RESET}")
+    print(color_text(message, YELLOW))
 
 
 def error(message: str) -> None:
-    print(f"{RED}{message}{RESET}")
+    print(color_text(message, RED))

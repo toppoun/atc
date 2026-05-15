@@ -34,11 +34,11 @@ try:
         _watch_settings,
         load_config,
     )
-    from .console import GREEN, RED, RESET, YELLOW
+    from .console import GREEN, RED, RESET, color_text, error, ok, warn
     from .contest import cmd_contest, cmd_new
+    from .manual import cmd_manual, cmd_manual_tests
     from .models import CaseResult, ProblemResult
-    from .samples import download_samples
-    from .templates import TemplateError, load_template, resolve_template_file as _resolve_template_file
+    from .templates import TemplateError, resolve_template_file as _resolve_template_file
 except ImportError:
     from config import (
         CONFIG_FILE_META_KEY,
@@ -59,11 +59,11 @@ except ImportError:
         _watch_settings,
         load_config,
     )
-    from console import GREEN, RED, RESET, YELLOW
+    from console import GREEN, RED, RESET, color_text, error, ok, warn
     from contest import cmd_contest, cmd_new
+    from manual import cmd_manual, cmd_manual_tests
     from models import CaseResult, ProblemResult
-    from samples import download_samples
-    from templates import TemplateError, load_template, resolve_template_file as _resolve_template_file
+    from templates import TemplateError, resolve_template_file as _resolve_template_file
 
 # ===== 設定 =====
 LOG_DIR = Path(".atc") / "test-runs"
@@ -522,7 +522,7 @@ def cmd_config(args):
         atc_dir.mkdir(parents=True, exist_ok=True)
         config_file = atc_dir / CONFIG_FILE_NAME
         if config_file.exists():
-            print(f"{YELLOW}already exists: {config_file.resolve()}{RESET}")
+            warn(f"already exists: {config_file.resolve()}")
             return
         config_file.write_text(_config_to_toml(_default_config()), encoding="utf-8")
         print(f"created: {config_file.resolve()}")
@@ -530,61 +530,6 @@ def cmd_config(args):
         cmd_config_doctor()
     else:
         usage()
-
-# ---------- manual ----------
-# TODO: manual source/test helpers are a good next candidate for atc/manual.py.
-def cmd_manual(args):
-    cwd = Path.cwd()
-    config = load_config(cwd)
-    # 簡易的に拡張子を判別（引数に .cpp 等が含まれていればそれを使う）
-    lang = _default_language(config)
-    targets = []
-    for arg in args:
-        if arg in ["py", "cpp"]:
-            lang = arg
-            continue
-        targets.append(arg)
-
-    template_content = load_template(lang, config, cwd)
-    for p in targets:
-        # 範囲指定 A~E などの展開
-        if "~" in p or "-" in p:
-            sep = "~" if "~" in p else "-"
-            s, e = p.split(sep)
-            for c in range(ord(s), ord(e) + 1):
-                f = cwd / f"{chr(c)}.{lang}"
-                if not f.exists():
-                    f.write_text(template_content, encoding="utf-8")
-                    print(f" {GREEN}Created{RESET}: {f.name}")
-            continue
-            
-        f = cwd / f"{p}.{lang}"
-        if not f.exists():
-            f.write_text(template_content, encoding="utf-8")
-            print(f" {GREEN}Created{RESET}: {f.name}")
-
-# ---------- manual tests ----------
-def cmd_manual_tests():
-    cwd = Path.cwd()
-    config = load_config(cwd)
-    problems = _config_problems(config)
-    contest = cwd.name.lower()
-    tests = cwd / "tests"
-
-    if not contest:
-        print(f"{RED}コンテストIDを現在のフォルダ名から取得できません。{RESET}")
-        sys.exit(1)
-
-    print(f"contest: {contest}")
-    for p in problems:
-        print(f"fetching {p} ...", end=" ", flush=True)
-        ok, reason = download_samples(contest, p, tests / p)
-        if ok:
-            print(f"{GREEN}done{RESET}")
-        else:
-            print(f"{RED}failed{RESET}")
-            if reason:
-                print(f"  reason: {reason}")
 
 def _normalize_problem(problem: str):
     return problem.upper()
@@ -619,7 +564,7 @@ def _prepare_cpp_run_command(cwd: Path, problem: str, cpp_file: Path, config: di
     flags = _runner_cpp_flags(config)
 
     if show_compile:
-        print(f"{YELLOW}Compiling {cpp_file.name}...{RESET}")
+        warn(f"Compiling {cpp_file.name}...")
     try:
         c_proc = subprocess.run(
             [compiler_path, *flags, str(cpp_file), "-o", str(exe_path)],
@@ -774,7 +719,7 @@ def run_problem_tests(problem: str, run_language: Optional[str] = None, show_com
 
 def _print_detailed_result(result: ProblemResult):
     if result.error_status:
-        print(f"{RED}{result.error_status}{RESET}")
+        error(result.error_status)
         if result.error_message:
             print(result.error_message)
         return
@@ -782,7 +727,7 @@ def _print_detailed_result(result: ProblemResult):
     for case in result.cases:
         print(f"=== {case.name} ===")
         if case.status == "AC":
-            print(f" {GREEN}AC{RESET}")
+            print(f" {color_text('AC', GREEN)}")
         elif case.status == "RE":
             print(f" {RED}RE{RESET}\n{case.stderr}")
         elif case.status == "TLE":
@@ -888,7 +833,7 @@ def cmd_run_all(run_language: Optional[str] = None):
 def cmd_rerun(run_language: Optional[str] = None):
     failed_path = LOG_DIR / "last_failed.txt"
     if not failed_path.exists():
-        print(f"{YELLOW}直前の失敗記録がありません。{RESET}")
+        warn("直前の失敗記録がありません。")
         return
 
     groups = {}
@@ -903,7 +848,7 @@ def cmd_rerun(run_language: Optional[str] = None):
             groups.setdefault(problem, set()).add(case_name)
 
     if not groups:
-        print(f"{GREEN}直前に失敗したケースはありません。{RESET}")
+        ok("直前に失敗したケースはありません。")
         return
 
     results = []
@@ -996,7 +941,7 @@ def _changed_problems(cwd: Path, paths: Set[Path], selected: List[str], problems
 
 def _run_auto_tests(problems: List[str], run_language: Optional[str] = None, reason=""):
     if not problems:
-        print(f"{YELLOW}テスト対象が見つかりません。{RESET}")
+        warn("テスト対象が見つかりません。")
         return False
 
     label = ",".join(problems)
@@ -1085,7 +1030,7 @@ def main():
         try:
             port, open_browser = parse_visual_args(sys.argv[2:])
         except ValueError as e:
-            print(f"{RED}Error: {e}{RESET}")
+            error(f"Error: {e}")
             print("Usage: atc visual [--port 8765] [--no-open]")
             sys.exit(1)
         sys.exit(cmd_visual(port=port, open_browser=open_browser))

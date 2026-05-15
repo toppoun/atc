@@ -12,7 +12,7 @@ try:
         _find_project_root,
         load_config,
     )
-    from .console import RED, RESET, YELLOW
+    from .console import error, warn
 except ImportError:
     from config import (
         _config_project_root,
@@ -21,7 +21,7 @@ except ImportError:
         _find_project_root,
         load_config,
     )
-    from console import RED, RESET, YELLOW
+    from console import error, warn
 
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
@@ -50,13 +50,13 @@ def load_template(ext: str, config: Optional[dict] = None, start: Optional[Path]
     try:
         template_file = resolve_template_file(ext, config, start)
     except TemplateError as e:
-        print(f"{RED}Error: {e}{RESET}")
+        error(f"Error: {e}")
         sys.exit(1)
 
     if template_file.exists():
         return template_file.read_text(encoding="utf-8")
 
-    print(f"{YELLOW}Warning: {template_file} が見つかりません。空ファイルを作成します。{RESET}")
+    warn(f"Warning: {template_file} が見つかりません。空ファイルを作成します。")
     return ""
 
 
