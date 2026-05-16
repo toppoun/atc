@@ -3,11 +3,11 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set
 
 try:
-    from .config import SOURCE_EXTS, _config_problems, _watch_settings, load_config
-    from .runner import LOG_DIR, _available_problems, _normalize_problem, _run_auto_tests
+    from .config import SOURCE_EXTS, config_problems, load_config, watch_settings
+    from .runner import LOG_DIR, available_problems, normalize_problem, run_auto_tests
 except ImportError:
-    from config import SOURCE_EXTS, _config_problems, _watch_settings, load_config
-    from runner import LOG_DIR, _available_problems, _normalize_problem, _run_auto_tests
+    from config import SOURCE_EXTS, config_problems, load_config, watch_settings
+    from runner import LOG_DIR, available_problems, normalize_problem, run_auto_tests
 
 
 CONFIG_FILES = {
@@ -37,7 +37,7 @@ def _watch_snapshot(cwd: Path, problems: Optional[List[str]] = None):
 
 
 def _watch_paths(cwd: Path, problems: Optional[List[str]] = None):
-    problems = problems or _config_problems(load_config(cwd))
+    problems = problems or config_problems(load_config(cwd))
     for problem in problems:
         for ext in SOURCE_EXTS:
             source = cwd / f"{problem}.{ext}"
@@ -69,7 +69,7 @@ def _changed_paths(before: Dict[Path, tuple], after: Dict[Path, tuple]):
 
 
 def _problem_from_changed_path(cwd: Path, path: Path, problems: Optional[List[str]] = None):
-    problems = problems or _config_problems(load_config(cwd))
+    problems = problems or config_problems(load_config(cwd))
     problem_set = set(problems)
 
     try:
@@ -95,12 +95,12 @@ def _problem_from_changed_path(cwd: Path, path: Path, problems: Optional[List[st
 def _changed_problems(cwd: Path, paths: Set[Path], selected: List[str], problems: Optional[List[str]] = None):
     selected_set = set(selected)
     changed = set()
-    problems = problems or _config_problems(load_config(cwd))
+    problems = problems or config_problems(load_config(cwd))
 
     for path in paths:
         problem = _problem_from_changed_path(cwd, path, problems)
         if problem == "ALL":
-            return selected or _available_problems(cwd, problems)
+            return selected or available_problems(cwd, problems)
         if problem:
             changed.add(problem)
 
@@ -112,8 +112,8 @@ def _changed_problems(cwd: Path, paths: Set[Path], selected: List[str], problems
 def cmd_watch(args):
     cwd = Path.cwd()
     config = load_config(cwd)
-    configured_problems = _config_problems(config)
-    poll_seconds, debounce_seconds, _watch_warnings = _watch_settings(config)
+    configured_problems = config_problems(config)
+    poll_seconds, debounce_seconds, _watch_warnings = watch_settings(config)
     run_language = None
     selected = []
 
@@ -124,14 +124,14 @@ def cmd_watch(args):
         elif low in ["all", "--all"]:
             selected = []
         else:
-            selected.append(_normalize_problem(arg))
+            selected.append(normalize_problem(arg))
 
     watch_problems = selected or configured_problems
-    problems = selected or _available_problems(cwd, configured_problems)
+    problems = selected or available_problems(cwd, configured_problems)
     print(f"watching {cwd}")
     print(f"poll: {poll_seconds:.2f}s / debounce: {debounce_seconds:.2f}s / log: {LOG_DIR / 'last.log'}")
     print("Ctrl+C で終了します。")
-    _run_auto_tests(problems, run_language, reason="initial")
+    run_auto_tests(problems, run_language, reason="initial")
 
     snapshot = _watch_snapshot(cwd, watch_problems)
     pending = set()
@@ -150,7 +150,7 @@ def cmd_watch(args):
 
             if pending and last_change_at and time.perf_counter() - last_change_at >= debounce_seconds:
                 changed = _changed_problems(cwd, pending, selected, watch_problems)
-                _run_auto_tests(changed, run_language, reason="changed")
+                run_auto_tests(changed, run_language, reason="changed")
                 pending.clear()
                 last_change_at = None
     except KeyboardInterrupt:

@@ -329,6 +329,8 @@ config_file_path = _config_file_path
 config_root = _config_root
 config_project_root = _config_project_root
 find_project_root = _find_project_root
+
+# Public aliases used by feature modules.
 config_problems = _config_problems
 default_language = _default_language
 resolve_command = _resolve_command

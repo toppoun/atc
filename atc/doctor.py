@@ -25,7 +25,7 @@ try:
         _runner_compile_timeout,
         _runner_cpp_flags,
         _runner_timeout,
-        _watch_settings,
+        watch_settings,
     )
     from .templates import TemplateError, resolve_template_file as _resolve_template_file
 except ImportError:
@@ -41,7 +41,7 @@ except ImportError:
         _runner_compile_timeout,
         _runner_cpp_flags,
         _runner_timeout,
-        _watch_settings,
+        watch_settings,
     )
     from templates import TemplateError, resolve_template_file as _resolve_template_file
 
@@ -223,7 +223,7 @@ def _doctor_check_runner(report: DoctorReport, config: dict):
 
 def _doctor_check_watch(report: DoctorReport, config: dict):
     report.section("Watch")
-    poll_seconds, debounce_seconds, warnings = _watch_settings(config)
+    poll_seconds, debounce_seconds, warnings = watch_settings(config)
     if warnings:
         report.item("WARN", "Watch settings: invalid values were ignored.", warnings)
     report.item("OK", f"poll_seconds: {poll_seconds}")

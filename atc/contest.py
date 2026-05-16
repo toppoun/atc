@@ -7,10 +7,10 @@ from typing import Optional
 
 try:
     from .config import (
-        _config_problems,
         _config_root,
-        _default_language,
         _find_project_root,
+        config_problems,
+        default_language,
         load_config,
     )
     from .console import error, ok as print_ok, warn
@@ -18,10 +18,10 @@ try:
     from .templates import load_template
 except ImportError:
     from config import (
-        _config_problems,
         _config_root,
-        _default_language,
         _find_project_root,
+        config_problems,
+        default_language,
         load_config,
     )
     from console import error, ok as print_ok, warn
@@ -31,13 +31,13 @@ except ImportError:
 
 def cmd_new(contest: str, lang: Optional[str] = None):
     config = load_config(Path.cwd())
-    lang = lang or _default_language(config)
+    lang = lang or default_language(config)
     create_contest_files(contest, Path(contest), lang, config)
 
 
 def cmd_contest(contest: str, lang: Optional[str] = None):
     config = load_config(Path.cwd())
-    lang = lang or _default_language(config)
+    lang = lang or default_language(config)
     contest_dir = resolve_contest_dir(contest, config)
 
     if contest_dir.exists():
@@ -54,7 +54,7 @@ def cmd_contest(contest: str, lang: Optional[str] = None):
 
 def create_contest_files(contest_id: str, base: Path, lang: str, config: Optional[dict] = None):
     config = config or load_config(Path.cwd())
-    problems = _config_problems(config)
+    problems = config_problems(config)
     tests = base / "tests"
     base.mkdir(parents=True, exist_ok=True)
 

@@ -2,12 +2,12 @@ import sys
 from pathlib import Path
 
 try:
-    from .config import _config_problems, _default_language, load_config
+    from .config import config_problems, default_language, load_config
     from .console import GREEN, color_text, error, ok as print_ok
     from .samples import download_samples
     from .templates import load_template
 except ImportError:
-    from config import _config_problems, _default_language, load_config
+    from config import config_problems, default_language, load_config
     from console import GREEN, color_text, error, ok as print_ok
     from samples import download_samples
     from templates import load_template
@@ -17,7 +17,7 @@ def cmd_manual(args):
     cwd = Path.cwd()
     config = load_config(cwd)
     # 簡易的に拡張子を判別（引数に .cpp 等が含まれていればそれを使う）
-    lang = _default_language(config)
+    lang = default_language(config)
     targets = []
     for arg in args:
         if arg in ["py", "cpp"]:
@@ -47,7 +47,7 @@ def cmd_manual(args):
 def cmd_manual_tests():
     cwd = Path.cwd()
     config = load_config(cwd)
-    problems = _config_problems(config)
+    problems = config_problems(config)
     contest = cwd.name.lower()
     tests = cwd / "tests"
 

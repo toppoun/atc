@@ -47,7 +47,7 @@ def test_config_root_relative_path_is_under_project_root(tmp_path, monkeypatch):
 
 
 def test_watch_settings_default_values():
-    poll_seconds, debounce_seconds, warnings = config_module._watch_settings(config_module._default_config())
+    poll_seconds, debounce_seconds, warnings = config_module.watch_settings(config_module._default_config())
 
     assert poll_seconds == config_module.WATCH_POLL_SECONDS
     assert debounce_seconds == config_module.WATCH_DEBOUNCE_SECONDS
@@ -61,7 +61,7 @@ def test_watch_settings_invalid_values_fall_back_to_defaults():
         "debounce_seconds": -1,
     }
 
-    poll_seconds, debounce_seconds, warnings = config_module._watch_settings(cfg)
+    poll_seconds, debounce_seconds, warnings = config_module.watch_settings(cfg)
 
     assert poll_seconds == config_module.WATCH_POLL_SECONDS
     assert debounce_seconds == config_module.WATCH_DEBOUNCE_SECONDS
