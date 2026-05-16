@@ -97,7 +97,7 @@ npm run compile
 
 ## package-data / templates
 
-`pyproject.toml` の package-data には、標準テンプレートと manifest 用テンプレート階層を含めます。
+`pyproject.toml` の package-data には、標準テンプレート、manifest 用テンプレート階層、配布用 visualizer asset を含めます。
 
 ```text
 atc/templates/template.py
@@ -105,4 +105,11 @@ atc/templates/template.cpp
 atc/templates/manifest.json
 atc/templates/python/*.py
 atc/templates/cpp/*.cpp
+atc/assets/visualizer.html
 ```
+
+## visualizer assets
+
+`visualizer.html` は `tools/visualizer.html` を本体として編集します。package 配布用には、同じ内容を `atc/assets/visualizer.html` にコピーします。
+
+`atc visual` は開発環境では `tools/visualizer.html` を優先し、配布環境では `atc/assets/visualizer.html` を fallback として使います。2つの内容がズレると `tests/test_visual_assets.py` が失敗します。
