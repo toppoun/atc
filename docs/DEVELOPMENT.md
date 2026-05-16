@@ -1,110 +1,108 @@
 # Development
 
-開発者向けメモです。
+開発者向けの構造メモです。ユーザー向けの使い方は `README.md` と `docs/USAGE.md` を見てください。
 
-## 構成
+## Module responsibilities
 
 ```text
-.
-├── atc/
-│   ├── cli.py
-│   └── templates/
-│       ├── template.py
-│       └── template.cpp
-├── vscode/
-│   └── atc-helper/
-│       ├── package.json
-│       ├── tsconfig.json
-│       └── src/
-│           └── extension.ts
-├── docs/
-├── install.sh
-├── update.sh
-├── uninstall.sh
-├── pyproject.toml
-└── README.md
+cli.py        entrypoint / command dispatch
+commands.py   command registry / aliases / usage
+config.py     config.toml / path / runner / watch settings
+console.py    colors and console helpers
+models.py     CaseResult / ProblemResult
+templates.py  template manifest and template resolution
+samples.py    oj sample download
+contest.py    atc new / atc contest
+manual.py     atc manual
+runner.py     atc run / test / rerun
+watch.py      atc watch
+doctor.py     atc config doctor
+visual.py     atc visual / vis
 ```
 
-- Python CLI: `atc/cli.py`
-- VS Code 拡張機能: `vscode/atc-helper/`
-- 標準テンプレート: `atc/templates/`
-- 実行時作業ディレクトリ: `.atc/`
+## 新機能を追加するときの置き場所
 
-## Python CLI
-
-ローカルインストール:
-
-```bash
-python3 -m pip install -e .
+```text
+新しいCLIコマンド -> commands.py + 専用module
+config仕様変更 -> config.py
+template仕様変更 -> templates.py
+sample download -> samples.py
+contest作成 -> contest.py
+test実行 -> runner.py
+watch -> watch.py
+doctor診断項目 -> doctor.py
+visualizer起動 -> visual.py
+表示色・console出力 -> console.py
+共通データ構造 -> models.py
 ```
 
-構文チェック:
+`cli.py` は薄い entrypoint として保ちます。新しい処理本体を `cli.py` に戻さないでください。
+
+## 依存方向
+
+循環 import を避けるため、基本の依存方向は次の通りです。
+
+```text
+cli.py / commands.py
+  -> feature modules
+
+feature modules
+  -> config.py / console.py / models.py
+
+config.py / models.py / console.py
+  -> lower-level modules
+```
+
+避けたい例:
+
+```text
+config.py -> contest.py
+runner.py -> watch.py
+templates.py -> doctor.py
+```
+
+## リファクタ時のルール
+
+- 挙動を変えない
+- 先に `python -m compileall atc`
+- 一時ディレクトリでコマンド確認
+- visualizer.html と VS Code拡張は必要がない限り触らない
+- 新コマンド追加と大規模リファクタを同時にやらない
+- config 探索順、テンプレート探索順、出力文言、exit code を変える場合は明示的に扱う
+
+## テスト例
 
 ```bash
 python -m compileall atc
+atc config show
+atc config doctor
+atc visual --no-open
+atc vis --no-live-preview --no-open
 ```
 
-wheel 作成確認:
+一時ディレクトリで:
 
 ```bash
-python -m pip wheel . --no-deps --no-build-isolation -w dist
+atc manual A py
+atc run A py
+atc watch A py
 ```
 
-## VS Code 拡張機能
+VS Code 拡張を触った場合だけ:
 
 ```bash
 cd vscode/atc-helper
-npm install
 npm run compile
-npx @vscode/vsce package --allow-missing-repository
 ```
-
-ローカルインストール:
-
-```bash
-code --install-extension ./atc-helper-0.0.1.vsix --force
-```
-
-インストール後は `Developer: Reload Window` を実行してください。
-
-## VSIX
-
-Marketplace 公開はまだしません。ローカル VSIX インストールで利用します。
 
 ## package-data / templates
 
-`pyproject.toml` で `atc/templates/template.py` と `atc/templates/template.cpp` を package-data に含めています。
+`pyproject.toml` の package-data には、標準テンプレートと manifest 用テンプレート階層を含めます。
 
-これにより `pip install .` でも標準テンプレートが入ります。
-
-## 確認すること
-
-変更後は最低限これを確認します。
-
-```bash
-python -m compileall atc
-
-cd vscode/atc-helper
-npm run compile
+```text
+atc/templates/template.py
+atc/templates/template.cpp
+atc/templates/manifest.json
+atc/templates/python/*.py
+atc/templates/cpp/*.cpp
 ```
-
-可能なら wheel にテンプレートが入ることも確認します。
-
-```bash
-python -m pip wheel . --no-deps --no-build-isolation -w dist
-```
-
-## ブランチ例
-
-```bash
-git switch -c feature/your-feature-name
-```
-
-Python CLI と VS Code 拡張機能は別々に確認してください。
-
-## 注意
-
-- `.atc/` は実行時に生成される作業ディレクトリです
-- `vscode/atc-helper/out/` は TypeScript compile の出力です
-- `node_modules/` や生成された `.vsix` は通常 commit 対象ではありません
-- 既存ユーザーの contest フォルダや config を壊さないようにしてください

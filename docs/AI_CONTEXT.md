@@ -4,21 +4,53 @@
 
 ## まず読むファイル
 
-- `README.md`: 人間向けの概要
+コード変更時にまず読むべきファイル:
+
 - `docs/AI_CONTEXT.md`: AI向け仕様
+- `docs/DEVELOPMENT.md`: モジュール構造と開発ルール
+- `atc/cli.py`: entrypoint / command dispatch
+- `atc/commands.py`: command registry / aliases / usage
+- 変更対象の feature module
+
+必要に応じて読むファイル:
+
 - `docs/CONFIG.md`: config の詳細
-- `docs/DEVELOPMENT.md`: 開発手順
-- `atc/cli.py`: Python CLI 本体
+- `docs/USAGE.md`: ユーザー向けコマンド説明
+- `atc/config.py`: config / path / runner / watch settings
+- `atc/templates.py`: template manifest / template resolution
 - `vscode/atc-helper/src/extension.ts`: VS Code 拡張本体
 
 ## 概要
 
-このリポジトリは AtCoder 用の Python CLI と VS Code 拡張機能です。
+このリポジトリは AtCoder 用の Python CLI、VS Code 補助、visualizer を提供します。
 
 - CLI: `atc/cli.py`
+- Command registry: `atc/commands.py`
 - VS Code 拡張: `vscode/atc-helper/src/extension.ts`
+- Visualizer: `tools/visualizer.html`
 - 連携ファイル: `.atc/current-contest.json`
 - 設定ファイル: `.atc/config.toml`
+
+## 現在のモジュール構成
+
+```text
+atc/
+├── cli.py          # entrypoint / command dispatch
+├── commands.py     # command registry / aliases / usage
+├── config.py       # config.toml / path / runner / watch settings
+├── console.py      # colors and console helpers
+├── models.py       # CaseResult / ProblemResult
+├── templates.py    # template / manifest handling
+├── samples.py      # oj sample download
+├── contest.py      # atc new / atc contest
+├── manual.py       # atc manual
+├── runner.py       # atc run / test / rerun
+├── watch.py        # atc watch
+├── doctor.py       # atc config doctor
+└── visual.py       # atc visual / vis
+```
+
+`cli.py` は dispatcher です。コマンド名、alias、usage、handler wrapper は `commands.py` に集約します。処理本体は feature module に置きます。
 
 ## 実装済みコマンド
 
@@ -32,12 +64,15 @@
 - `atc run all [python|pypy|cpp]`
 - `atc rerun [python|pypy|cpp]`
 - `atc retry [python|pypy|cpp]`
-- `atc watch [A] [python|pypy|cpp]`
+- `atc watch [A|all] [python|pypy|cpp]`
+- `atc w [A|all] [python|pypy|cpp]`
+- `atc auto [A|all] [python|pypy|cpp]`
 - `atc visual [--live-preview|--no-live-preview] [--live-preview-url URL] [--no-fallback] [--port PORT] [--no-open]`
 - `atc vis [--live-preview|--no-live-preview] [--live-preview-url URL] [--no-fallback] [--port PORT] [--no-open]`
 - `atc vizui [--live-preview|--no-live-preview] [--live-preview-url URL] [--no-fallback] [--port PORT] [--no-open]`
 - `atc manual A B C [py|cpp]`
 - `atc manual A~E [py|cpp]`
+- `atc manual A-E [py|cpp]`
 - `atc manual tests`
 - `atc config show`
 - `atc config init`
@@ -50,6 +85,33 @@
 - Marketplace 公開
 - VS Code Tasks 自動生成
 
+## 新機能追加時の編集場所
+
+```text
+新しいCLIコマンド -> commands.py + 専用module
+config仕様変更 -> config.py
+template仕様変更 -> templates.py
+sample download -> samples.py
+contest作成 -> contest.py
+test実行 -> runner.py
+watch -> watch.py
+doctor診断項目 -> doctor.py
+visualizer起動 -> visual.py
+表示色・console出力 -> console.py
+共通データ構造 -> models.py
+```
+
+## 触らない方がよいもの
+
+必要がない限り触らない:
+
+- `tools/visualizer.html`
+- `vscode/atc-helper/`
+- 既存コマンドの引数仕様
+- config 探索順
+- template 探索順
+- 出力文言と exit code
+
 ## config 探索順
 
 CLI:
@@ -60,7 +122,7 @@ CLI:
 
 VS Code 拡張:
 
-1. workspace folder ごとに親方向へ `.atc/config.toml` を探し、最初に見つかったものを使う
+1. workspace folder ごとに親方向へ `.atc/config.toml` を探す
 2. 見つからない workspace がある場合は `~/.atc/config.toml` も候補
 3. それも無ければ workspace 推定へ fallback
 
@@ -73,53 +135,7 @@ VS Code 拡張:
 - `~` は home に展開
 - 相対パスなら `.atc/config.toml` の project root 基準
 
-`.atc/config.toml` の project root は `.atc` の親ディレクトリ。
-
-例:
-
-```text
-/Users/friend/atcoder/.atc/config.toml
-```
-
-```toml
-[paths]
-root = "."
-```
-
-root:
-
-```text
-/Users/friend/atcoder
-```
-
-## watch config
-
-`[watch]` は任意設定。既存ユーザーの `.atc/config.toml` に無くても、`load_config()` の default config と deep merge で補完される。
-
-デフォルト:
-
-```toml
-[watch]
-poll_seconds = 0.25
-debounce_seconds = 1.5
-```
-
-- `poll_seconds`: 推奨範囲 `0.1` 〜 `5.0`
-- `debounce_seconds`: 推奨範囲 `0.0` 〜 `10.0`
-
-一部だけ指定された場合、未指定キーは default で補完する。値が不正な場合は `atc config doctor` で WARN を出し、`atc watch` 実行時は安全な default に fallback する。既存 config を勝手に書き換えない。
-
-```toml
-root = "contests"
-```
-
-root:
-
-```text
-/Users/friend/atcoder/contests
-```
-
-## contest dir 解決
+`.atc/config.toml` の project root は `.atc` の親ディレクトリです。
 
 `atc contest abc335 cpp` の場合:
 
@@ -127,13 +143,59 @@ root:
 - `paths.root` があり `paths.abc` がある: `root/paths.abc/abc335`
 - `paths.root` があり `paths.abc = ""`: `root/abc335`
 
-`arc` / `agc` も同様。
+## templates
 
-`atc new` は現在の cwd 基準の新規作成コマンドとして残す。
+標準テンプレート:
+
+- `atc/templates/template.py`
+- `atc/templates/template.cpp`
+
+manifest 対応済みです。
+
+```toml
+[templates]
+manifest = "templates/manifest.json"
+py = "fast"
+cpp = "acl"
+```
+
+テンプレート本文は JSON に入れず、`.py` / `.cpp` ファイルとして管理します。従来の直接パス指定も維持します。
+
+```toml
+[templates]
+py = "templates/template.py"
+cpp = "templates/template.cpp"
+```
+
+manifest が明示されていて壊れている場合、`atc config doctor` では ERROR として表示します。
+
+## runner / watch
+
+`runner.py` は `run / test / rerun` を担当します。
+
+- Python / PyPy 実行
+- C++ compile
+- AC / WA / RE / TLE / CE / NO_TESTS / ERROR 判定
+- `.atc/test-runs/last.log`
+- `.atc/test-runs/last_failed.txt`
+
+`watch.py` はファイル変更検知、debounce、runner 呼び出しを担当します。
+
+## visual
+
+`atc visual` / `atc vis` / `atc vizui` は `visual.py` が担当します。
+
+デフォルトでは VS Code Live Preview URL を優先します。
+
+```text
+http://127.0.0.1:3000/tools/visualizer.html?vscode-livepreview=true
+```
+
+Live Preview が使えない場合はローカルHTTPサーバーに fallback します。Live Preview を使わない場合は `--no-live-preview` を指定します。
 
 ## current-contest.json
 
-`atc contest` は contest 作成または既存確認後に `.atc/current-contest.json` を書く。
+`atc contest` は contest 作成または既存確認後に `.atc/current-contest.json` を書きます。
 
 保存先:
 
@@ -150,13 +212,11 @@ root:
 }
 ```
 
-- `contestDir` は絶対パス
-- `requestId` は毎回更新
-- VS Code 拡張は `requestId` で重複処理を避ける
+VS Code 拡張は `requestId` で重複処理を避けます。
 
 ## VS Code watcher 仕様
 
-VS Code 拡張は起動時に watcher を登録するが、既存の `current-contest.json` を読んで即 terminal を開くことはしない。
+VS Code 拡張は起動時に watcher を登録しますが、既存の `current-contest.json` を読んで即 terminal を開くことはしません。
 
 terminal が開く条件:
 
@@ -168,49 +228,9 @@ terminal が開く条件:
 - 左: `atc terminal`
 - 右: `atc watch`
 
-watcher 候補:
-
-- config root の `.atc/current-contest.json`
-- workspace folder 直下
-- workspace folder の親1〜2階層
-- workspace folder 配下の浅い階層
-  - `<workspace>/.atc/current-contest.json`
-  - `<workspace>/*/.atc/current-contest.json`
-  - `<workspace>/*/*/.atc/current-contest.json`
-
-固定カテゴリ名 `ABC(Atcoder Beginner Contest)` などは後方互換 fallback。config がある場合は config root を優先する。
-
-## テンプレート
-
-標準テンプレート:
-
-- `atc/templates/template.py`
-- `atc/templates/template.cpp`
-
-`pyproject.toml` の package-data に含める。
-
-ユーザーごとのテンプレートは `templates/` に置き、`[templates]` で指定する。
-
-## runner
-
-`[runner]`:
-
-- `python`
-- `pypy`
-- `cpp_compiler`
-- `cpp_flags`
-- `timeout_seconds`
-- `compile_timeout_seconds`
-
-Python 実行で `runner.python` が見つからない場合は `sys.executable` fallback。
-
-PyPy 実行を指定していて見つからない場合は ERROR。
-
-C++ 実行で compiler が見つからない場合は ERROR。
-
 ## config doctor
 
-`atc config doctor` は配布先の環境確認用コマンド。
+`atc config doctor` は `doctor.py` が担当します。
 
 確認項目:
 
@@ -221,6 +241,7 @@ C++ 実行で compiler が見つからない場合は ERROR。
 - `paths.abc` / `paths.arc` / `paths.agc`
 - Python / C++ templates
 - runner.python / runner.pypy / runner.cpp_compiler / timeouts
+- watch settings
 - `oj`
 - VS Code `code` command
 - VS Code extension `kouki.atc-helper`
@@ -232,47 +253,36 @@ C++ 実行で compiler が見つからない場合は ERROR。
 - ERROR が 1 個以上なら exit 1
 - WARN だけなら exit 0
 
-doctor では、PyPy / C++ compiler / `oj` / VS Code `code` command が無い場合は WARN 扱い。
-実際にその runner や機能を使うコマンドでは ERROR になり得る。
+## よく使う確認コマンド
 
-## 既知の制限
+```bash
+python -m compileall atc
+atc config show
+atc config doctor
+atc visual --no-open
+atc vis --no-live-preview --no-open
+```
 
-- VS Code 拡張は主に `[paths]` だけを読む
-- config 変更後は VS Code reload 推奨
-- `atc submit` は未実装
-- `atc open` は未実装
-- ADT や tessoku など特殊 URL 形式の完全対応は未実装
-- VS Code Marketplace には未公開
-- 既存 terminal 再利用は未実装。現在は実行ごとに terminal を作る
+一時ディレクトリで:
 
-## 今後の TODO
+```bash
+atc manual A py
+atc run A py
+atc watch A py
+```
 
-優先度高:
+VS Code 拡張を触った場合だけ:
 
-- `atc status`
-- tests 再取得コマンド
-- VS Code terminal 再利用
-
-優先度中:
-
-- `atc open A`
-- config validation 強化
-- doctor 結果の copy 用出力
-
-後回し:
-
-- `atc submit`
-- VS Code Tasks 連携
-- Marketplace 公開
+```bash
+cd vscode/atc-helper
+npm run compile
+```
 
 ## Codex に依頼するときの注意
 
-- まず `docs/AI_CONTEXT.md` を読んでから作業すること
+- まず `docs/AI_CONTEXT.md` と `docs/DEVELOPMENT.md` を読むこと
 - 実装済みでない機能を README に実装済みとして書かないこと
 - 既存コマンドの挙動を壊さないこと
 - CLI と VS Code 拡張の root 解決がズレないようにすること
 - config が無い場合の既存動作を維持すること
-- 変更後は以下を確認すること
-  - `python -m compileall atc`
-  - `cd vscode/atc-helper && npm run compile`
-  
+- 新コマンド追加と大規模リファクタを同時にやらないこと

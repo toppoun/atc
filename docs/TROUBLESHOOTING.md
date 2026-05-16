@@ -1,14 +1,12 @@
 # Troubleshooting
 
-困ったときの確認ポイントです。
-
-まず診断結果を確認します。
+困ったときは、まず診断結果を確認します。
 
 ```bash
 atc config doctor
 ```
 
-出力をそのまま共有すると、Python / `oj` / C++ compiler / VS Code 連携 / config / `current-contest.json` のどこで詰まっているか分かりやすくなります。
+出力をそのまま共有すると、Python / `oj` / C++ compiler / VS Code 連携 / config / templates / `current-contest.json` のどこで詰まっているか分かりやすくなります。
 
 ## `atc` が見つからない
 
@@ -24,14 +22,6 @@ atc config doctor
 - `python3 -m pip install -e .` を実行したか確認
 - 仮想環境を使っている場合は activate する
 - pip の script path が PATH に入っているか確認
-
-macOS の user install では、次のような場所が PATH に必要なことがあります。
-
-```bash
-python3 -m site --user-base
-```
-
-出力されたパスの `bin` を PATH に追加してください。
 
 ## `oj` が見つからない
 
@@ -82,7 +72,7 @@ xcode-select --install
 
 使うコンパイラは `.atc/config.toml` の `[runner].cpp_compiler` で変更できます。
 
-## VS Code の `code` コマンドが見つからない
+## VS Code の `code` コマンドが確認できない
 
 VS Code で Command Palette を開き、次を実行してください。
 
@@ -96,49 +86,22 @@ Shell Command: Install 'code' command in PATH
 code --version
 ```
 
-Windows で VS Code 拡張機能が入っているか確認する例:
+`atc config doctor` は VS Code を不用意に開かないため、`code --list-extensions` は自動実行しません。
+
+## VS Code extension が確認できない
+
+`doctor` が extension を確認できない場合でも、未インストールとは断定しません。VS Code の Extensions 画面で `AtC Helper` / `atc-helper` を確認してください。
+
+手動確認:
+
+```bash
+code --list-extensions | grep -i atc
+```
+
+Windows では:
 
 ```powershell
 code.cmd --list-extensions | Select-String -Pattern "atc"
-```
-
-または:
-
-```powershell
-& "$env:LOCALAPPDATA\Programs\Microsoft VS Code\bin\code.cmd" --list-extensions | Select-String -Pattern "atc"
-```
-
-## `atc config doctor` で VS Code が開く
-
-現在の `doctor` は、VS Code のウィンドウやタブを開かないように、`code --list-extensions` を自動実行しません。
-
-もし古いバージョンの `doctor` 実行時に VS Code が開く場合は、VS Code extension check の結果を信用しすぎず、VS Code の Extensions 画面で `AtC Helper` / `atc-helper` を確認してください。
-
-手動確認する場合だけ、次のコマンドを実行してください。
-
-```powershell
-code.cmd --list-extensions | Select-String -Pattern "atc"
-```
-
-## `config.toml` が壊れている
-
-確認:
-
-```bash
-atc config show
-```
-
-よくある原因:
-
-- `[` や `]` の閉じ忘れ
-- 文字列の quote 忘れ
-- 配列の comma 忘れ
-
-直せない場合は、既存ファイルを退避して作り直します。
-
-```bash
-mv .atc/config.toml .atc/config.toml.bak
-atc config init
 ```
 
 ## VS Code 連携が反応しない
@@ -155,7 +118,27 @@ VS Code 拡張機能は `config.toml` の `[paths]` を読み、`<paths.root>/.a
 
 config を変更した場合は `Developer: Reload Window` を実行してください。
 
-## `atc visual` で Live Preview が使われない
+## `atc visual` が開かない
+
+まずブラウザを自動で開かず URL だけ確認します。
+
+```bash
+atc visual --no-open
+```
+
+Live Preview を使わずローカルサーバーだけ確認する場合:
+
+```bash
+atc vis --no-live-preview --no-open
+```
+
+ローカルサーバーの URL は次の形式です。
+
+```text
+http://127.0.0.1:<port>/visualizer.html
+```
+
+## Live Preview が使われない
 
 `atc visual` / `atc vis` は、まず VS Code Live Preview の URL を確認します。Live Preview が起動していない、または接続できない場合は、自前のローカルHTTPサーバーに fallback します。
 
@@ -165,27 +148,65 @@ Live Preview を使いたくない場合:
 atc vis --no-live-preview
 ```
 
-自前サーバーを使う場合の URL は次の形式です。
+fallback せず Live Preview だけを確認したい場合:
 
-```text
-http://127.0.0.1:<port>/visualizer.html
+```bash
+atc vis --live-preview --no-fallback --no-open
 ```
 
-たとえばデフォルトポートでは:
+## `config.toml` が壊れている
 
-```text
-http://127.0.0.1:8765/visualizer.html
+確認:
+
+```bash
+atc config doctor
+atc config show
+```
+
+よくある原因:
+
+- `[` や `]` の閉じ忘れ
+- 文字列の quote 忘れ
+- 配列の comma 忘れ
+
+直せない場合は、既存ファイルを退避して作り直します。
+
+```bash
+mv .atc/config.toml .atc/config.toml.bak
+atc config init
+```
+
+## template manifest が壊れている
+
+確認:
+
+```bash
+atc config doctor
+```
+
+よくある原因:
+
+- `manifest.json` が JSON として壊れている
+- `[templates] manifest` のパスが間違っている
+- `py` / `cpp` に指定したテンプレート名が manifest に無い
+- manifest の `path` が存在しないファイルを指している
+
+従来の直接パス指定に戻すこともできます。
+
+```toml
+[templates]
+py = "templates/template.py"
+cpp = "templates/template.cpp"
 ```
 
 ## watch が頻繁に走る
 
 `atc watch` は polling 方式です。
 
-現在の値:
-
-```text
-WATCH_POLL_SECONDS = 0.25
-WATCH_DEBOUNCE_SECONDS = 1.5
+```toml
+[watch]
+poll_seconds = 0.25
+debounce_seconds = 1.5
 ```
 
 保存を連続で行うエディタ設定や formatter によって、頻繁に再実行されることがあります。

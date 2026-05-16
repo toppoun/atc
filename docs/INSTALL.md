@@ -10,10 +10,9 @@ macOS 向けの導入手順です。Windows 用 `install.ps1` はありません
 - Node.js / npm
 - VS Code
 - VS Code の `code` コマンド
-- `online-judge-tools`
 - C++ を使う場合は Xcode Command Line Tools
 
-`install.sh` は Python CLI と VS Code 拡張機能をまとめて入れます。
+`install.sh` は Python CLI と VS Code 拡張機能をまとめて入れます。`online-judge-tools` は Python package dependency として入ります。
 
 ## 最短手順
 
@@ -93,7 +92,7 @@ clang++ --version
 
 ## online-judge-tools
 
-サンプル取得には `oj` を使います。通常は package dependency として入りますが、見つからない場合は入れ直してください。
+サンプル取得には `oj` を使います。見つからない場合は入れ直してください。
 
 ```bash
 python3 -m pip install online-judge-tools

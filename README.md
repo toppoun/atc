@@ -1,113 +1,104 @@
 # atc
 
-AtCoder のコンテスト準備、サンプル取得、ローカルテスト、watch 実行、VS Code の分割ターミナル起動をまとめて扱うための CLI ツールです。
+AtCoder 用の CLI + VS Code 補助 + グラフ可視化ツールです。
 
-README は最初に読む入口です。詳しい説明は `docs/` に分けています。
+できること:
 
-## できること
+- contest フォルダ作成
+- template 展開
+- sample download
+- local test
+- watch mode
+- config doctor
+- visualizer 起動
+- VS Code 分割 terminal 連携
 
-- `atc contest abc335 cpp` で、コンテストフォルダを作る、または既存フォルダを開く
-- `online-judge-tools` を使ってサンプルテストを取得する
-- `atc t A` / `atc run all` でローカルテストする
-- `atc watch` で保存時に自動テストする
-- `atc visual` で VS Code Live Preview またはローカルサーバー経由の可視化ツールを開く
-- VS Code 拡張機能 `atc-helper` と連携し、手動用 terminal と `atc watch` 用 terminal を左右分割で開く
-- `.atc/config.toml` で root、テンプレート、問題一覧、実行環境を設定する
+README は短い入口です。詳しい仕様や開発者向け情報は `docs/` を見てください。
 
-## macOS 最短インストール
+## インストール
 
-友達に配る場合は、まずこれだけで始められる想定です。
+macOS では `install.sh` で Python CLI と VS Code 拡張をまとめて入れられます。
 
 ```bash
-git clone <repo>
-cd <repo>
-chmod +x install.sh update.sh uninstall.sh
 ./install.sh
 ```
 
-必要なもの:
-
-- Python 3
-- Node.js / npm
-- VS Code
-- VS Code の `code` コマンド
-- Git
-- C++ を使う場合は Xcode Command Line Tools
-
-`code` コマンドが無い場合は、VS Code の Command Palette で次を実行してください。
-
-```text
-Shell Command: Install 'code' command in PATH
-```
-
-C++ コンパイラが無い場合:
+手動で CLI だけ入れる場合:
 
 ```bash
-xcode-select --install
+python3 -m pip install -e .
 ```
 
-更新:
+VS Code 拡張込みの詳しい手順は [docs/INSTALL.md](docs/INSTALL.md) を見てください。
 
-```bash
-./update.sh
-```
-
-アンインストール:
-
-```bash
-./uninstall.sh
-```
-
-詳しくは [docs/INSTALL.md](docs/INSTALL.md) を見てください。
-
-## 最初にやること
-
-AtCoder 用の root ディレクトリ、またはその配下を VS Code で開いてから:
+## 初回セットアップ
 
 ```bash
 atc config init
 atc config doctor
-atc contest abc335 cpp
 ```
 
-`atc config init` は `.atc/config.toml` を作ります。`atc config doctor` は Python、`oj`、C++ compiler、VS Code 連携などを確認します。必要なら `paths.root` や `paths.abc` を編集してください。
-
-既に `.atc/config.toml` を作成済みでも、追加された任意設定はデフォルト値で補完されます。たとえば `[watch]` は追記しなくても `poll_seconds = 0.25`、`debounce_seconds = 1.5` で動きます。
+`config doctor` は Python、`oj`、C++ compiler、templates、VS Code 連携などを確認します。
 
 ## よく使うコマンド
 
 | コマンド | 用途 |
 | - | - |
-| `atc contest abc335 cpp` | なければ作成、あれば既存コンテストをアクティブ化 |
-| `atc new abc335 py` | 純粋に新規作成とサンプル取得 |
-| `atc t A` | A 問題をテスト |
-| `atc t A python` | A.py を Python でテスト |
-| `atc t A cpp` | A.cpp を C++ でテスト |
-| `atc run all` | 全問題をまとめてテスト |
+| `atc contest abc335 cpp` | contest 作成または既存 contest をアクティブ化 |
+| `atc run A` | A 問題をテスト |
+| `atc run all` | 検出できる全問題をテスト |
 | `atc rerun` | 直前に失敗したケースだけ再実行 |
-| `atc watch` | ファイル保存を監視して自動テスト |
-| `atc visual` | Live Preview 優先で可視化ツールを開く |
-| `atc manual A B C cpp` | 問題ファイルを手動作成 |
-| `atc manual tests` | 現在のフォルダ名を contest ID としてサンプル取得 |
-| `atc config show` | 現在の設定を表示 |
-| `atc config doctor` | 環境と設定を診断 |
-
-`atc visual` は、VS Code Live Preview が使える場合はそれを開き、使えない場合はローカルサーバーで `visualizer.html` を開きます。
+| `atc watch` | ファイル変更を監視して自動テスト |
+| `atc manual A B C py` | 問題ファイルを手動作成 |
+| `atc visual` | visualizer を開く |
 
 詳しい使い方は [docs/USAGE.md](docs/USAGE.md) を見てください。
 
+## config
+
+`.atc/config.toml` の例:
+
+```toml
+[paths]
+root = "."
+abc = "ABC"
+arc = "ARC"
+agc = "AGC"
+
+[defaults]
+language = "cpp"
+problems = ["A", "B", "C", "D", "E"]
+
+[templates]
+manifest = "templates/manifest.json"
+py = "fast"
+cpp = "acl"
+```
+
+従来通り、直接テンプレートファイルを指定する形式も使えます。
+
+```toml
+[templates]
+py = "templates/template.py"
+cpp = "templates/template.cpp"
+```
+
+詳細は [docs/CONFIG.md](docs/CONFIG.md) を見てください。
+
+## atc visual
+
+```bash
+atc visual
+atc vis
+```
+
+VS Code Live Preview が使える場合はそれを優先し、使えない場合はローカルサーバーに fallback して `visualizer.html` を開きます。
+
 ## ドキュメント
 
-- インストール: [docs/INSTALL.md](docs/INSTALL.md)
-- 使い方: [docs/USAGE.md](docs/USAGE.md)
-- config: [docs/CONFIG.md](docs/CONFIG.md)
-- 困ったとき: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
-- 開発者向け: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
-- AI/Codex 向け詳細仕様: [docs/AI_CONTEXT.md](docs/AI_CONTEXT.md)
-
-## 注意
-
-- VS Code Marketplace にはまだ公開していません。ローカル VSIX インストールで使います。
-- VS Code 拡張機能を更新したら、`Developer: Reload Window` または VS Code 再起動をしてください。
-- `atc contest` は VS Code の `code` コマンドを直接起動しません。`.atc/current-contest.json` を更新し、VS Code 拡張機能がそれを監視します。
-- `atc submit` や `atc open` は現時点では未対応です。
+- [docs/INSTALL.md](docs/INSTALL.md)
+- [docs/USAGE.md](docs/USAGE.md)
+- [docs/CONFIG.md](docs/CONFIG.md)
+- [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+- [docs/AI_CONTEXT.md](docs/AI_CONTEXT.md)

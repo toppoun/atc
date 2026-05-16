@@ -22,8 +22,9 @@ arc = "ARC"
 agc = "AGC"
 
 [templates]
-py = "templates/template.py"
-cpp = "templates/template.cpp"
+manifest = "templates/manifest.json"
+py = "fast"
+cpp = "acl"
 
 [defaults]
 language = "cpp"
@@ -36,6 +37,10 @@ cpp_compiler = "g++"
 cpp_flags = ["-std=c++20", "-O2", "-Wall", "-Wextra"]
 timeout_seconds = 2.0
 compile_timeout_seconds = 10.0
+
+[watch]
+poll_seconds = 0.25
+debounce_seconds = 1.5
 ```
 
 ## `[paths]`
@@ -44,8 +49,6 @@ compile_timeout_seconds = 10.0
 
 AtCoder 用 root を指定します。
 
-絶対パス推奨です。
-
 ```toml
 [paths]
 root = "/Users/friend/atcoder"
@@ -53,41 +56,16 @@ root = "/Users/friend/atcoder"
 
 相対パスの場合は `.atc/config.toml` の project root 基準です。
 
-```text
-/Users/friend/atcoder/.atc/config.toml
-```
-
-この config に:
-
 ```toml
 [paths]
 root = "."
 ```
 
-と書くと root は:
-
-```text
-/Users/friend/atcoder
-```
-
-になります。
-
-```toml
-[paths]
-root = "contests"
-```
-
-なら:
-
-```text
-/Users/friend/atcoder/contests
-```
-
-になります。
+この config が `/Users/friend/atcoder/.atc/config.toml` にある場合、root は `/Users/friend/atcoder` になります。
 
 `root = ""` の場合、`atc contest abc335` は現在のカレントディレクトリ直下に `abc335/` を作ります。
 
-### `abc` / `arc` / `agc`
+### `paths.abc` / `paths.arc` / `paths.agc`
 
 contest ID に応じたカテゴリフォルダです。
 
@@ -99,23 +77,9 @@ arc = "ARC"
 agc = "AGC"
 ```
 
-この場合:
+この場合、`atc contest abc335 cpp` は `/Users/friend/atcoder/ABC/abc335` を使います。
 
-```bash
-atc contest abc335 cpp
-```
-
-は:
-
-```text
-/Users/friend/atcoder/ABC/abc335
-```
-
-を使います。
-
-### root 直下に contest を置く
-
-カテゴリ分けしない場合は空文字にします。
+root 直下に contest を置く場合は空文字にします。
 
 ```toml
 [paths]
@@ -125,18 +89,41 @@ arc = ""
 agc = ""
 ```
 
-この場合:
-
-```text
-/Users/friend/atcoder/abc335
-/Users/friend/atcoder/arc180
-```
-
-のように root 直下に作ります。
+この場合、`abc335` や `arc180` は root 直下に作られます。
 
 ## `[templates]`
 
 問題ファイル作成時のテンプレートです。
+
+### manifest 方式
+
+```toml
+[templates]
+manifest = "templates/manifest.json"
+py = "fast"
+cpp = "acl"
+```
+
+`py` / `cpp` には manifest 内のテンプレート名を指定できます。テンプレート本文は JSON ではなく `.py` / `.cpp` ファイルとして管理します。
+
+例:
+
+```text
+templates/
+├── manifest.json
+├── python/
+│   ├── default.py
+│   └── fast.py
+└── cpp/
+    ├── default.cpp
+    └── acl.cpp
+```
+
+manifest が壊れている場合、`atc config doctor` は ERROR を表示します。
+
+### 従来の直接パス指定
+
+従来通り、テンプレートファイルを直接指定できます。
 
 ```toml
 [templates]
@@ -144,18 +131,11 @@ py = "templates/template.py"
 cpp = "templates/template.cpp"
 ```
 
-ユーザーごとのテンプレートは project root の `templates/` に置くのを推奨します。
-
-```text
-<project-root>/templates/template.py
-<project-root>/templates/template.cpp
-```
-
 テンプレートが見つからない場合は警告を出し、空ファイルを作ります。
 
 ## `[defaults]`
 
-### `language`
+### `defaults.language`
 
 作成言語のデフォルトです。
 
@@ -169,7 +149,7 @@ language = "cpp"
 - `py`
 - `cpp`
 
-### `problems`
+### `defaults.problems`
 
 作成・取得・watch 対象の問題一覧です。
 
@@ -198,16 +178,16 @@ timeout_seconds = 2.0
 compile_timeout_seconds = 10.0
 ```
 
-- `timeout_seconds`: テストケース実行時間
-- `compile_timeout_seconds`: C++ コンパイル時間
-- `python` が見つからない場合、CLI は `sys.executable` fallback を使います
-- `pypy` が見つからない場合は分かりやすい ERROR を返します
+- `runner.python`: Python 実行コマンド。見つからない場合は `sys.executable` fallback
+- `runner.pypy`: PyPy 実行コマンド。見つからない場合は ERROR
+- `runner.cpp_compiler`: C++ compiler
+- `runner.cpp_flags`: C++ compile flags
+- `runner.timeout_seconds`: テストケース実行時間
+- `runner.compile_timeout_seconds`: C++ コンパイル時間
 
 ## `[watch]`
 
-`atc watch` の監視間隔です。任意設定なので、省略した場合はデフォルト値が使われます。
-
-既に `.atc/config.toml` を作成済みの場合も、必ず追記する必要はありません。必要になった時だけ手動で `[watch]` を追記してください。
+`atc watch` の監視間隔です。省略した場合はデフォルト値が使われます。
 
 ```toml
 [watch]
@@ -215,8 +195,8 @@ poll_seconds = 0.25
 debounce_seconds = 1.5
 ```
 
-- `poll_seconds`: ファイル変更を確認する間隔です。推奨範囲は `0.1` 〜 `5.0` です。
-- `debounce_seconds`: 変更検知後にテスト実行を待つ時間です。推奨範囲は `0.0` 〜 `10.0` です。
+- `watch.poll_seconds`: ファイル変更を確認する間隔。推奨範囲は `0.1` 〜 `5.0`
+- `watch.debounce_seconds`: 変更検知後にテスト実行を待つ時間。推奨範囲は `0.0` 〜 `10.0`
 
 一部だけ指定した場合、指定していない値はデフォルトで補完されます。
 
@@ -224,8 +204,6 @@ debounce_seconds = 1.5
 [watch]
 debounce_seconds = 2.0
 ```
-
-この場合、`poll_seconds` はデフォルトの `0.25`、`debounce_seconds` は `2.0` になります。
 
 値が不正な場合、`atc config doctor` で WARN を表示し、実行時は安全なデフォルト値に fallback します。
 
