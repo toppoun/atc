@@ -11,13 +11,13 @@ try:
     from .config import (
         SOURCE_EXTS,
         _normalize_run_language,
-        _resolve_command,
         _runner_command,
         _runner_compile_timeout,
         _runner_cpp_flags,
         _runner_timeout,
         config_problems,
         load_config,
+        resolve_executable,
     )
     from .console import GREEN, RED, RESET, color_text, error, ok, warn
     from .models import CaseResult, ProblemResult
@@ -25,13 +25,13 @@ except ImportError:
     from config import (
         SOURCE_EXTS,
         _normalize_run_language,
-        _resolve_command,
         _runner_command,
         _runner_compile_timeout,
         _runner_cpp_flags,
         _runner_timeout,
         config_problems,
         load_config,
+        resolve_executable,
     )
     from console import GREEN, RED, RESET, color_text, error, ok, warn
     from models import CaseResult, ProblemResult
@@ -65,7 +65,7 @@ def _missing_cpp_compiler_message(compiler: str):
 
 def _prepare_cpp_run_command(cwd: Path, problem: str, cpp_file: Path, config: dict, show_compile=False):
     compiler = _runner_command(config, "cpp_compiler", "g++")
-    compiler_path = _resolve_command(compiler)
+    compiler_path = resolve_executable(compiler)
     if not compiler_path:
         return "cpp", [], None, "ERROR", _missing_cpp_compiler_message(compiler)
 
@@ -99,7 +99,7 @@ def _prepare_python_run_command(py_file: Path, run_language: str, config: dict):
     key = "pypy" if run_language == "pypy" else "python"
     default = "pypy" if run_language == "pypy" else "python"
     command = _runner_command(config, key, default)
-    executable = _resolve_command(command)
+    executable = resolve_executable(command)
     if run_language == "pypy" and not executable and command == "pypy":
         executable = shutil.which("pypy3")
     if run_language != "pypy" and not executable:

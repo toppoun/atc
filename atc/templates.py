@@ -7,18 +7,18 @@ from typing import List, Optional
 try:
     from .config import (
         _config_project_root,
-        _config_root,
         _find_config_file,
         _find_project_root,
+        config_root,
         load_config,
     )
     from .console import error, warn
 except ImportError:
     from config import (
         _config_project_root,
-        _config_root,
         _find_config_file,
         _find_project_root,
+        config_root,
         load_config,
     )
     from console import error, warn
@@ -228,9 +228,9 @@ def _resolve_template_path_value(value: str, ext: str, config: dict, start: Path
         _config_project_root(config_file) / template_path,
     ]
 
-    config_root = _config_root(config)
-    if config_root:
-        candidates.append(config_root / template_path)
+    root_path = config_root(config)
+    if root_path:
+        candidates.append(root_path / template_path)
 
     candidates.append(_find_project_root(start, config) / template_path)
 
@@ -254,9 +254,9 @@ def _resolve_manifest_path_value(value: str, config: dict, start: Path):
         _config_project_root(config_file) / manifest_path,
     ]
 
-    config_root = _config_root(config)
-    if config_root:
-        candidates.append(config_root / manifest_path)
+    root_path = config_root(config)
+    if root_path:
+        candidates.append(root_path / manifest_path)
 
     candidates.append(_find_project_root(start, config) / manifest_path)
     return _first_existing_or_last(candidates)
@@ -274,9 +274,9 @@ def _implicit_manifest_candidates(config: dict, start: Path):
             ]
         )
 
-        config_root = _config_root(config)
-        if config_root:
-            candidates.append(config_root / manifest_path)
+        root_path = config_root(config)
+        if root_path:
+            candidates.append(root_path / manifest_path)
 
         candidates.append(_find_project_root(start, config) / manifest_path)
 

@@ -7,7 +7,7 @@ from typing import Optional
 
 try:
     from .config import (
-        _config_root,
+        config_root,
         _find_project_root,
         config_problems,
         default_language,
@@ -18,7 +18,7 @@ try:
     from .templates import load_template
 except ImportError:
     from config import (
-        _config_root,
+        config_root,
         _find_project_root,
         config_problems,
         default_language,
@@ -95,7 +95,7 @@ def resolve_contest_dir(contest: str, config: dict):
         return contest_path
 
     paths = config.get("paths", {})
-    root_path = _config_root(config)
+    root_path = config_root(config)
     category_key = contest_category_key(contest)
     category_dir = str(paths.get(category_key) or "").strip() if category_key else ""
 

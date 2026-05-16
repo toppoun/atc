@@ -326,13 +326,14 @@ def _config_to_toml(config: dict) -> str:
 
 
 config_file_path = _config_file_path
+
+# Public aliases used by feature modules.
 config_root = _config_root
 config_project_root = _config_project_root
 find_project_root = _find_project_root
-
-# Public aliases used by feature modules.
 config_problems = _config_problems
 default_language = _default_language
+resolve_executable = _resolve_command
 resolve_command = _resolve_command
 normalize_run_language = _normalize_run_language
 runner_settings = _runner_settings

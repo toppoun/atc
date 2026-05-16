@@ -15,32 +15,32 @@ except ModuleNotFoundError:
 try:
     from .config import (
         CONFIG_FILE_META_KEY,
-        _config_root,
         _deep_merge_config,
         _default_config,
         _find_config_file,
         _find_project_root,
-        _resolve_command,
         _runner_command,
         _runner_compile_timeout,
         _runner_cpp_flags,
         _runner_timeout,
+        config_root,
+        resolve_executable,
         watch_settings,
     )
     from .templates import TemplateError, resolve_template_file as _resolve_template_file
 except ImportError:
     from config import (
         CONFIG_FILE_META_KEY,
-        _config_root,
         _deep_merge_config,
         _default_config,
         _find_config_file,
         _find_project_root,
-        _resolve_command,
         _runner_command,
         _runner_compile_timeout,
         _runner_cpp_flags,
         _runner_timeout,
+        config_root,
+        resolve_executable,
         watch_settings,
     )
     from templates import TemplateError, resolve_template_file as _resolve_template_file
@@ -142,7 +142,7 @@ def _doctor_check_config(report: DoctorReport, config: dict, config_file: Option
 
     paths = config.get("paths", {})
     root_value = str(paths.get("root") or "").strip()
-    root = _config_root(config)
+    root = config_root(config)
     if root_value:
         if root and root.exists():
             report.item("OK", f"Resolved root: {root}")
@@ -180,14 +180,14 @@ def _doctor_check_templates(report: DoctorReport, config: dict, cwd: Path):
 def _doctor_check_runner(report: DoctorReport, config: dict):
     report.section("Runner")
     python_cmd = _runner_command(config, "python", "python")
-    python_runner = _resolve_command(python_cmd)
+    python_runner = resolve_executable(python_cmd)
     if python_runner:
         report.item("OK", f"Python runner: {python_runner}")
     else:
         report.item("OK", f"Python runner: {sys.executable}", [f"Configured runner.python was not found: {python_cmd}", "Using current Python as fallback."])
 
     pypy_cmd = _runner_command(config, "pypy", "pypy")
-    pypy_runner = _resolve_command(pypy_cmd)
+    pypy_runner = resolve_executable(pypy_cmd)
     if not pypy_runner and pypy_cmd == "pypy":
         pypy_runner = shutil.which("pypy3")
     if pypy_runner:
@@ -196,7 +196,7 @@ def _doctor_check_runner(report: DoctorReport, config: dict):
         report.item("WARN", "PyPy: not found. Python mode still works.")
 
     compiler_cmd = _runner_command(config, "cpp_compiler", "g++")
-    compiler = _resolve_command(compiler_cmd)
+    compiler = resolve_executable(compiler_cmd)
     if compiler:
         report.item("OK", f"C++ compiler: {compiler}")
     else:
@@ -400,7 +400,7 @@ def _doctor_check_vscode(report: DoctorReport):
 
 
 def _doctor_current_contest_root(config: dict, cwd: Path):
-    root = _config_root(config)
+    root = config_root(config)
     return root if root else _find_project_root(cwd, config)
 
 

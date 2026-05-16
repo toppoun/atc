@@ -34,7 +34,7 @@ def test_config_root_dot_is_project_root(tmp_path, monkeypatch):
 
     loaded = config_module.load_config(nested)
 
-    assert config_module._config_root(loaded) == tmp_path.resolve()
+    assert config_module.config_root(loaded) == tmp_path.resolve()
 
 
 def test_config_root_relative_path_is_under_project_root(tmp_path, monkeypatch):
@@ -43,7 +43,7 @@ def test_config_root_relative_path_is_under_project_root(tmp_path, monkeypatch):
 
     loaded = config_module.load_config(tmp_path)
 
-    assert config_module._config_root(loaded) == (tmp_path / "contests").resolve()
+    assert config_module.config_root(loaded) == (tmp_path / "contests").resolve()
 
 
 def test_watch_settings_default_values():
