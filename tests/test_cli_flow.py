@@ -1,0 +1,154 @@
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _write_test_config(cwd: Path) -> None:
+    atc_dir = cwd / ".atc"
+    atc_dir.mkdir(parents=True, exist_ok=True)
+    (atc_dir / "config.toml").write_text(
+        "\n".join(
+            [
+                "[defaults]",
+                'language = "py"',
+                'problems = ["A"]',
+                "",
+                "[runner]",
+                f"python = {json.dumps(sys.executable)}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+
+def _run_cli(cwd: Path, *args: str) -> subprocess.CompletedProcess:
+    env = os.environ.copy()
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONPATH"] = str(PROJECT_ROOT) + os.pathsep + env.get("PYTHONPATH", "")
+    return subprocess.run(
+        [sys.executable, "-m", "atc.cli", *args],
+        cwd=cwd,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+
+
+def _assert_no_traceback(proc: subprocess.CompletedProcess) -> None:
+    output = proc.stdout + proc.stderr
+    assert "Traceback" not in output, output
+
+
+def _assert_success(proc: subprocess.CompletedProcess) -> None:
+    _assert_no_traceback(proc)
+    assert proc.returncode == 0, f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+
+
+def _assert_error_without_traceback(proc: subprocess.CompletedProcess) -> str:
+    _assert_no_traceback(proc)
+    assert proc.returncode == 1, f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+    return proc.stdout + proc.stderr
+
+
+def _write_echo_problem(cwd: Path, expected: str = "hello") -> None:
+    (cwd / "A.py").write_text("print(input())\n", encoding="utf-8")
+    _write_sample(cwd, expected)
+
+
+def _write_sample(cwd: Path, expected: str = "hello") -> None:
+    testdir = cwd / "tests" / "A"
+    testdir.mkdir(parents=True, exist_ok=True)
+    (testdir / "sample-1.in").write_text("hello\n", encoding="utf-8")
+    (testdir / "sample-1.out").write_text(f"{expected}\n", encoding="utf-8")
+
+
+def test_cli_manual_run_rerun_success_flow(tmp_path):
+    _write_test_config(tmp_path)
+
+    manual = _run_cli(tmp_path, "manual", "A", "py")
+    _assert_success(manual)
+    assert (tmp_path / "A.py").is_file()
+    assert "Created" in manual.stdout
+
+    _write_echo_problem(tmp_path)
+
+    run = _run_cli(tmp_path, "run", "A", "py")
+    _assert_success(run)
+    assert "AC" in run.stdout
+
+    rerun = _run_cli(tmp_path, "rerun", "py")
+    _assert_success(rerun)
+
+
+def test_cli_run_all_writes_log_and_rerun_failed_problem(tmp_path):
+    _write_test_config(tmp_path)
+    _write_sample(tmp_path)
+
+    run_all = _run_cli(tmp_path, "run", "all", "py")
+    _assert_no_traceback(run_all)
+    assert run_all.returncode == 1, f"stdout:\n{run_all.stdout}\nstderr:\n{run_all.stderr}"
+    assert "FAIL" in run_all.stdout
+
+    log_path = tmp_path / ".atc" / "test-runs" / "last.log"
+    failed_path = tmp_path / ".atc" / "test-runs" / "last_failed.txt"
+    assert log_path.is_file()
+    assert "ERROR: ファイルが見つかりません。" in log_path.read_text(encoding="utf-8")
+    assert failed_path.read_text(encoding="utf-8") == "A *"
+
+    (tmp_path / "A.py").write_text("print(input())\n", encoding="utf-8")
+
+    rerun = _run_cli(tmp_path, "rerun", "py")
+    _assert_success(rerun)
+    assert "PASS" in rerun.stdout
+    assert log_path.is_file()
+    assert failed_path.read_text(encoding="utf-8") == ""
+
+
+def test_cli_config_doctor_broken_config_reports_error(tmp_path):
+    atc_dir = tmp_path / ".atc"
+    atc_dir.mkdir(parents=True)
+    (atc_dir / "config.toml").write_text(
+        "[paths\nroot = \".\"\n",
+        encoding="utf-8",
+    )
+
+    result = _run_cli(tmp_path, "config", "doctor")
+    combined = _assert_error_without_traceback(result)
+
+    assert "ERROR" in combined
+    assert "config" in combined.lower() or "toml" in combined.lower()
+
+
+def test_cli_config_doctor_broken_template_manifest_reports_error(tmp_path):
+    atc_dir = tmp_path / ".atc"
+    atc_dir.mkdir(parents=True)
+    (atc_dir / "config.toml").write_text(
+        "\n".join(
+            [
+                "[templates]",
+                'manifest = "templates/manifest.json"',
+                'py = "fast"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    manifest = tmp_path / "templates" / "manifest.json"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text("{broken", encoding="utf-8")
+
+    result = _run_cli(tmp_path, "config", "doctor")
+    combined = _assert_error_without_traceback(result)
+
+    assert "ERROR" in combined
+    assert "manifest" in combined.lower()
