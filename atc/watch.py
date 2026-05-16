@@ -20,6 +20,9 @@ CONFIG_FILES = {
     "Makefile",
     "CMakeLists.txt",
 }
+CONFIG_PATHS = {
+    Path(".atc") / "config.toml",
+}
 
 
 def _watch_snapshot(cwd: Path, problems: Optional[List[str]] = None):
@@ -51,6 +54,10 @@ def _watch_paths(cwd: Path, problems: Optional[List[str]] = None):
         config = cwd / name
         if config.exists():
             yield config
+    for rel_path in CONFIG_PATHS:
+        config = cwd / rel_path
+        if config.exists():
+            yield config
 
 
 def _changed_paths(before: Dict[Path, tuple], after: Dict[Path, tuple]):
@@ -71,6 +78,8 @@ def _problem_from_changed_path(cwd: Path, path: Path, problems: Optional[List[st
         return None
 
     parts = rel.parts
+    if rel in CONFIG_PATHS:
+        return "ALL"
     if len(parts) == 1:
         if rel.name in CONFIG_FILES:
             return "ALL"

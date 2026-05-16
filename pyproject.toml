@@ -13,6 +13,11 @@ dependencies = [
   "tomli; python_version < '3.11'"
 ]
 
+[project.optional-dependencies]
+dev = [
+  "pytest",
+]
+
 [project.scripts]
 atc = "atc.cli:main"
 
@@ -25,5 +30,9 @@ atc = [
   "templates/template.cpp",
   "templates/manifest.json",
   "templates/python/*.py",
-  "templates/cpp/*.cpp"
+  "templates/cpp/*.cpp",
+  "assets/visualizer.html"
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

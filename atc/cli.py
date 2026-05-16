@@ -1,20 +1,9 @@
 import sys
-import shutil
 
 try:
     from .commands import USAGE_ERROR, resolve_command, usage_lines
 except ImportError:
     from commands import USAGE_ERROR, resolve_command, usage_lines
-
-# ===== 設定 =====
-# ---------- 共通・補助関数 ----------
-
-def detect_pypy():
-    for name in ["pypy3", "pypy"]:
-        path = shutil.which(name)
-        if path:
-            return path
-    return None
 
 # ---------- usage ----------
 
