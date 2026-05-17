@@ -121,6 +121,22 @@ atc manual A-E cpp
 atc manual tests
 ```
 
+## `atc template`
+
+利用可能なテンプレートを確認したり、テンプレート本文を表示します。
+
+```bash
+atc template list
+atc template list py
+atc template list cpp
+atc template show py default
+atc template show cpp acl
+```
+
+- `list`: manifest から利用可能なテンプレート名、説明、path を表示
+- `list py` / `list cpp`: 指定言語だけ表示
+- `show <py|cpp> <name>`: 指定テンプレートの本文を stdout に表示
+
 ## `atc config`
 
 ```bash

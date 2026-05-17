@@ -50,6 +50,7 @@ atc config doctor
 | `atc rerun` | 直前に失敗したケースだけ再実行 |
 | `atc watch` | ファイル変更を監視して自動テスト |
 | `atc manual A B C py` | 問題ファイルを手動作成 |
+| `atc template list` | 利用可能なテンプレートを表示 |
 | `atc visual` | visualizer を開く |
 
 詳しい使い方は [docs/USAGE.md](docs/USAGE.md) を見てください。

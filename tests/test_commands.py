@@ -14,6 +14,8 @@ def test_resolve_command_aliases():
     assert resolve_command("vis").name == "visual"
     assert resolve_command("vizui").name == "visual"
 
+    assert resolve_command("template").name == "template"
+
     assert resolve_command("unknown") is None
 
 
@@ -27,5 +29,7 @@ def test_usage_lines_include_main_commands():
     assert "atc run all" in usage
     assert "atc rerun" in usage
     assert "atc watch" in usage
+    assert "atc template list" in usage
+    assert "atc template show" in usage
     assert "atc visual" in usage
     assert "atc manual" in usage

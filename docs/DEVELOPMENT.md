@@ -11,6 +11,7 @@ config.py     config.toml / path / runner / watch settings
 console.py    colors and console helpers
 models.py     CaseResult / ProblemResult
 templates.py  template manifest and template resolution
+template_commands.py template list/show CLI
 samples.py    oj sample download
 contest.py    atc new / atc contest
 manual.py     atc manual
@@ -26,6 +27,7 @@ visual.py     atc visual / vis
 新しいCLIコマンド -> commands.py + 専用module
 config仕様変更 -> config.py
 template仕様変更 -> templates.py
+template CLI表示 -> template_commands.py
 sample download -> samples.py
 contest作成 -> contest.py
 test実行 -> runner.py

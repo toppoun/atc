@@ -166,3 +166,47 @@ def test_cli_argparse_handlers_reject_extra_args(tmp_path):
         result = _run_cli(tmp_path, *args)
         combined = _assert_error_without_traceback(result)
         assert "Error" in combined or "Usage" in combined or "使い方" in combined
+
+
+def test_cli_template_list_and_show(tmp_path):
+    list_all = _run_cli(tmp_path, "template", "list")
+    _assert_success(list_all)
+    assert "Python templates:" in list_all.stdout
+    assert "C++ templates:" in list_all.stdout
+    assert "default" in list_all.stdout
+
+    list_py = _run_cli(tmp_path, "template", "list", "py")
+    _assert_success(list_py)
+    assert "Python templates:" in list_py.stdout
+    assert "fast" in list_py.stdout
+    assert "C++ templates:" not in list_py.stdout
+
+    list_cpp = _run_cli(tmp_path, "template", "list", "cpp")
+    _assert_success(list_cpp)
+    assert "C++ templates:" in list_cpp.stdout
+    assert "acl" in list_cpp.stdout
+    assert "Python templates:" not in list_cpp.stdout
+
+    show_py = _run_cli(tmp_path, "template", "show", "py", "default")
+    _assert_success(show_py)
+    assert "def main" in show_py.stdout
+
+    show_cpp = _run_cli(tmp_path, "template", "show", "cpp", "default")
+    _assert_success(show_cpp)
+    assert "#include <bits/stdc++.h>" in show_cpp.stdout
+
+
+def test_cli_template_errors_without_traceback(tmp_path):
+    cases = [
+        ("template",),
+        ("template", "unknown"),
+        ("template", "list", "js"),
+        ("template", "show", "py"),
+        ("template", "show", "py", "unknown"),
+        ("template", "show", "js", "fast"),
+    ]
+
+    for args in cases:
+        result = _run_cli(tmp_path, *args)
+        combined = _assert_error_without_traceback(result)
+        assert "Error" in combined or "Usage" in combined or "使い方" in combined

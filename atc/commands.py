@@ -16,6 +16,7 @@ try:
     from .doctor import cmd_config_doctor
     from .manual import cmd_manual, cmd_manual_tests
     from .runner import cmd_rerun, cmd_run, cmd_run_all
+    from .template_commands import cmd_template_list, cmd_template_show
     from .visual import cmd_visual, parse_visual_args
     from .watch import cmd_watch
 except ImportError:
@@ -32,6 +33,7 @@ except ImportError:
     from doctor import cmd_config_doctor
     from manual import cmd_manual, cmd_manual_tests
     from runner import cmd_rerun, cmd_run, cmd_run_all
+    from template_commands import cmd_template_list, cmd_template_show
     from visual import cmd_visual, parse_visual_args
     from watch import cmd_watch
 
@@ -134,6 +136,28 @@ def handle_rerun(args: List[str]):
     return 0
 
 
+def handle_template(args: List[str]):
+    parser = AtcArgumentParser(prog="atc template")
+    subparsers = parser.add_subparsers(dest="subcommand", required=True, parser_class=AtcArgumentParser)
+
+    list_parser = subparsers.add_parser("list", prog="atc template list")
+    list_parser.add_argument("lang", nargs="?")
+
+    show_parser = subparsers.add_parser("show", prog="atc template show")
+    show_parser.add_argument("lang")
+    show_parser.add_argument("name")
+
+    parsed = _parse_handler_args(parser, args)
+    if parsed is None:
+        return USAGE_ERROR
+
+    if parsed.subcommand == "list":
+        return cmd_template_list(parsed.lang)
+    if parsed.subcommand == "show":
+        return cmd_template_show(parsed.lang, parsed.name)
+    return USAGE_ERROR
+
+
 def handle_watch(args: List[str]):
     cmd_watch(args)
     return 0
@@ -205,6 +229,13 @@ COMMANDS: Tuple[CommandSpec, ...] = (
         usage=("atc watch [A] [python|pypy|cpp]",),
         description="Watch files and rerun tests automatically.",
         handler=handle_watch,
+    ),
+    CommandSpec(
+        name="template",
+        aliases=(),
+        usage=("atc template list [py|cpp]", "atc template show <py|cpp> <name>"),
+        description="List templates or print a template body.",
+        handler=handle_template,
     ),
     CommandSpec(
         name="visual",

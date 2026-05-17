@@ -18,6 +18,7 @@
 - `docs/USAGE.md`: ユーザー向けコマンド説明
 - `atc/config.py`: config / path / runner / watch settings
 - `atc/templates.py`: template manifest / template resolution
+- `atc/template_commands.py`: template list/show CLI 表示
 - `vscode/atc-helper/src/extension.ts`: VS Code 拡張本体
 
 ## 概要
@@ -41,6 +42,7 @@ atc/
 ├── console.py      # colors and console helpers
 ├── models.py       # CaseResult / ProblemResult
 ├── templates.py    # template / manifest handling
+├── template_commands.py # atc template list/show
 ├── samples.py      # oj sample download
 ├── contest.py      # atc new / atc contest
 ├── manual.py       # atc manual
@@ -74,6 +76,8 @@ atc/
 - `atc manual A~E [py|cpp]`
 - `atc manual A-E [py|cpp]`
 - `atc manual tests`
+- `atc template list [py|cpp]`
+- `atc template show <py|cpp> <name>`
 - `atc config show`
 - `atc config init`
 - `atc config doctor`
@@ -91,6 +95,7 @@ atc/
 新しいCLIコマンド -> commands.py + 専用module
 config仕様変更 -> config.py
 template仕様変更 -> templates.py
+template CLI表示 -> template_commands.py
 sample download -> samples.py
 contest作成 -> contest.py
 test実行 -> runner.py
