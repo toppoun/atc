@@ -1,0 +1,339 @@
+import json
+import platform
+import random
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional
+
+try:
+    from .config import (
+        load_config,
+        normalize_run_language,
+        resolve_executable,
+        runner_command,
+        runner_compile_timeout,
+        runner_cpp_flags,
+        runner_timeout,
+    )
+    from .console import error, ok, warn
+except ImportError:
+    from config import (
+        load_config,
+        normalize_run_language,
+        resolve_executable,
+        runner_command,
+        runner_compile_timeout,
+        runner_cpp_flags,
+        runner_timeout,
+    )
+    from console import error, ok, warn
+
+
+COMPARE_MODES = {"exact", "strip", "tokens"}
+DEFAULT_STRESS_COUNT = 100
+DEFAULT_STRESS_TIMEOUT = 2.0
+STRESS_DIR = Path(".atc") / "stress"
+
+
+class StressError(Exception):
+    pass
+
+
+@dataclass
+class StressProgram:
+    command: list
+    path: Path
+    cleanup_path: Optional[Path] = None
+
+
+@dataclass
+class StressRunOutput:
+    stdout: str
+    stderr: str
+    returncode: int
+
+
+def normalize_problem(problem: str) -> str:
+    return str(problem).strip().upper()
+
+
+def normalize_compare_mode(mode: str) -> str:
+    normalized = str(mode or "").strip().lower()
+    if normalized not in COMPARE_MODES:
+        raise StressError("Invalid compare mode. Use exact, strip, or tokens.")
+    return normalized
+
+
+def compare_outputs(actual: str, expected: str, mode: str = "strip") -> bool:
+    mode = normalize_compare_mode(mode)
+    if mode == "exact":
+        return actual == expected
+    if mode == "tokens":
+        return actual.split() == expected.split()
+    return actual.strip() == expected.strip()
+
+
+def seed_for_case(base_seed: int, case_number: int) -> int:
+    return int(base_seed) + int(case_number) - 1
+
+
+def validate_count(count: int) -> int:
+    if count <= 0:
+        raise StressError("count must be greater than 0.")
+    return count
+
+
+def resolve_stress_timeout(timeout: Optional[float], config: dict) -> float:
+    value = (runner_timeout(config) or DEFAULT_STRESS_TIMEOUT) if timeout is None else timeout
+    if value <= 0:
+        raise StressError("timeout must be greater than 0.")
+    return float(value)
+
+
+def _display_path(path: Path, cwd: Path) -> str:
+    try:
+        return str(path.relative_to(cwd))
+    except ValueError:
+        return str(path)
+
+
+def _python_command(config: dict, key: str = "python") -> str:
+    default = "pypy" if key == "pypy" else "python"
+    command = runner_command(config, key, default)
+    executable = resolve_executable(command)
+    if key == "pypy" and not executable and command == "pypy":
+        executable = resolve_executable("pypy3")
+    if key != "pypy" and not executable:
+        executable = sys.executable
+    if not executable:
+        label = "PyPy" if key == "pypy" else "Python"
+        raise StressError(f"{label} command not found: {command}.")
+    return executable
+
+
+def _ensure_file(path: Path, label: str) -> None:
+    if not path.is_file():
+        raise StressError(f"{label} file not found: {path}")
+
+
+def _prepare_generator(cwd: Path, problem: str, gen: Optional[str], config: dict) -> StressProgram:
+    path = (cwd / (gen or f"{problem}_gen.py")).resolve()
+    _ensure_file(path, "generator")
+    return StressProgram(command=[_python_command(config, "python"), str(path)], path=path)
+
+
+def _prepare_brute(cwd: Path, problem: str, brute: Optional[str], config: dict) -> StressProgram:
+    path = (cwd / (brute or f"{problem}_brute.py")).resolve()
+    _ensure_file(path, "brute")
+    return StressProgram(command=[_python_command(config, "python"), str(path)], path=path)
+
+
+def _compile_cpp_solution(cwd: Path, problem: str, cpp_file: Path, config: dict) -> StressProgram:
+    compiler = runner_command(config, "cpp_compiler", "g++")
+    compiler_path = resolve_executable(compiler)
+    if not compiler_path:
+        raise StressError(f"C++ compiler not found: {compiler}")
+
+    stress_dir = cwd / STRESS_DIR / problem
+    stress_dir.mkdir(parents=True, exist_ok=True)
+    suffix = ".exe" if platform.system() == "Windows" else ".out"
+    exe_path = stress_dir / f"_{problem}_stress{suffix}"
+
+    warn(f"Compiling {cpp_file.name}...")
+    try:
+        proc = subprocess.run(
+            [compiler_path, *runner_cpp_flags(config), str(cpp_file), "-o", str(exe_path)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=runner_compile_timeout(config),
+        )
+    except subprocess.TimeoutExpired:
+        raise StressError(f"Compile timed out after {runner_compile_timeout(config)} seconds.")
+    except OSError as e:
+        raise StressError(str(e))
+
+    if proc.returncode != 0:
+        message = proc.stderr.strip() or proc.stdout.strip() or f"compiler exited with status {proc.returncode}"
+        raise StressError(f"Compile failed:\n{message}")
+
+    return StressProgram(command=[str(exe_path)], path=cpp_file, cleanup_path=exe_path)
+
+
+def _prepare_solution(cwd: Path, problem: str, language: Optional[str], config: dict) -> tuple[str, StressProgram]:
+    run_language = normalize_run_language(language, config)
+    if not run_language:
+        raise StressError("Invalid language. Use py, python, pypy, or cpp.")
+
+    if run_language == "cpp":
+        cpp_file = (cwd / f"{problem}.cpp").resolve()
+        _ensure_file(cpp_file, "solution")
+        return "cpp", _compile_cpp_solution(cwd, problem, cpp_file, config)
+
+    py_file = (cwd / f"{problem}.py").resolve()
+    _ensure_file(py_file, "solution")
+    python_key = "pypy" if run_language == "pypy" else "python"
+    return "py", StressProgram(command=[_python_command(config, python_key), str(py_file)], path=py_file)
+
+
+def _run_process(command: list, input_text: Optional[str], timeout: float, label: str) -> StressRunOutput:
+    run_kwargs = {"stdin": subprocess.DEVNULL} if input_text is None else {"input": input_text}
+    try:
+        proc = subprocess.run(
+            command,
+            **run_kwargs,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        raise StressError(f"{label} timed out after {timeout} seconds.")
+    except OSError as e:
+        raise StressError(f"{label} failed: {e}")
+    return StressRunOutput(stdout=proc.stdout, stderr=proc.stderr, returncode=proc.returncode)
+
+
+def save_failure(
+    cwd: Path,
+    problem: str,
+    language: str,
+    case_number: int,
+    base_seed: int,
+    seed: int,
+    gen_path: Path,
+    brute_path: Path,
+    solution_path: Path,
+    compare: str,
+    input_text: str,
+    your_output: str,
+    brute_output: str,
+) -> Path:
+    stress_dir = cwd / STRESS_DIR / problem
+    stress_dir.mkdir(parents=True, exist_ok=True)
+
+    (stress_dir / "failed.in").write_text(input_text, encoding="utf-8")
+    (stress_dir / "your.out").write_text(your_output, encoding="utf-8")
+    (stress_dir / "brute.out").write_text(brute_output, encoding="utf-8")
+    meta = {
+        "problem": problem,
+        "language": language,
+        "case": case_number,
+        "base_seed": base_seed,
+        "seed": seed,
+        "gen": _display_path(gen_path, cwd),
+        "brute": _display_path(brute_path, cwd),
+        "solution": _display_path(solution_path, cwd),
+        "compare": compare,
+    }
+    (stress_dir / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return stress_dir
+
+
+def _print_failure(case_number: int, seed: int, input_text: str, your_output: str, brute_output: str, saved_dir: Path) -> None:
+    error(f"WA found at case {case_number}")
+    print(f"seed: {seed}")
+    print()
+    print("input:")
+    print(input_text, end="" if input_text.endswith("\n") else "\n")
+    print()
+    print("your output:")
+    print(your_output, end="" if your_output.endswith("\n") else "\n")
+    print()
+    print("brute output:")
+    print(brute_output, end="" if brute_output.endswith("\n") else "\n")
+    print()
+    print("saved:")
+    for name in ["failed.in", "your.out", "brute.out", "meta.json"]:
+        print(saved_dir / name)
+
+
+def cmd_stress(
+    problem: str,
+    language: Optional[str] = None,
+    count: int = DEFAULT_STRESS_COUNT,
+    seed: Optional[int] = None,
+    gen: Optional[str] = None,
+    brute: Optional[str] = None,
+    timeout: Optional[float] = None,
+    compare: str = "strip",
+) -> int:
+    cwd = Path.cwd()
+    config = load_config(cwd)
+    problem = normalize_problem(problem)
+
+    try:
+        count = validate_count(count)
+        compare = normalize_compare_mode(compare)
+        timeout = resolve_stress_timeout(timeout, config)
+        base_seed = int(seed) if seed is not None else random.randrange(0, 2**31)
+        display_language, solution = _prepare_solution(cwd, problem, language, config)
+        generator = _prepare_generator(cwd, problem, gen, config)
+        brute_program = _prepare_brute(cwd, problem, brute, config)
+    except StressError as e:
+        error(f"Error: {e}")
+        return 1
+
+    print(f"stress {problem} {display_language}")
+    print(f"solution: {_display_path(solution.path, cwd)}")
+    print(f"gen: {_display_path(generator.path, cwd)}")
+    print(f"brute: {_display_path(brute_program.path, cwd)}")
+    print(f"count: {count}")
+    print(f"seed: {base_seed}")
+    print(f"compare: {compare}")
+    print(f"timeout: {timeout}")
+    print()
+
+    try:
+        for case_number in range(1, count + 1):
+            case_seed = seed_for_case(base_seed, case_number)
+            generated = _run_process([*generator.command, str(case_seed)], None, timeout, "generator")
+            if generated.returncode != 0:
+                raise StressError(f"generator failed at case {case_number}: {generated.stderr.strip() or generated.stdout.strip()}")
+
+            your = _run_process(solution.command, generated.stdout, timeout, "solution")
+            if your.returncode != 0:
+                raise StressError(f"solution failed at case {case_number}: {your.stderr.strip() or your.stdout.strip()}")
+
+            brute_output = _run_process(brute_program.command, generated.stdout, timeout, "brute")
+            if brute_output.returncode != 0:
+                raise StressError(f"brute failed at case {case_number}: {brute_output.stderr.strip() or brute_output.stdout.strip()}")
+
+            if not compare_outputs(your.stdout, brute_output.stdout, compare):
+                saved_dir = save_failure(
+                    cwd=cwd,
+                    problem=problem,
+                    language=display_language,
+                    case_number=case_number,
+                    base_seed=base_seed,
+                    seed=case_seed,
+                    gen_path=generator.path,
+                    brute_path=brute_program.path,
+                    solution_path=solution.path,
+                    compare=compare,
+                    input_text=generated.stdout,
+                    your_output=your.stdout,
+                    brute_output=brute_output.stdout,
+                )
+                _print_failure(case_number, case_seed, generated.stdout, your.stdout, brute_output.stdout, saved_dir)
+                return 1
+
+            print(f"[{case_number}] OK")
+    except StressError as e:
+        error(f"Error: {e}")
+        return 1
+    finally:
+        if solution.cleanup_path and solution.cleanup_path.exists():
+            try:
+                solution.cleanup_path.unlink()
+            except OSError:
+                pass
+
+    print()
+    ok(f"PASS: all {count} cases matched")
+    return 0

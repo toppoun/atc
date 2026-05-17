@@ -16,6 +16,7 @@ try:
     from .doctor import cmd_config_doctor
     from .manual import cmd_manual, cmd_manual_tests
     from .runner import cmd_rerun, cmd_run, cmd_run_all
+    from .stress import cmd_stress
     from .template_commands import cmd_template_list, cmd_template_show
     from .visual import cmd_visual, parse_visual_args
     from .watch import cmd_watch
@@ -33,6 +34,7 @@ except ImportError:
     from doctor import cmd_config_doctor
     from manual import cmd_manual, cmd_manual_tests
     from runner import cmd_rerun, cmd_run, cmd_run_all
+    from stress import cmd_stress
     from template_commands import cmd_template_list, cmd_template_show
     from visual import cmd_visual, parse_visual_args
     from watch import cmd_watch
@@ -158,6 +160,31 @@ def handle_template(args: List[str]):
     return USAGE_ERROR
 
 
+def handle_stress(args: List[str]):
+    parser = AtcArgumentParser(prog="atc stress")
+    parser.add_argument("problem")
+    parser.add_argument("lang", nargs="?")
+    parser.add_argument("--count", type=int, default=100)
+    parser.add_argument("--seed", type=int)
+    parser.add_argument("--gen")
+    parser.add_argument("--brute")
+    parser.add_argument("--timeout", type=float)
+    parser.add_argument("--compare", default="strip")
+    parsed = _parse_handler_args(parser, args)
+    if parsed is None:
+        return USAGE_ERROR
+    return cmd_stress(
+        parsed.problem,
+        parsed.lang,
+        count=parsed.count,
+        seed=parsed.seed,
+        gen=parsed.gen,
+        brute=parsed.brute,
+        timeout=parsed.timeout,
+        compare=parsed.compare,
+    )
+
+
 def handle_watch(args: List[str]):
     cmd_watch(args)
     return 0
@@ -236,6 +263,13 @@ COMMANDS: Tuple[CommandSpec, ...] = (
         usage=("atc template list [py|cpp]", "atc template show <py|cpp> <name>"),
         description="List templates or print a template body.",
         handler=handle_template,
+    ),
+    CommandSpec(
+        name="stress",
+        aliases=(),
+        usage=("atc stress A [py|cpp] [--count N] [--seed S]",),
+        description="Run randomized stress tests against a brute force solution.",
+        handler=handle_stress,
     ),
     CommandSpec(
         name="visual",

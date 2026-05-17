@@ -101,6 +101,41 @@ atc auto
 
 終了は `Ctrl+C` です。
 
+## `atc stress`
+
+提出予定解と愚直解を、ランダム生成した入力で比較します。
+
+```bash
+atc stress A
+atc stress A py
+atc stress A cpp
+atc stress A py --count 100 --seed 42
+atc stress A --gen A_gen.py --brute A_brute.py
+atc stress A --timeout 2.0 --compare strip
+```
+
+必要ファイル:
+
+```text
+A.py / A.cpp
+A_gen.py
+A_brute.py
+```
+
+`A_gen.py` は seed を argv で受け取ります。
+
+```bash
+python A_gen.py 42
+```
+
+比較モード:
+
+- `exact`: stdout を完全一致で比較
+- `strip`: 前後空白を除去して比較
+- `tokens`: 空白区切り tokens として比較
+
+不一致が見つかった場合は `.atc/stress/A/` に入力、出力、meta 情報を保存します。
+
 ## `atc manual`
 
 問題ファイルを手動で作ります。
