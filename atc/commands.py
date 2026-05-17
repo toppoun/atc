@@ -16,7 +16,7 @@ try:
     from .doctor import cmd_config_doctor
     from .manual import cmd_manual, cmd_manual_tests
     from .runner import cmd_rerun, cmd_run, cmd_run_all
-    from .stress import cmd_stress
+    from .stress import cmd_stress, cmd_stress_init
     from .template_commands import cmd_template_list, cmd_template_show
     from .visual import cmd_visual, parse_visual_args
     from .watch import cmd_watch
@@ -34,7 +34,7 @@ except ImportError:
     from doctor import cmd_config_doctor
     from manual import cmd_manual, cmd_manual_tests
     from runner import cmd_rerun, cmd_run, cmd_run_all
-    from stress import cmd_stress
+    from stress import cmd_stress, cmd_stress_init
     from template_commands import cmd_template_list, cmd_template_show
     from visual import cmd_visual, parse_visual_args
     from watch import cmd_watch
@@ -161,6 +161,15 @@ def handle_template(args: List[str]):
 
 
 def handle_stress(args: List[str]):
+    if args and args[0] == "init":
+        parser = AtcArgumentParser(prog="atc stress init")
+        parser.add_argument("subcommand")
+        parser.add_argument("problem")
+        parsed = _parse_handler_args(parser, args)
+        if parsed is None:
+            return USAGE_ERROR
+        return cmd_stress_init(parsed.problem)
+
     parser = AtcArgumentParser(prog="atc stress")
     parser.add_argument("problem")
     parser.add_argument("lang", nargs="?")
@@ -260,14 +269,14 @@ COMMANDS: Tuple[CommandSpec, ...] = (
     CommandSpec(
         name="template",
         aliases=(),
-        usage=("atc template list [py|cpp]", "atc template show <py|cpp> <name>"),
+        usage=("atc template list [py|cpp|stress]", "atc template show <py|cpp|stress> <name>"),
         description="List templates or print a template body.",
         handler=handle_template,
     ),
     CommandSpec(
         name="stress",
         aliases=(),
-        usage=("atc stress A [py|cpp] [--count N] [--seed S]",),
+        usage=("atc stress A [py|cpp] [--count N] [--seed S]", "atc stress init A"),
         description="Run randomized stress tests against a brute force solution.",
         handler=handle_stress,
     ),

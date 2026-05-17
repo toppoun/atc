@@ -50,6 +50,7 @@ atc config doctor
 | `atc rerun` | 直前に失敗したケースだけ再実行 |
 | `atc watch` | ファイル変更を監視して自動テスト |
 | `atc stress A py` | ランダムケースで提出予定解と愚直解を比較 |
+| `atc stress init A` | stress 用 generator / brute を作成 |
 | `atc manual A B C py` | 問題ファイルを手動作成 |
 | `atc template list` | 利用可能なテンプレートを表示 |
 | `atc visual` | visualizer を開く |

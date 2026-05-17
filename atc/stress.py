@@ -18,6 +18,12 @@ try:
         runner_timeout,
     )
     from .console import error, ok, warn
+    from .templates import (
+        TemplateError,
+        load_template_manifest,
+        resolve_template_manifest,
+        resolve_template_name,
+    )
 except ImportError:
     from config import (
         load_config,
@@ -29,6 +35,12 @@ except ImportError:
         runner_timeout,
     )
     from console import error, ok, warn
+    from templates import (
+        TemplateError,
+        load_template_manifest,
+        resolve_template_manifest,
+        resolve_template_name,
+    )
 
 
 COMPARE_MODES = {"exact", "strip", "tokens"}
@@ -128,6 +140,41 @@ def _prepare_brute(cwd: Path, problem: str, brute: Optional[str], config: dict) 
     path = (cwd / (brute or f"{problem}_brute.py")).resolve()
     _ensure_file(path, "brute")
     return StressProgram(command=[_python_command(config, "python"), str(path)], path=path)
+
+
+def _stress_template_path(cwd: Path, config: dict, name: str) -> Path:
+    manifest_path = resolve_template_manifest(config, cwd, required=True)
+    manifest = load_template_manifest(manifest_path)
+    return resolve_template_name("stress", name, manifest, manifest_path)
+
+
+def _write_stress_template(target: Path, template_path: Path) -> bool:
+    if target.exists():
+        warn(f"Warning: already exists: {target}")
+        return False
+    target.write_text(template_path.read_text(encoding="utf-8"), encoding="utf-8")
+    print(f"created: {target}")
+    return True
+
+
+def cmd_stress_init(problem: str) -> int:
+    cwd = Path.cwd()
+    config = load_config(cwd)
+    problem = normalize_problem(problem)
+
+    try:
+        gen_template = _stress_template_path(cwd, config, "gen")
+        brute_template = _stress_template_path(cwd, config, "brute")
+        _write_stress_template(cwd / f"{problem}_gen.py", gen_template)
+        _write_stress_template(cwd / f"{problem}_brute.py", brute_template)
+    except TemplateError as e:
+        error(f"Error: {e}")
+        return 1
+    except OSError as e:
+        error(f"Error: failed to write stress template: {e}")
+        return 1
+
+    return 0
 
 
 def _compile_cpp_solution(cwd: Path, problem: str, cpp_file: Path, config: dict) -> StressProgram:

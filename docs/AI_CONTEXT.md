@@ -69,6 +69,7 @@ atc/
 - `atc rerun [python|pypy|cpp]`
 - `atc retry [python|pypy|cpp]`
 - `atc stress A [py|cpp] [--count N] [--seed S] [--gen PATH] [--brute PATH] [--timeout SEC] [--compare exact|strip|tokens]`
+- `atc stress init A`
 - `atc watch [A|all] [python|pypy|cpp]`
 - `atc w [A|all] [python|pypy|cpp]`
 - `atc auto [A|all] [python|pypy|cpp]`
@@ -79,8 +80,8 @@ atc/
 - `atc manual A~E [py|cpp]`
 - `atc manual A-E [py|cpp]`
 - `atc manual tests`
-- `atc template list [py|cpp]`
-- `atc template show <py|cpp> <name>`
+- `atc template list [py|cpp|stress]`
+- `atc template show <py|cpp|stress> <name>`
 - `atc config show`
 - `atc config init`
 - `atc config doctor`
@@ -158,6 +159,8 @@ VS Code 拡張:
 
 - `atc/templates/template.py`
 - `atc/templates/template.cpp`
+- `atc/templates/stress/gen.py`
+- `atc/templates/stress/brute.py`
 
 manifest 対応済みです。
 
@@ -199,6 +202,8 @@ manifest が明示されていて壊れている場合、`atc config doctor` で
 - seed は generator の argv に渡す
 - compare mode は `exact` / `strip` / `tokens`
 - 不一致時は `.atc/stress/<problem>/` に `failed.in`、`your.out`、`brute.out`、`meta.json` を保存
+- `atc stress init A` は stress 用テンプレートから `A_gen.py` / `A_brute.py` だけを作る
+- `A.py` / `A.cpp` は `manual` / `contest` 側の責務なので作らない
 
 ## visual
 

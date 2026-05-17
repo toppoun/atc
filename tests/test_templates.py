@@ -1,14 +1,25 @@
 import json
+from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 import pytest
 
 import atc.config as config_module
 from atc.templates import (
+    TEMPLATE_DIR,
     TemplateError,
     TemplateManifestError,
     load_template_manifest,
+    resolve_template_name,
     resolve_template_file,
 )
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _write_config(root, content):
@@ -82,3 +93,23 @@ def test_resolve_default_template_file_exists(tmp_path, monkeypatch):
 
     assert template.name == "template.py"
     assert template.exists()
+
+
+def test_package_manifest_contains_stress_templates():
+    manifest_path = TEMPLATE_DIR / "manifest.json"
+    manifest = load_template_manifest(manifest_path)
+
+    gen_template = resolve_template_name("stress", "gen", manifest, manifest_path)
+    brute_template = resolve_template_name("stress", "brute", manifest, manifest_path)
+
+    assert gen_template == TEMPLATE_DIR / "stress" / "gen.py"
+    assert brute_template == TEMPLATE_DIR / "stress" / "brute.py"
+    assert gen_template.exists()
+    assert brute_template.exists()
+
+
+def test_pyproject_includes_stress_templates_as_package_data():
+    pyproject = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    package_data = pyproject["tool"]["setuptools"]["package-data"]["atc"]
+
+    assert "templates/stress/*.py" in package_data

@@ -145,7 +145,12 @@ def list_templates(config: Optional[dict] = None, start: Optional[Path] = None) 
 
     manifest = load_template_manifest(manifest_path)
     results: List[TemplateInfo] = []
-    for ext in ["py", "cpp"]:
+    language_keys = []
+    for key in ["python", "py", "cpp", "c++", "stress"]:
+        if isinstance(manifest.get(key), dict):
+            language_keys.append(key)
+
+    for ext in language_keys:
         try:
             language_key, language_table = _manifest_language_table(ext, manifest, manifest_path)
         except TemplateManifestError:

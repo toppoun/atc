@@ -33,11 +33,17 @@ def _normalize_template_language(language: Optional[str]) -> Optional[str]:
         return "py"
     if normalized in ["cpp", "c++"]:
         return "cpp"
-    raise TemplateError("Invalid template language. Use py/python or cpp/c++.")
+    if normalized == "stress":
+        return "stress"
+    raise TemplateError("Invalid template language. Use py/python, cpp/c++, or stress.")
 
 
 def _language_label(language: str) -> str:
-    return "Python" if language == "py" else "C++"
+    if language == "py":
+        return "Python"
+    if language == "cpp":
+        return "C++"
+    return "Stress"
 
 
 def _template_matches_language(template: TemplateInfo, language: str) -> bool:
@@ -46,6 +52,8 @@ def _template_matches_language(template: TemplateInfo, language: str) -> bool:
         return template_language in ["py", "python"]
     if language == "cpp":
         return template_language in ["cpp", "c++"]
+    if language == "stress":
+        return template_language == "stress"
     return False
 
 
@@ -88,6 +96,8 @@ def cmd_template_list(language: Optional[str] = None) -> int:
     _print_template_group("Python", _templates_for_language(templates, "py"))
     print()
     _print_template_group("C++", _templates_for_language(templates, "cpp"))
+    print()
+    _print_template_group("Stress", _templates_for_language(templates, "stress"))
     return 0
 
 

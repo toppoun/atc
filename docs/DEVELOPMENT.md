@@ -32,7 +32,7 @@ template CLI表示 -> template_commands.py
 sample download -> samples.py
 contest作成 -> contest.py
 test実行 -> runner.py
-stress test -> stress.py
+stress test / stress init -> stress.py
 watch -> watch.py
 doctor診断項目 -> doctor.py
 visualizer起動 -> visual.py
@@ -109,8 +109,11 @@ atc/templates/template.cpp
 atc/templates/manifest.json
 atc/templates/python/*.py
 atc/templates/cpp/*.cpp
+atc/templates/stress/*.py
 atc/assets/visualizer.html
 ```
+
+stress 用 generator / brute テンプレートは `atc/templates/stress/` に置き、manifest の `stress` section に登録します。`atc stress init A` はこのテンプレートから `A_gen.py` / `A_brute.py` だけを作ります。
 
 ## visualizer assets
 

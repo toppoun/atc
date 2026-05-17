@@ -186,3 +186,62 @@ def test_cli_stress_rejects_invalid_arguments(tmp_path):
         _assert_no_traceback(result)
         assert result.returncode == 1
         assert "Error" in result.stdout or "使い方" in result.stdout
+
+
+def test_cli_stress_init_creates_generator_and_brute_templates(tmp_path):
+    result = _run_cli(tmp_path, "stress", "init", "A")
+
+    _assert_no_traceback(result)
+    assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
+    gen = tmp_path / "A_gen.py"
+    brute = tmp_path / "A_brute.py"
+    assert gen.is_file()
+    assert brute.is_file()
+    assert "random.seed(seed)" in gen.read_text(encoding="utf-8")
+    assert "replace with brute force solution" in brute.read_text(encoding="utf-8")
+
+    generated = subprocess.run(
+        [sys.executable, str(gen), "7"],
+        cwd=tmp_path,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    _assert_no_traceback(generated)
+    assert generated.returncode == 0
+    assert generated.stdout.strip()
+
+
+def test_cli_stress_init_does_not_overwrite_existing_files(tmp_path):
+    gen = tmp_path / "A_gen.py"
+    gen.write_text("keep me\n", encoding="utf-8")
+
+    result = _run_cli(tmp_path, "stress", "init", "A")
+
+    _assert_no_traceback(result)
+    assert result.returncode == 0
+    assert gen.read_text(encoding="utf-8") == "keep me\n"
+    assert (tmp_path / "A_brute.py").is_file()
+    assert "Warning" in result.stdout
+
+
+def test_cli_template_list_and_show_stress_templates(tmp_path):
+    list_result = _run_cli(tmp_path, "template", "list", "stress")
+    _assert_no_traceback(list_result)
+    assert list_result.returncode == 0
+    assert "Stress templates:" in list_result.stdout
+    assert "gen" in list_result.stdout
+    assert "brute" in list_result.stdout
+
+    show_gen = _run_cli(tmp_path, "template", "show", "stress", "gen")
+    _assert_no_traceback(show_gen)
+    assert show_gen.returncode == 0
+    assert "random.seed(seed)" in show_gen.stdout
+
+    show_brute = _run_cli(tmp_path, "template", "show", "stress", "brute")
+    _assert_no_traceback(show_brute)
+    assert show_brute.returncode == 0
+    assert "replace with brute force solution" in show_brute.stdout
