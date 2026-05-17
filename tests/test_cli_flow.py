@@ -152,3 +152,17 @@ def test_cli_config_doctor_broken_template_manifest_reports_error(tmp_path):
 
     assert "ERROR" in combined
     assert "manifest" in combined.lower()
+
+
+def test_cli_argparse_handlers_reject_extra_args(tmp_path):
+    cases = [
+        ("new", "abc001", "py", "extra"),
+        ("contest", "abc001", "py", "extra"),
+        ("run", "A", "py", "extra"),
+        ("rerun", "py", "extra"),
+    ]
+
+    for args in cases:
+        result = _run_cli(tmp_path, *args)
+        combined = _assert_error_without_traceback(result)
+        assert "Error" in combined or "Usage" in combined or "使い方" in combined

@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple
 
 try:
+    from .argparse_utils import ArgumentParseError, AtcArgumentParser
     from .config import (
         CONFIG_FILE_NAME,
         _config_to_toml,
@@ -18,6 +19,7 @@ try:
     from .visual import cmd_visual, parse_visual_args
     from .watch import cmd_watch
 except ImportError:
+    from argparse_utils import ArgumentParseError, AtcArgumentParser
     from config import (
         CONFIG_FILE_NAME,
         _config_to_toml,
@@ -50,19 +52,34 @@ class CommandSpec:
     handler: Callable[[List[str]], Any]
 
 
+def _parse_handler_args(parser: AtcArgumentParser, args: List[str]):
+    try:
+        return parser.parse_args(args)
+    except ArgumentParseError as e:
+        if str(e):
+            error(f"Error: {e}")
+        return None
+
+
 def handle_new(args: List[str]):
-    if len(args) < 1:
+    parser = AtcArgumentParser(prog="atc new")
+    parser.add_argument("contest")
+    parser.add_argument("lang", nargs="?")
+    parsed = _parse_handler_args(parser, args)
+    if parsed is None:
         return USAGE_ERROR
-    lang = args[1] if len(args) == 2 else None
-    cmd_new(args[0], lang)
+    cmd_new(parsed.contest, parsed.lang)
     return 0
 
 
 def handle_contest(args: List[str]):
-    if len(args) < 1:
+    parser = AtcArgumentParser(prog="atc contest")
+    parser.add_argument("contest")
+    parser.add_argument("lang", nargs="?")
+    parsed = _parse_handler_args(parser, args)
+    if parsed is None:
         return USAGE_ERROR
-    lang = args[1] if len(args) == 2 else None
-    cmd_contest(args[0], lang)
+    cmd_contest(parsed.contest, parsed.lang)
     return 0
 
 
@@ -94,19 +111,26 @@ def handle_config(args: List[str]):
 
 
 def handle_run(args: List[str]):
-    if len(args) < 1:
+    parser = AtcArgumentParser(prog="atc run")
+    parser.add_argument("problem")
+    parser.add_argument("lang", nargs="?")
+    parsed = _parse_handler_args(parser, args)
+    if parsed is None:
         return USAGE_ERROR
-    interp = args[1] if len(args) == 2 else None
-    if args[0].lower() == "all":
-        cmd_run_all(interp)
+    if parsed.problem.lower() == "all":
+        cmd_run_all(parsed.lang)
     else:
-        cmd_run(args[0], interp)
+        cmd_run(parsed.problem, parsed.lang)
     return 0
 
 
 def handle_rerun(args: List[str]):
-    interp = args[0] if len(args) == 1 else None
-    cmd_rerun(interp)
+    parser = AtcArgumentParser(prog="atc rerun")
+    parser.add_argument("lang", nargs="?")
+    parsed = _parse_handler_args(parser, args)
+    if parsed is None:
+        return USAGE_ERROR
+    cmd_rerun(parsed.lang)
     return 0
 
 
