@@ -31,5 +31,15 @@
       "path": "cpp/debug.cpp",
       "description": "C++ template with debug helpers"
     }
+  },
+  "stress": {
+    "gen": {
+      "path": "stress/gen.py",
+      "description": "Random input generator template"
+    },
+    "brute": {
+      "path": "stress/brute.py",
+      "description": "Brute force solution template"
+    }
   }
 }

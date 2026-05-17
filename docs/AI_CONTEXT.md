@@ -19,6 +19,7 @@
 - `atc/config.py`: config / path / runner / watch settings
 - `atc/templates.py`: template manifest / template resolution
 - `atc/template_commands.py`: template list/show CLI 表示
+- `atc/stress.py`: random stress test
 - `vscode/atc-helper/src/extension.ts`: VS Code 拡張本体
 
 ## 概要
@@ -47,6 +48,7 @@ atc/
 ├── contest.py      # atc new / atc contest
 ├── manual.py       # atc manual
 ├── runner.py       # atc run / test / rerun
+├── stress.py       # atc stress
 ├── watch.py        # atc watch
 ├── doctor.py       # atc config doctor
 └── visual.py       # atc visual / vis
@@ -66,6 +68,8 @@ atc/
 - `atc run all [python|pypy|cpp]`
 - `atc rerun [python|pypy|cpp]`
 - `atc retry [python|pypy|cpp]`
+- `atc stress A [py|cpp] [--count N] [--seed S] [--gen PATH] [--brute PATH] [--timeout SEC] [--compare exact|strip|tokens]`
+- `atc stress init A`
 - `atc watch [A|all] [python|pypy|cpp]`
 - `atc w [A|all] [python|pypy|cpp]`
 - `atc auto [A|all] [python|pypy|cpp]`
@@ -76,8 +80,8 @@ atc/
 - `atc manual A~E [py|cpp]`
 - `atc manual A-E [py|cpp]`
 - `atc manual tests`
-- `atc template list [py|cpp]`
-- `atc template show <py|cpp> <name>`
+- `atc template list [py|cpp|stress]`
+- `atc template show <py|cpp|stress> <name>`
 - `atc config show`
 - `atc config init`
 - `atc config doctor`
@@ -99,6 +103,7 @@ template CLI表示 -> template_commands.py
 sample download -> samples.py
 contest作成 -> contest.py
 test実行 -> runner.py
+stress test -> stress.py
 watch -> watch.py
 doctor診断項目 -> doctor.py
 visualizer起動 -> visual.py
@@ -154,6 +159,8 @@ VS Code 拡張:
 
 - `atc/templates/template.py`
 - `atc/templates/template.cpp`
+- `atc/templates/stress/gen.py`
+- `atc/templates/stress/brute.py`
 
 manifest 対応済みです。
 
@@ -185,6 +192,18 @@ manifest が明示されていて壊れている場合、`atc config doctor` で
 - `.atc/test-runs/last_failed.txt`
 
 `watch.py` はファイル変更検知、debounce、runner 呼び出しを担当します。
+
+## stress
+
+`atc stress` は `stress.py` が担当します。
+
+- `A.py` / `A.cpp` と `A_gen.py` / `A_brute.py` を使う
+- generator / brute は Python 固定
+- seed は generator の argv に渡す
+- compare mode は `exact` / `strip` / `tokens`
+- 不一致時は `.atc/stress/<problem>/` に `failed.in`、`your.out`、`brute.out`、`meta.json` を保存
+- `atc stress init A` は stress 用テンプレートから `A_gen.py` / `A_brute.py` だけを作る
+- `A.py` / `A.cpp` は `manual` / `contest` 側の責務なので作らない
 
 ## visual
 
