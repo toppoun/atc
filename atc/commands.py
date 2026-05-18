@@ -233,7 +233,7 @@ COMMANDS: Tuple[CommandSpec, ...] = (
     ),
     CommandSpec(
         name="contest",
-        aliases=("contests",),
+        aliases=("contests", "c"),
         usage=("atc contest abc413 [py|cpp]",),
         description="Create or select a contest directory.",
         handler=handle_contest,

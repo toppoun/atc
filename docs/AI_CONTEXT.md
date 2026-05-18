@@ -61,6 +61,7 @@ atc/
 - `atc new abc335 [py|cpp]`
 - `atc contest abc335 [py|cpp]`
 - `atc contests abc335 [py|cpp]`
+- `atc c abc335 [py|cpp]`
 - `atc run A [python|pypy|cpp]`
 - `atc r A [python|pypy|cpp]`
 - `atc test A [python|pypy|cpp]`

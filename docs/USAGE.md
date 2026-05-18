@@ -17,11 +17,12 @@ atc new abc335 py
 
 VS Code terminal 連携を起動したい場合は `atc contest` を使ってください。
 
-## `atc contest` / `atc contests`
+## `atc contest` / `atc contests` / `atc c`
 
 ```bash
 atc contest abc335 cpp
 atc contests abc335 py
+atc c abc335 cpp
 ```
 
 「なければ作る、あればそのコンテストをアクティブにする」コマンドです。

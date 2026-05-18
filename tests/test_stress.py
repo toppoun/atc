@@ -198,7 +198,7 @@ def test_cli_stress_init_creates_generator_and_brute_templates(tmp_path):
     assert gen.is_file()
     assert brute.is_file()
     assert "random.seed(seed)" in gen.read_text(encoding="utf-8")
-    assert "replace with brute force solution" in brute.read_text(encoding="utf-8")
+    assert "def main" in brute.read_text(encoding="utf-8")
 
     generated = subprocess.run(
         [sys.executable, str(gen), "7"],
@@ -244,4 +244,4 @@ def test_cli_template_list_and_show_stress_templates(tmp_path):
     show_brute = _run_cli(tmp_path, "template", "show", "stress", "brute")
     _assert_no_traceback(show_brute)
     assert show_brute.returncode == 0
-    assert "replace with brute force solution" in show_brute.stdout
+    assert "def main" in show_brute.stdout

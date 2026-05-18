@@ -45,6 +45,7 @@ atc config doctor
 | コマンド | 用途 |
 | - | - |
 | `atc contest abc335 cpp` | contest 作成または既存 contest をアクティブ化 |
+| `atc c abc335 cpp` | `atc contest` の省略形 |
 | `atc run A` | A 問題をテスト |
 | `atc run all` | 検出できる全問題をテスト |
 | `atc rerun` | 直前に失敗したケースだけ再実行 |
