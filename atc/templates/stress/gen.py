@@ -16,7 +16,7 @@ def main() -> None:
     seed = int(sys.argv[1]) if len(sys.argv) >= 2 else None
     random.seed(seed)
 
-    # TODO: 問題に合わせた出力に変更してください。
+    # TODO: replace with brute force solution
     n = ni(2, 8)
     a = nl(n, 2, 8)
 

@@ -25,6 +25,7 @@ def sl(): return list(si())
 
 
 def main():
+    # TODO: replace with brute force solution
     n = ni()
     a = nl()
 
