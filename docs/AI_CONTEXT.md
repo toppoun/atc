@@ -268,6 +268,7 @@ terminal が開く条件:
 - runner.python / runner.pypy / runner.cpp_compiler / timeouts
 - watch settings
 - `oj`
+- `oj login --check https://atcoder.jp/`
 - VS Code `code` command
 - VS Code extension `kouki.atc-helper`
 - `<resolved-root>/.atc/current-contest.json`

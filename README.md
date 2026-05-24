@@ -38,7 +38,7 @@ atc config init
 atc config doctor
 ```
 
-`config doctor` は Python、`oj`、C++ compiler、templates、VS Code 連携などを確認します。
+`config doctor` は Python、`oj` と AtCoder ログイン状態、C++ compiler、templates、VS Code 連携などを確認します。
 
 ## よく使うコマンド
 

@@ -38,6 +38,24 @@ python3 -m pip install online-judge-tools
 oj login https://atcoder.jp/
 ```
 
+## AtCoder にログインしているか確認したい
+
+`atc config doctor` は `oj` の AtCoder login status も確認します。
+
+手動で確認する場合:
+
+```bash
+oj login --check https://atcoder.jp/
+```
+
+未ログインの場合:
+
+```bash
+oj login https://atcoder.jp/
+```
+
+ネットワークが無い場合は、ログイン済みでも check が失敗することがあります。その場合はネットワーク接続後に再確認してください。
+
 ## サンプル取得に失敗する
 
 原因候補:

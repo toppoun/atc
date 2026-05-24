@@ -189,7 +189,19 @@ atc config doctor
 
 - `init`: カレントディレクトリに `.atc/config.toml` を作成
 - `show`: 現在読み込まれる config を表示
-- `doctor`: Python、config、templates、runner、watch、`oj`、VS Code 連携、`current-contest.json` を診断
+- `doctor`: Python、config、templates、runner、watch、`oj` と AtCoder login status、VS Code 連携、`current-contest.json` を診断
+
+AtCoder に未ログインの場合は、次を実行してください。
+
+```bash
+oj login https://atcoder.jp/
+```
+
+ログイン確認だけしたい場合:
+
+```bash
+oj login --check https://atcoder.jp/
+```
 
 config の詳細は [CONFIG.md](CONFIG.md) を見てください。
 

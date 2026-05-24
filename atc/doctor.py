@@ -108,6 +108,44 @@ def _run_doctor_command(args: List[str], timeout: float = 3.0):
         return None, "", str(e)
 
 
+def _doctor_check_oj_login(report: DoctorReport, oj: str):
+    try:
+        code, stdout, stderr = _run_doctor_command(
+            [oj, "login", "--check", "https://atcoder.jp/"],
+            timeout=8.0,
+        )
+    except Exception as e:
+        report.item(
+            "WARN",
+            "oj login check failed.",
+            [str(e), "check manually: oj login --check https://atcoder.jp/"],
+        )
+        return
+
+    output = "\n".join(part for part in [stdout, stderr] if part)
+    if code == 0:
+        report.item("OK", "oj login: logged in to atcoder.jp")
+        return
+
+    if "timed out" in output.lower() or "timeout" in output.lower():
+        report.item(
+            "WARN",
+            "oj login check failed or timed out.",
+            ["check manually: oj login --check https://atcoder.jp/"],
+        )
+        return
+
+    report.item(
+        "WARN",
+        "oj login: not logged in to atcoder.jp or login check failed.",
+        [
+            "sample download may fail for live contests.",
+            "run: oj login https://atcoder.jp/",
+            "check manually: oj login --check https://atcoder.jp/",
+        ],
+    )
+
+
 def _first_line(text: str):
     return text.splitlines()[0] if text else ""
 
@@ -240,6 +278,7 @@ def _doctor_check_tools(report: DoctorReport):
             report.item("OK", f"oj: {oj}" + (f" ({version})" if version else ""))
         else:
             report.item("WARN", f"oj command exists but failed: {oj}", [stderr or stdout or "oj --version failed"])
+        _doctor_check_oj_login(report, oj)
     else:
         report.item(
             "WARN",
