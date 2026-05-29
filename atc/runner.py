@@ -5,7 +5,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Set
+from typing import Callable, List, Optional, Set
 
 try:
     from .config import (
@@ -135,7 +135,13 @@ def _prepare_run_command(cwd: Path, problem: str, run_language: Optional[str] = 
     return None, [], None, "ERROR", "ファイルが見つかりません。"
 
 
-def run_problem_tests(problem: str, run_language: Optional[str] = None, show_compile=False, case_names: Optional[Set[str]] = None):
+def run_problem_tests(
+    problem: str,
+    run_language: Optional[str] = None,
+    show_compile=False,
+    case_names: Optional[Set[str]] = None,
+    on_case_result: Optional[Callable[[CaseResult], None]] = None,
+):
     cwd = Path.cwd()
     config = load_config(cwd)
     problem = _normalize_problem(problem)
@@ -184,15 +190,16 @@ def run_problem_tests(problem: str, run_language: Optional[str] = None, show_com
                     elapsed = (time.perf_counter() - case_started) * 1000
                 except subprocess.TimeoutExpired as e:
                     elapsed = (time.perf_counter() - case_started) * 1000
-                    result.cases.append(
-                        CaseResult(
-                            name=infile.name,
-                            status="TLE",
-                            elapsed_ms=elapsed,
-                            output=(e.stdout or "").strip() if isinstance(e.stdout, str) else "",
-                            stderr=f"Timed out after {_runner_timeout(config)} seconds.",
-                        )
+                    case = CaseResult(
+                        name=infile.name,
+                        status="TLE",
+                        elapsed_ms=elapsed,
+                        output=(e.stdout or "").strip() if isinstance(e.stdout, str) else "",
+                        stderr=f"Timed out after {_runner_timeout(config)} seconds.",
                     )
+                    result.cases.append(case)
+                    if on_case_result:
+                        on_case_result(case)
                     continue
                 except OSError as e:
                     result.error_status = "ERROR"
@@ -211,22 +218,50 @@ def run_problem_tests(problem: str, run_language: Optional[str] = None, show_com
             else:
                 status = "WA"
 
-            result.cases.append(
-                CaseResult(
-                    name=infile.name,
-                    status=status,
-                    elapsed_ms=elapsed,
-                    expected=expected,
-                    output=output,
-                    stderr=stderr,
-                )
+            case = CaseResult(
+                name=infile.name,
+                status=status,
+                elapsed_ms=elapsed,
+                expected=expected,
+                output=output,
+                stderr=stderr,
             )
+            result.cases.append(case)
+            if on_case_result:
+                on_case_result(case)
     finally:
         if mode == "cpp" and cleanup_path and cleanup_path.exists():
             cleanup_path.unlink()
 
     result.duration_ms = (time.perf_counter() - started) * 1000
     return result
+
+
+def _print_case_result(case: CaseResult):
+    print(f"=== {case.name} ===", flush=True)
+    if case.status == "AC":
+        print(f" {color_text('AC', GREEN)}", flush=True)
+    elif case.status == "RE":
+        print(f" {RED}RE{RESET}", flush=True)
+        if case.stderr:
+            print(case.stderr, flush=True)
+    elif case.status == "TLE":
+        print(f" {RED}TLE{RESET}", flush=True)
+        if case.stderr:
+            print(case.stderr, flush=True)
+        if case.output:
+            print(f" output:\n{case.output}", flush=True)
+    else:
+        print(f" {RED}WA{RESET}", flush=True)
+        if case.expected is not None:
+            print(f" expected:\n{case.expected}", flush=True)
+        print(f" output:\n{case.output}", flush=True)
+    print(f" time: {case.elapsed_ms:.2f} ms", flush=True)
+    print(flush=True)
+
+
+def _print_result_summary(result: ProblemResult):
+    print(f"結果: {result.ok_count}/{result.total_count} AC")
 
 
 def _print_detailed_result(result: ProblemResult):
@@ -237,22 +272,9 @@ def _print_detailed_result(result: ProblemResult):
         return
 
     for case in result.cases:
-        print(f"=== {case.name} ===")
-        if case.status == "AC":
-            print(f" {color_text('AC', GREEN)}")
-        elif case.status == "RE":
-            print(f" {RED}RE{RESET}\n{case.stderr}")
-        elif case.status == "TLE":
-            print(f" {RED}TLE{RESET}")
-            if case.stderr:
-                print(case.stderr)
-            if case.output:
-                print(f" output:\n{case.output}")
-        else:
-            print(f" {RED}WA{RESET}\n expected:\n{case.expected}\n output:\n{case.output}")
-        print(f" time: {case.elapsed_ms:.2f} ms")
+        _print_case_result(case)
 
-    print(f"\n結果: {result.ok_count}/{result.total_count} AC")
+    _print_result_summary(result)
 
 
 def _format_seconds(ms: float):
@@ -328,8 +350,11 @@ def _results_passed(results: List[ProblemResult]):
 
 
 def cmd_run(problem: str, run_language: Optional[str] = None):
-    result = run_problem_tests(problem, run_language, show_compile=True)
-    _print_detailed_result(result)
+    result = run_problem_tests(problem, run_language, show_compile=True, on_case_result=_print_case_result)
+    if result.error_status:
+        _print_detailed_result(result)
+    else:
+        _print_result_summary(result)
     if not result.passed:
         sys.exit(1)
 

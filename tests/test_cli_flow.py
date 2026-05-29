@@ -90,6 +90,30 @@ def test_cli_manual_run_rerun_success_flow(tmp_path):
     _assert_success(rerun)
 
 
+def test_cli_single_run_prints_each_case_once_before_summary(tmp_path):
+    _write_test_config(tmp_path)
+    (tmp_path / "A.py").write_text("print(input())\n", encoding="utf-8")
+    testdir = tmp_path / "tests" / "A"
+    testdir.mkdir(parents=True)
+    (testdir / "sample-1.in").write_text("hello\n", encoding="utf-8")
+    (testdir / "sample-1.out").write_text("hello\n", encoding="utf-8")
+    (testdir / "sample-2.in").write_text("world\n", encoding="utf-8")
+    (testdir / "sample-2.out").write_text("world\n", encoding="utf-8")
+
+    run = _run_cli(tmp_path, "t", "A", "py")
+
+    _assert_success(run)
+    first = run.stdout.find("=== sample-1.in ===")
+    second = run.stdout.find("=== sample-2.in ===")
+    summary = run.stdout.find("結果: 2/2 AC")
+    assert first != -1
+    assert second != -1
+    assert summary != -1
+    assert first < second < summary
+    assert run.stdout.count("=== sample-1.in ===") == 1
+    assert run.stdout.count("=== sample-2.in ===") == 1
+
+
 def test_cli_run_all_writes_log_and_rerun_failed_problem(tmp_path):
     _write_test_config(tmp_path)
     _write_sample(tmp_path)

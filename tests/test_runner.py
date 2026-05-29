@@ -1,5 +1,20 @@
+import json
+import sys
+
 from atc.models import CaseResult, ProblemResult
 from atc.runner import LOG_DIR, results_passed, run_problem_tests, write_test_log
+
+
+def _write_runner_config(cwd, timeout_seconds=None):
+    atc_dir = cwd / ".atc"
+    atc_dir.mkdir(parents=True, exist_ok=True)
+    lines = [
+        "[runner]",
+        f"python = {json.dumps(sys.executable)}",
+    ]
+    if timeout_seconds is not None:
+        lines.append(f"timeout_seconds = {timeout_seconds}")
+    (atc_dir / "config.toml").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def _passed_result(problem="A"):
@@ -111,3 +126,79 @@ def test_run_problem_tests_python_minimal_ac_case(tmp_path, monkeypatch):
     assert result.total_count == 1
     assert result.cases[0].status == "AC"
     assert result.cases[0].output == "hello"
+
+
+def test_run_problem_tests_calls_callback_in_sample_order(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    _write_runner_config(tmp_path)
+    (tmp_path / "A.py").write_text("print(input())\n", encoding="utf-8")
+    testdir = tmp_path / "tests" / "A"
+    testdir.mkdir(parents=True)
+    (testdir / "sample-1.in").write_text("hello\n", encoding="utf-8")
+    (testdir / "sample-1.out").write_text("hello\n", encoding="utf-8")
+    (testdir / "sample-2.in").write_text("world\n", encoding="utf-8")
+    (testdir / "sample-2.out").write_text("world\n", encoding="utf-8")
+    callback_results = []
+
+    result = run_problem_tests(
+        "A",
+        "python",
+        on_case_result=lambda case: callback_results.append((case.name, case.status)),
+    )
+
+    assert callback_results == [("sample-1.in", "AC"), ("sample-2.in", "AC")]
+    assert [case.name for case in result.cases] == ["sample-1.in", "sample-2.in"]
+    assert result.passed is True
+    assert result.ok_count == 2
+    assert result.total_count == 2
+
+
+def test_run_problem_tests_calls_callback_for_wa_case(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    _write_runner_config(tmp_path)
+    (tmp_path / "A.py").write_text("print(input())\n", encoding="utf-8")
+    testdir = tmp_path / "tests" / "A"
+    testdir.mkdir(parents=True)
+    (testdir / "sample-1.in").write_text("hello\n", encoding="utf-8")
+    (testdir / "sample-1.out").write_text("expected\n", encoding="utf-8")
+    callback_statuses = []
+
+    result = run_problem_tests("A", "python", on_case_result=lambda case: callback_statuses.append(case.status))
+
+    assert callback_statuses == ["WA"]
+    assert result.cases[0].status == "WA"
+    assert result.passed is False
+
+
+def test_run_problem_tests_calls_callback_for_re_case(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    _write_runner_config(tmp_path)
+    (tmp_path / "A.py").write_text("import sys\nprint('before exit')\nsys.exit(3)\n", encoding="utf-8")
+    testdir = tmp_path / "tests" / "A"
+    testdir.mkdir(parents=True)
+    (testdir / "sample-1.in").write_text("hello\n", encoding="utf-8")
+    (testdir / "sample-1.out").write_text("before exit\n", encoding="utf-8")
+    callback_statuses = []
+
+    result = run_problem_tests("A", "python", on_case_result=lambda case: callback_statuses.append(case.status))
+
+    assert callback_statuses == ["RE"]
+    assert result.cases[0].status == "RE"
+    assert result.passed is False
+
+
+def test_run_problem_tests_calls_callback_for_tle_case(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    _write_runner_config(tmp_path, timeout_seconds=0.1)
+    (tmp_path / "A.py").write_text("import time\ntime.sleep(1)\n", encoding="utf-8")
+    testdir = tmp_path / "tests" / "A"
+    testdir.mkdir(parents=True)
+    (testdir / "sample-1.in").write_text("hello\n", encoding="utf-8")
+    (testdir / "sample-1.out").write_text("hello\n", encoding="utf-8")
+    callback_statuses = []
+
+    result = run_problem_tests("A", "python", on_case_result=lambda case: callback_statuses.append(case.status))
+
+    assert callback_statuses == ["TLE"]
+    assert result.cases[0].status == "TLE"
+    assert result.passed is False
