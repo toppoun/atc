@@ -16,7 +16,7 @@ try:
     from .doctor import cmd_config_doctor
     from .manual import cmd_manual, cmd_manual_tests
     from .runner import cmd_rerun, cmd_run, cmd_run_all
-    from .stress import cmd_stress, cmd_stress_init
+    from .stress import cmd_stress, cmd_stress_init, cmd_stress_promote
     from .template_commands import cmd_template_list, cmd_template_show
     from .visual import cmd_visual, parse_visual_args
     from .watch import cmd_watch
@@ -34,7 +34,7 @@ except ImportError:
     from doctor import cmd_config_doctor
     from manual import cmd_manual, cmd_manual_tests
     from runner import cmd_rerun, cmd_run, cmd_run_all
-    from stress import cmd_stress, cmd_stress_init
+    from stress import cmd_stress, cmd_stress_init, cmd_stress_promote
     from template_commands import cmd_template_list, cmd_template_show
     from visual import cmd_visual, parse_visual_args
     from watch import cmd_watch
@@ -169,6 +169,16 @@ def handle_stress(args: List[str]):
         if parsed is None:
             return USAGE_ERROR
         return cmd_stress_init(parsed.problem)
+    if args and args[0] == "promote":
+        parser = AtcArgumentParser(prog="atc stress promote")
+        parser.add_argument("subcommand")
+        parser.add_argument("problem")
+        parser.add_argument("--name")
+        parser.add_argument("--force", action="store_true")
+        parsed = _parse_handler_args(parser, args)
+        if parsed is None:
+            return USAGE_ERROR
+        return cmd_stress_promote(parsed.problem, name=parsed.name, force=parsed.force)
 
     parser = AtcArgumentParser(prog="atc stress")
     parser.add_argument("problem")
@@ -276,7 +286,7 @@ COMMANDS: Tuple[CommandSpec, ...] = (
     CommandSpec(
         name="stress",
         aliases=(),
-        usage=("atc stress A [py|cpp] [--count N] [--seed S]", "atc stress init A"),
+        usage=("atc stress A [py|cpp] [--count N] [--seed S]", "atc stress init A", "atc stress promote A [--name NAME] [--force]"),
         description="Run randomized stress tests against a brute force solution.",
         handler=handle_stress,
     ),

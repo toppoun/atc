@@ -35,5 +35,6 @@ def test_usage_lines_include_main_commands():
     assert "atc template show" in usage
     assert "atc stress A" in usage
     assert "atc stress init A" in usage
+    assert "atc stress promote A" in usage
     assert "atc visual" in usage
     assert "atc manual" in usage

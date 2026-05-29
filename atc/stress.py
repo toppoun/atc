@@ -5,7 +5,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 try:
     from .config import (
@@ -175,6 +175,91 @@ def cmd_stress_init(problem: str) -> int:
         return 1
 
     return 0
+
+
+def _validate_promote_name(name: str) -> str:
+    normalized = str(name or "").strip()
+    if not normalized:
+        raise StressError("case name must not be empty.")
+    if Path(normalized).name != normalized or Path(normalized).suffix:
+        raise StressError("case name must be a simple name without path separators or extension.")
+    return normalized
+
+
+def _next_promote_name(testdir: Path) -> str:
+    index = 1
+    while True:
+        candidate = f"stress-{index}"
+        if not (testdir / f"{candidate}.in").exists() and not (testdir / f"{candidate}.out").exists():
+            return candidate
+        index += 1
+
+
+def _first_existing(paths: List[Path]) -> Optional[Path]:
+    for path in paths:
+        if path.exists():
+            return path
+    return None
+
+
+def promote_failed_case(problem: str, *, name: Optional[str] = None, force: bool = False) -> int:
+    cwd = Path.cwd()
+    problem = normalize_problem(problem)
+    stress_dir = cwd / STRESS_DIR / problem
+    failed_input = stress_dir / "failed.in"
+    brute_output = stress_dir / "brute.out"
+
+    if not failed_input.exists():
+        error(f"Error: no failed stress input found for {problem}")
+        print("Run first:")
+        print(f"  atc stress {problem}")
+        return 1
+    if not brute_output.exists():
+        error(f"Error: no brute output found for {problem}")
+        print("Run first:")
+        print(f"  atc stress {problem}")
+        return 1
+
+    testdir = cwd / "tests" / problem
+    try:
+        case_name = _validate_promote_name(name) if name is not None else _next_promote_name(testdir)
+    except StressError as e:
+        error(f"Error: {e}")
+        return 1
+
+    target_input = testdir / f"{case_name}.in"
+    target_output = testdir / f"{case_name}.out"
+    existing = _first_existing([target_input, target_output])
+    if existing and not force:
+        error(f"Error: {_display_path(existing, cwd)} already exists")
+        print("Use --force to overwrite.")
+        return 1
+
+    try:
+        input_text = failed_input.read_text(encoding="utf-8")
+        expected_text = brute_output.read_text(encoding="utf-8")
+        testdir.mkdir(parents=True, exist_ok=True)
+        target_input.write_text(input_text, encoding="utf-8")
+        target_output.write_text(expected_text, encoding="utf-8")
+    except OSError as e:
+        error(f"Error: failed to promote stress case: {e}")
+        return 1
+
+    print(f"promoted stress case for {problem}")
+    print()
+    print("input:")
+    print(f"  {_display_path(failed_input, cwd)}")
+    print("expected:")
+    print(f"  {_display_path(brute_output, cwd)}")
+    print()
+    print("saved:")
+    print(f"  {_display_path(target_input, cwd)}")
+    print(f"  {_display_path(target_output, cwd)}")
+    return 0
+
+
+def cmd_stress_promote(problem: str, name: Optional[str] = None, force: bool = False) -> int:
+    return promote_failed_case(problem, name=name, force=force)
 
 
 def _compile_cpp_solution(cwd: Path, problem: str, cpp_file: Path, config: dict) -> StressProgram:

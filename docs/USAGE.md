@@ -114,6 +114,8 @@ atc stress A py --count 100 --seed 42
 atc stress A --gen A_gen.py --brute A_brute.py
 atc stress A --timeout 2.0 --compare strip
 atc stress init A
+atc stress promote A
+atc stress promote A --name corner
 ```
 
 必要ファイル:
@@ -139,6 +141,17 @@ python A_gen.py 42
 不一致が見つかった場合は `.atc/stress/A/` に入力、出力、meta 情報を保存します。
 
 `atc stress init A` は stress 用テンプレートから `A_gen.py` / `A_brute.py` だけを作ります。`A.py` / `A.cpp` は作らず、既存ファイルも上書きしません。
+
+`atc stress promote A` は、最後に見つかった反例を通常テストへ昇格します。入力は `.atc/stress/A/failed.in`、期待出力は `.atc/stress/A/brute.out` を使い、`tests/A/stress-1.in` / `tests/A/stress-1.out` に保存します。既にある場合は `stress-2`, `stress-3`, ... の次の空き番号を使います。
+
+名前を指定する場合:
+
+```bash
+atc stress promote A --name corner
+atc t A
+```
+
+この場合は `tests/A/corner.in` / `tests/A/corner.out` に保存します。既存ファイルは上書きしません。上書きする場合だけ `--force` を付けます。
 
 ## `atc manual`
 

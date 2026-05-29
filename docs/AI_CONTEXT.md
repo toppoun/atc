@@ -71,6 +71,7 @@ atc/
 - `atc retry [python|pypy|cpp]`
 - `atc stress A [py|cpp] [--count N] [--seed S] [--gen PATH] [--brute PATH] [--timeout SEC] [--compare exact|strip|tokens]`
 - `atc stress init A`
+- `atc stress promote A [--name NAME] [--force]`
 - `atc watch [A|all] [python|pypy|cpp]`
 - `atc w [A|all] [python|pypy|cpp]`
 - `atc auto [A|all] [python|pypy|cpp]`
@@ -104,7 +105,7 @@ template CLI表示 -> template_commands.py
 sample download -> samples.py
 contest作成 -> contest.py
 test実行 -> runner.py
-stress test -> stress.py
+stress test / stress promote -> stress.py
 watch -> watch.py
 doctor診断項目 -> doctor.py
 visualizer起動 -> visual.py
@@ -204,6 +205,8 @@ manifest が明示されていて壊れている場合、`atc config doctor` で
 - compare mode は `exact` / `strip` / `tokens`
 - 不一致時は `.atc/stress/<problem>/` に `failed.in`、`your.out`、`brute.out`、`meta.json` を保存
 - `atc stress init A` は stress 用テンプレートから `A_gen.py` / `A_brute.py` だけを作る
+- `atc stress promote A` は `.atc/stress/A/failed.in` と `.atc/stress/A/brute.out` を `tests/A/stress-N.in/out` に昇格する
+- `atc stress promote A --name corner` は `tests/A/corner.in/out` に保存し、`--force` が無い限り既存ファイルを上書きしない
 - `A.py` / `A.cpp` は `manual` / `contest` 側の責務なので作らない
 
 ## visual
