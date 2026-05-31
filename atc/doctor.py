@@ -4,6 +4,7 @@ import platform
 import shutil
 import subprocess
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional, Set
 
@@ -13,6 +14,7 @@ except ModuleNotFoundError:
     import tomli as tomllib
 
 try:
+    from .console import RICH_AVAILABLE, Text, Table, Panel, box, console
     from .config import (
         CONFIG_FILE_META_KEY,
         _deep_merge_config,
@@ -30,6 +32,7 @@ try:
     from .problems import contest_metadata_error, contest_metadata_problems
     from .templates import TemplateError, resolve_template_file as _resolve_template_file
 except ImportError:
+    from console import RICH_AVAILABLE, Text, Table, Panel, box, console
     from config import (
         CONFIG_FILE_META_KEY,
         _deep_merge_config,
@@ -47,28 +50,318 @@ except ImportError:
     from problems import contest_metadata_error, contest_metadata_problems
     from templates import TemplateError, resolve_template_file as _resolve_template_file
 
+try:
+    from rich.columns import Columns
+except ImportError:  # pragma: no cover - exercised when rich is not installed
+    Columns = None
+
+
+STATUS_ORDER = ["OK", "WARN", "ERROR", "INFO"]
+STATUS_STYLES = {
+    "OK": "green",
+    "WARN": "yellow",
+    "ERROR": "bold red",
+    "INFO": "cyan",
+}
+DASHBOARD_CARD_WIDTH = 24
+
+
+@dataclass
+class DoctorItem:
+    section: str
+    status: str
+    message: str
+    details: List[str] = field(default_factory=list)
+
 
 class DoctorReport:
-    def __init__(self):
+    def __init__(self, immediate: bool = True):
         self.counts = {"OK": 0, "WARN": 0, "ERROR": 0, "INFO": 0}
+        self.immediate = immediate
+        self.current_section = ""
+        self.section_order: List[str] = []
+        self.items: List[DoctorItem] = []
 
     def section(self, title: str):
-        print()
-        print(title)
+        self.current_section = title
+        if title not in self.section_order:
+            self.section_order.append(title)
+        if self.immediate:
+            print()
+            print(title)
 
     def item(self, status: str, message: str, details: Optional[List[str]] = None):
         self.counts[status] = self.counts.get(status, 0) + 1
-        print(f"  [{status}] {message}")
-        for detail in details or []:
-            print(f"       {detail}")
+        item = DoctorItem(self.current_section, status, message, list(details or []))
+        self.items.append(item)
+        if self.immediate:
+            self._print_plain_item(item)
 
     def summary(self):
+        if not self.immediate:
+            self._render_summary()
+            return
+        self._print_plain_summary()
+
+    def render(self):
+        if RICH_AVAILABLE:
+            self._render_rich()
+            return
+        self._render_plain()
+
+    def _print_plain_item(self, item: DoctorItem):
+        print(f"  [{item.status}] {item.message}")
+        for detail in item.details:
+            print(f"       {detail}")
+
+    def _print_plain_summary(self):
         print()
         print("Summary")
         print(f"  OK: {self.counts.get('OK', 0)}")
         print(f"  WARN: {self.counts.get('WARN', 0)}")
         print(f"  ERROR: {self.counts.get('ERROR', 0)}")
         print(f"  INFO: {self.counts.get('INFO', 0)}")
+
+    def _render_plain(self):
+        print("AtC Doctor")
+        for label, value in self._dashboard_rows():
+            print(f"  {label:<8} {value}")
+        print()
+        print("Status")
+        for status in STATUS_ORDER:
+            print(f"  {status:<5} {self.counts.get(status, 0)}")
+        print()
+        print("Tools")
+        for label, status in self._tool_rows():
+            print(f"  {label:<8} {status}")
+        print()
+        print("Current")
+        for label, value in self._current_rows():
+            print(f"  {label:<8} {value}")
+        self._render_details_plain()
+        self._print_plain_summary()
+
+    def _render_rich(self):
+        border_style = "bold red" if self.has_error else "cyan"
+        console.print(self._dashboard_panel(border_style))
+        card_height = max(len(self._status_rows()), len(self._tool_rows()), len(self._current_rows()))
+        panels = [
+            self._status_panel(card_height),
+            self._tools_panel(card_height),
+            self._current_panel(card_height),
+        ]
+        if Columns:
+            console.print(Columns(panels, equal=True))
+        else:
+            for panel in panels:
+                console.print(panel)
+        self._render_details_rich()
+        self._render_summary()
+
+    def _dashboard_panel(self, border_style: str):
+        table = Table.grid(padding=(0, 2), expand=True)
+        table.add_column(style="bold", no_wrap=True)
+        table.add_column(style="dim", ratio=1)
+        for label, value in self._dashboard_rows():
+            table.add_row(label, value)
+        return Panel(table, title="AtC Doctor", border_style=border_style, box=box.ROUNDED)
+
+    def _pad_rows(self, rows, min_rows: int):
+        padded = list(rows)
+        while len(padded) < min_rows:
+            padded.append(("", ""))
+        return padded
+
+    def _kv_table(self, rows, *, value_style: str = ""):
+        table = Table.grid(padding=(0, 2), expand=True)
+        table.add_column(style="bold", no_wrap=True)
+        table.add_column(justify="right")
+        for label, value in rows:
+            if isinstance(value, str) and value in STATUS_STYLES:
+                rendered_value = self._status_text(value)
+            elif value_style:
+                rendered_value = Text(str(value), style=value_style)
+            else:
+                rendered_value = str(value)
+            table.add_row(label, rendered_value)
+        return table
+
+    def _status_panel(self, min_rows: int = 0):
+        rows = self._pad_rows(self._status_rows(), min_rows)
+        return Panel(
+            self._kv_table(rows),
+            title="Status",
+            border_style="cyan",
+            box=box.ROUNDED,
+            width=DASHBOARD_CARD_WIDTH,
+        )
+
+    def _tools_panel(self, min_rows: int = 0):
+        rows = self._pad_rows(self._tool_rows(), min_rows)
+        return Panel(
+            self._kv_table(rows),
+            title="Tools",
+            border_style="cyan",
+            box=box.ROUNDED,
+            width=DASHBOARD_CARD_WIDTH,
+        )
+
+    def _current_panel(self, min_rows: int = 0):
+        rows = self._pad_rows(self._current_rows(), min_rows)
+        return Panel(
+            self._kv_table(rows, value_style="dim"),
+            title="Current",
+            border_style="cyan",
+            box=box.ROUNDED,
+            width=DASHBOARD_CARD_WIDTH,
+        )
+
+    def _render_details_plain(self):
+        for section in self.section_order:
+            print()
+            print(section)
+            for item in self._items_for_section(section):
+                self._print_plain_item(item)
+
+    def _render_details_rich(self):
+        for section in self.section_order:
+            console.print()
+            console.print(section, style="bold cyan")
+            for item in self._items_for_section(section):
+                line = Text("  ")
+                line.append(f"[{item.status}]", style=STATUS_STYLES.get(item.status, ""))
+                line.append(" ")
+                self._append_message(line, item.message)
+                console.print(line)
+                for detail in item.details:
+                    console.print(Text(f"       {detail}", style="dim"))
+
+    def _render_summary(self):
+        if RICH_AVAILABLE:
+            console.print()
+            console.print("Summary", style="bold cyan")
+            for status in STATUS_ORDER:
+                line = Text("  ")
+                line.append(f"{status}: ", style=STATUS_STYLES.get(status, ""))
+                line.append(str(self.counts.get(status, 0)))
+                console.print(line)
+            return
+        self._print_plain_summary()
+
+    def _append_message(self, line, message: str):
+        label, sep, value = message.partition(":")
+        if sep and label and len(label) <= 48:
+            line.append(label, style="bold")
+            line.append(sep)
+            line.append(value, style="dim")
+            return
+        line.append(message)
+
+    def _items_for_section(self, section: str):
+        return [item for item in self.items if item.section == section]
+
+    def _find_item(self, *, section: Optional[str] = None, prefixes=(), contains=()):
+        for item in self.items:
+            if section and item.section != section:
+                continue
+            if prefixes and not any(item.message.startswith(prefix) for prefix in prefixes):
+                continue
+            if contains and not any(part in item.message for part in contains):
+                continue
+            return item
+        return None
+
+    def _message_after(self, prefix: str, *, section: Optional[str] = None):
+        item = self._find_item(section=section, prefixes=(prefix,))
+        if not item:
+            return None
+        return item.message[len(prefix):].strip()
+
+    def _dashboard_rows(self):
+        root = self._message_after("Resolved root: ", section="Config")
+        if not root:
+            root = self._message_after("Resolved root does not exist: ", section="Config")
+        if not root and self._find_item(section="Config", prefixes=("paths.root is empty.",)):
+            root = "current directory"
+
+        config_file = self._message_after("Config file: ", section="Config")
+        current = self._message_after("contestDir: ", section="Current contest")
+        if not current and self._find_item(section="Current contest", prefixes=("current-contest.json not found yet.",)):
+            current = "(none)"
+
+        oj_login = "unknown"
+        login_item = self._find_item(section="Tools", prefixes=("oj login:", "oj login check"))
+        if login_item:
+            if login_item.status == "OK":
+                oj_login = "logged in"
+            elif login_item.status == "WARN":
+                oj_login = "not logged in or check failed"
+            else:
+                oj_login = login_item.status.lower()
+        elif self._find_item(section="Tools", prefixes=("oj was not found.",)):
+            oj_login = "oj not found"
+
+        return [
+            ("Root", root or "(unknown)"),
+            ("Config", config_file or "(default config)"),
+            ("Current", current or "(unknown)"),
+            ("oj", oj_login),
+        ]
+
+    def _tool_rows(self):
+        return [
+            ("Python", self._status_for(section="Environment", prefixes=("Python:",))),
+            ("PyPy", self._status_for(section="Runner", prefixes=("PyPy:",))),
+            ("g++", self._status_for(section="Runner", prefixes=("C++ compiler:", "Configured C++ compiler", "C++ compiler not found."))),
+            ("oj", self._status_for(section="Tools", prefixes=("oj:", "oj command", "oj was not found."))),
+            ("oj login", self._status_for(section="Tools", prefixes=("oj login:", "oj login check"))),
+            ("VS Code", self._status_for(section="VS Code", prefixes=("VS Code extension:",))),
+        ]
+
+    def _status_rows(self):
+        return [(self._status_text(status), str(self.counts.get(status, 0))) for status in STATUS_ORDER]
+
+    def _current_rows(self):
+        contest_dir = self._message_after("contestDir: ", section="Current contest")
+        if contest_dir:
+            contest = Path(contest_dir).name
+        elif self._find_item(section="Current contest", prefixes=("current-contest.json not found yet.",)):
+            contest = "(none)"
+        else:
+            contest = "(unknown)"
+
+        metadata = "unknown"
+        metadata_item = self._find_item(section="Contest metadata", prefixes=("Contest metadata:",))
+        if metadata_item:
+            if metadata_item.status == "OK":
+                metadata = "found"
+            elif metadata_item.status == "INFO":
+                metadata = "not found"
+            else:
+                metadata = metadata_item.status
+
+        current_status = self._status_for(
+            section="Current contest",
+            prefixes=(
+                "current-contest.json",
+                "contestDir",
+                "Failed to read current-contest.json",
+            ),
+        )
+
+        return [
+            ("contest", contest),
+            ("metadata", metadata),
+            ("current", current_status),
+            ("VS Code", self._status_for(section="VS Code", prefixes=("VS Code extension:",))),
+        ]
+
+    def _status_for(self, *, section: str, prefixes=()):
+        item = self._find_item(section=section, prefixes=prefixes)
+        return item.status if item else "INFO"
+
+    def _status_text(self, status: str):
+        return Text(status, style=STATUS_STYLES.get(status, ""))
 
     @property
     def has_error(self):
@@ -494,10 +787,9 @@ def _doctor_check_contest_metadata(report: DoctorReport, cwd: Path):
 
 def cmd_config_doctor():
     cwd = Path.cwd()
-    report = DoctorReport()
+    report = DoctorReport(immediate=False)
     config, config_file, config_error = _load_config_for_doctor(cwd)
 
-    print("AtC Doctor")
     _doctor_check_python(report)
     _doctor_check_config(report, config, config_file, config_error)
     _doctor_check_templates(report, config, cwd)
@@ -507,7 +799,7 @@ def cmd_config_doctor():
     _doctor_check_vscode(report)
     _doctor_check_contest_metadata(report, cwd)
     _doctor_check_current_contest(report, config, cwd)
-    report.summary()
+    report.render()
 
     if report.has_error:
         sys.exit(1)

@@ -103,3 +103,33 @@ def test_doctor_broken_contest_metadata_reports_error(tmp_path, capsys):
     assert report.counts["ERROR"] == 1
     assert "[ERROR] Contest metadata:" in output
     assert "failed to read contest metadata" in output
+
+
+def test_doctor_report_render_prints_dashboard(capsys):
+    report = doctor.DoctorReport(immediate=False)
+    report.section("Environment")
+    report.item("OK", "Python: C:/Python/python.exe (3.14.4)")
+    report.section("Config")
+    report.item("OK", "Config file: D:/atcoder/.atc/config.toml")
+    report.item("OK", "Resolved root: D:/atcoder")
+    report.section("Runner")
+    report.item("OK", "PyPy: C:/pypy/pypy.exe")
+    report.item("OK", "C++ compiler: C:/msys64/ucrt64/bin/g++.exe")
+    report.section("Tools")
+    report.item("OK", "oj: C:/Python/Scripts/oj.exe (oj 11.5.1)")
+    report.item("OK", "oj login: logged in to atcoder.jp")
+    report.section("VS Code")
+    report.item("WARN", "VS Code extension: could not verify")
+    report.section("Current contest")
+    report.item("OK", "contestDir: D:/atcoder/ABC/abc460")
+
+    report.render()
+    output = capsys.readouterr().out
+
+    assert "AtC Doctor" in output
+    assert "Status" in output
+    assert "Tools" in output
+    assert "metadata" in output
+    assert "Environment" in output
+    assert "[OK] Python:" in output
+    assert "Summary" in output

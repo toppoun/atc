@@ -196,6 +196,9 @@ def test_cli_config_doctor_broken_config_reports_error(tmp_path):
     result = _run_cli(tmp_path, "config", "doctor")
     combined = _assert_error_without_traceback(result)
 
+    assert "AtC Doctor" in combined
+    assert "Status" in combined
+    assert "Tools" in combined
     assert "ERROR" in combined
     assert "config" in combined.lower() or "toml" in combined.lower()
 
