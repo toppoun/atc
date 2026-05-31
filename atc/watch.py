@@ -3,9 +3,11 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set
 
 try:
+    from .console import print_text, print_watch_header
     from .config import SOURCE_EXTS, config_problems, load_config, watch_settings
     from .runner import LOG_DIR, available_problems, normalize_problem, run_auto_tests
 except ImportError:
+    from console import print_text, print_watch_header
     from config import SOURCE_EXTS, config_problems, load_config, watch_settings
     from runner import LOG_DIR, available_problems, normalize_problem, run_auto_tests
 
@@ -128,10 +130,8 @@ def cmd_watch(args):
 
     watch_problems = selected or configured_problems
     problems = selected or available_problems(cwd, configured_problems)
-    print(f"watching {cwd}")
-    print(f"poll: {poll_seconds:.2f}s / debounce: {debounce_seconds:.2f}s / log: {LOG_DIR / 'last.log'}")
-    print("Ctrl+C で終了します。")
-    run_auto_tests(problems, run_language, reason="initial")
+    print_watch_header(cwd, poll_seconds, debounce_seconds, LOG_DIR / "last.log", problems)
+    run_auto_tests(problems, run_language, reason="initial", display_mode="watch")
 
     snapshot = _watch_snapshot(cwd, watch_problems)
     pending = set()
@@ -150,8 +150,9 @@ def cmd_watch(args):
 
             if pending and last_change_at and time.perf_counter() - last_change_at >= debounce_seconds:
                 changed = _changed_problems(cwd, pending, selected, watch_problems)
-                run_auto_tests(changed, run_language, reason="changed")
+                run_auto_tests(changed, run_language, reason="changed", display_mode="watch")
                 pending.clear()
                 last_change_at = None
     except KeyboardInterrupt:
-        print("\nwatch stopped.")
+        print_text()
+        print_text("watch stopped.")

@@ -19,7 +19,15 @@ try:
         load_config,
         resolve_executable,
     )
-    from .console import GREEN, RED, RESET, color_text, error, ok, warn
+    from .console import (
+        error,
+        ok,
+        print_auto_summary as console_print_auto_summary,
+        print_test_results,
+        print_text,
+        print_watch_result,
+        warn,
+    )
     from .models import CaseResult, ProblemResult
 except ImportError:
     from config import (
@@ -33,7 +41,15 @@ except ImportError:
         load_config,
         resolve_executable,
     )
-    from console import GREEN, RED, RESET, color_text, error, ok, warn
+    from console import (
+        error,
+        ok,
+        print_auto_summary as console_print_auto_summary,
+        print_test_results,
+        print_text,
+        print_watch_result,
+        warn,
+    )
     from models import CaseResult, ProblemResult
 
 
@@ -237,42 +253,50 @@ def run_problem_tests(
     return result
 
 
-def _print_case_result(case: CaseResult):
-    print(f"=== {case.name} ===", flush=True)
-    if case.status == "AC":
-        print(f" {color_text('AC', GREEN)}", flush=True)
-    elif case.status == "RE":
-        print(f" {RED}RE{RESET}", flush=True)
-        if case.stderr:
-            print(case.stderr, flush=True)
-    elif case.status == "TLE":
-        print(f" {RED}TLE{RESET}", flush=True)
-        if case.stderr:
-            print(case.stderr, flush=True)
-        if case.output:
-            print(f" output:\n{case.output}", flush=True)
-    else:
-        print(f" {RED}WA{RESET}", flush=True)
-        if case.expected is not None:
-            print(f" expected:\n{case.expected}", flush=True)
-        print(f" output:\n{case.output}", flush=True)
-    print(f" time: {case.elapsed_ms:.2f} ms", flush=True)
-    print(flush=True)
-
-
 def _print_result_summary(result: ProblemResult):
-    print(f"結果: {result.ok_count}/{result.total_count} AC")
+    print_test_results(
+        result.cases,
+        ok_count=result.ok_count,
+        total_count=result.total_count,
+        failure_details=_result_failure_details(result),
+    )
+
+
+def _case_input_text(problem: str, case_name: str):
+    case_path = Path.cwd() / "tests" / problem / case_name
+    try:
+        return case_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+
+def _case_failure_sections(problem: str, case: CaseResult):
+    sections = []
+    input_text = _case_input_text(problem, case.name) if problem else None
+    if input_text:
+        sections.append(("input", input_text))
+    if case.expected is not None:
+        sections.append(("expected", case.expected))
+    if case.output:
+        sections.append(("actual", case.output))
+    if case.stderr:
+        sections.append(("stderr", case.stderr))
+    return sections
+
+
+def _result_failure_details(result: ProblemResult):
+    return [
+        (case.name, case.status, _case_failure_sections(result.problem, case))
+        for case in result.failed_cases
+    ]
 
 
 def _print_detailed_result(result: ProblemResult):
     if result.error_status:
         error(result.error_status)
         if result.error_message:
-            print(result.error_message)
+            print_text(result.error_message)
         return
-
-    for case in result.cases:
-        _print_case_result(case)
 
     _print_result_summary(result)
 
@@ -320,7 +344,7 @@ def _write_test_log(results: List[ProblemResult]):
     return log_path
 
 
-def _print_auto_summary(results: List[ProblemResult], log_path: Path):
+def _print_auto_summary(results: List[ProblemResult], log_path: Path, display_mode: str = "normal"):
     total_cases = sum(result.total_count for result in results)
     passed_cases = sum(result.ok_count for result in results)
     failed_items = []
@@ -333,16 +357,21 @@ def _print_auto_summary(results: List[ProblemResult], log_path: Path):
             failed_items.append((result.problem, case.status, case.name))
 
     problems = ",".join(result.problem for result in results)
-    if failed_items:
-        print(f"{RED}FAIL{RESET} {problems}: {passed_cases}/{total_cases} AC in {_format_seconds(total_ms)}")
-        for problem, status, detail in failed_items[:8]:
-            print(f"  {problem} - {status}: {detail}")
-        if len(failed_items) > 8:
-            print(f"  ... and {len(failed_items) - 8} more")
-        print(f"Full log: {log_path}")
-    else:
-        print(f"{GREEN}PASS{RESET} {problems}: {total_cases} tests in {_format_seconds(total_ms)}")
-        print(f"Full log: {log_path}")
+    if display_mode == "watch":
+        print_watch_result(problems, passed_cases, total_cases, _format_seconds(total_ms), failed_items)
+        return
+
+    for result in results:
+        if not result.error_status and result.cases:
+            print_test_results(
+                result.cases,
+                title=f"Test Results: {result.problem}",
+                ok_count=result.ok_count,
+                total_count=result.total_count,
+                failure_details=_result_failure_details(result),
+            )
+
+    console_print_auto_summary(problems, passed_cases, total_cases, _format_seconds(total_ms), failed_items, log_path)
 
 
 def _results_passed(results: List[ProblemResult]):
@@ -350,11 +379,8 @@ def _results_passed(results: List[ProblemResult]):
 
 
 def cmd_run(problem: str, run_language: Optional[str] = None):
-    result = run_problem_tests(problem, run_language, show_compile=True, on_case_result=_print_case_result)
-    if result.error_status:
-        _print_detailed_result(result)
-    else:
-        _print_result_summary(result)
+    result = run_problem_tests(problem, run_language, show_compile=True)
+    _print_detailed_result(result)
     if not result.passed:
         sys.exit(1)
 
@@ -398,17 +424,17 @@ def cmd_rerun(run_language: Optional[str] = None):
         sys.exit(1)
 
 
-def _run_auto_tests(problems: List[str], run_language: Optional[str] = None, reason=""):
+def _run_auto_tests(problems: List[str], run_language: Optional[str] = None, reason="", display_mode: str = "normal"):
     if not problems:
         warn("テスト対象が見つかりません。")
         return False
 
     label = ",".join(problems)
     prefix = f"{reason}: " if reason else ""
-    print(f"{prefix}running {label} ...")
+    print_text(f"{prefix}running {label} ...")
     results = [run_problem_tests(problem, run_language, show_compile=False) for problem in problems]
     log_path = _write_test_log(results)
-    _print_auto_summary(results, log_path)
+    _print_auto_summary(results, log_path, display_mode=display_mode)
     return _results_passed(results)
 
 
