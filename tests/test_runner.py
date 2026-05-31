@@ -2,7 +2,7 @@ import json
 import sys
 
 from atc.models import CaseResult, ProblemResult
-from atc.runner import LOG_DIR, results_passed, run_problem_tests, write_test_log
+from atc.runner import LOG_DIR, print_auto_summary, results_passed, run_problem_tests, write_test_log
 
 
 def _write_runner_config(cwd, timeout_seconds=None):
@@ -108,6 +108,42 @@ def test_write_test_log_records_failed_cases(tmp_path, monkeypatch):
     assert log_path == LOG_DIR / "last.log"
     assert "status: WA" in log_path.read_text(encoding="utf-8")
     assert (tmp_path / ".atc" / "test-runs" / "last_failed.txt").read_text(encoding="utf-8") == "A sample-1.in\nB *"
+
+
+def test_watch_display_mode_prints_compact_success_summary(capsys):
+    result = _passed_result("A")
+
+    print_auto_summary([result], LOG_DIR / "last.log", display_mode="watch")
+
+    output = capsys.readouterr().out
+    assert "PASS A: 1 tests" in output
+    assert "Test Results" not in output
+    assert "Full log" not in output
+
+
+def test_watch_display_mode_prints_compact_failure_summary(capsys):
+    failed = ProblemResult(
+        problem="A",
+        mode="py",
+        cases=[
+            CaseResult(
+                name="sample-1.in",
+                status="WA",
+                elapsed_ms=1.0,
+                expected="hello",
+                output="bye",
+            )
+        ],
+    )
+
+    print_auto_summary([failed], LOG_DIR / "last.log", display_mode="watch")
+
+    output = capsys.readouterr().out
+    assert "FAIL A: sample-1.in WA" in output
+    assert "Result: 0/1 AC" in output
+    assert "Run `atc test A` for details." in output
+    assert "Test Results" not in output
+    assert "Full log" not in output
 
 
 def test_run_problem_tests_python_minimal_ac_case(tmp_path, monkeypatch):

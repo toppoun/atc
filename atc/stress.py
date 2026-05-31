@@ -17,7 +17,15 @@ try:
         runner_cpp_flags,
         runner_timeout,
     )
-    from .console import error, ok, warn
+    from .console import (
+        error,
+        ok,
+        print_promote_result,
+        print_stress_failure,
+        print_stress_header,
+        print_text,
+        warn,
+    )
     from .templates import (
         TemplateError,
         load_template_manifest,
@@ -34,7 +42,15 @@ except ImportError:
         runner_cpp_flags,
         runner_timeout,
     )
-    from console import error, ok, warn
+    from console import (
+        error,
+        ok,
+        print_promote_result,
+        print_stress_failure,
+        print_stress_header,
+        print_text,
+        warn,
+    )
     from templates import (
         TemplateError,
         load_template_manifest,
@@ -153,7 +169,7 @@ def _write_stress_template(target: Path, template_path: Path) -> bool:
         warn(f"Warning: already exists: {target}")
         return False
     target.write_text(template_path.read_text(encoding="utf-8"), encoding="utf-8")
-    print(f"created: {target}")
+    ok(f"created: {target}")
     return True
 
 
@@ -211,13 +227,13 @@ def promote_failed_case(problem: str, *, name: Optional[str] = None, force: bool
 
     if not failed_input.exists():
         error(f"Error: no failed stress input found for {problem}")
-        print("Run first:")
-        print(f"  atc stress {problem}")
+        print_text("Run first:")
+        print_text(f"  atc stress {problem}")
         return 1
     if not brute_output.exists():
         error(f"Error: no brute output found for {problem}")
-        print("Run first:")
-        print(f"  atc stress {problem}")
+        print_text("Run first:")
+        print_text(f"  atc stress {problem}")
         return 1
 
     testdir = cwd / "tests" / problem
@@ -232,7 +248,7 @@ def promote_failed_case(problem: str, *, name: Optional[str] = None, force: bool
     existing = _first_existing([target_input, target_output])
     if existing and not force:
         error(f"Error: {_display_path(existing, cwd)} already exists")
-        print("Use --force to overwrite.")
+        print_text("Use --force to overwrite.")
         return 1
 
     try:
@@ -245,16 +261,13 @@ def promote_failed_case(problem: str, *, name: Optional[str] = None, force: bool
         error(f"Error: failed to promote stress case: {e}")
         return 1
 
-    print(f"promoted stress case for {problem}")
-    print()
-    print("input:")
-    print(f"  {_display_path(failed_input, cwd)}")
-    print("expected:")
-    print(f"  {_display_path(brute_output, cwd)}")
-    print()
-    print("saved:")
-    print(f"  {_display_path(target_input, cwd)}")
-    print(f"  {_display_path(target_output, cwd)}")
+    print_promote_result(
+        problem,
+        Path(_display_path(failed_input, cwd)),
+        Path(_display_path(brute_output, cwd)),
+        Path(_display_path(target_input, cwd)),
+        Path(_display_path(target_output, cwd)),
+    )
     return 0
 
 
@@ -368,21 +381,14 @@ def save_failure(
 
 
 def _print_failure(case_number: int, seed: int, input_text: str, your_output: str, brute_output: str, saved_dir: Path) -> None:
-    error(f"WA found at case {case_number}")
-    print(f"seed: {seed}")
-    print()
-    print("input:")
-    print(input_text, end="" if input_text.endswith("\n") else "\n")
-    print()
-    print("your output:")
-    print(your_output, end="" if your_output.endswith("\n") else "\n")
-    print()
-    print("brute output:")
-    print(brute_output, end="" if brute_output.endswith("\n") else "\n")
-    print()
-    print("saved:")
-    for name in ["failed.in", "your.out", "brute.out", "meta.json"]:
-        print(saved_dir / name)
+    print_stress_failure(
+        case_number,
+        seed,
+        input_text,
+        your_output,
+        brute_output,
+        [saved_dir / name for name in ["failed.in", "your.out", "brute.out", "meta.json"]],
+    )
 
 
 def cmd_stress(
@@ -411,15 +417,17 @@ def cmd_stress(
         error(f"Error: {e}")
         return 1
 
-    print(f"stress {problem} {display_language}")
-    print(f"solution: {_display_path(solution.path, cwd)}")
-    print(f"gen: {_display_path(generator.path, cwd)}")
-    print(f"brute: {_display_path(brute_program.path, cwd)}")
-    print(f"count: {count}")
-    print(f"seed: {base_seed}")
-    print(f"compare: {compare}")
-    print(f"timeout: {timeout}")
-    print()
+    print_stress_header(
+        problem=problem,
+        language=display_language,
+        solution=_display_path(solution.path, cwd),
+        generator=_display_path(generator.path, cwd),
+        brute=_display_path(brute_program.path, cwd),
+        count=count,
+        seed=base_seed,
+        compare=compare,
+        timeout=timeout,
+    )
 
     try:
         for case_number in range(1, count + 1):
@@ -455,7 +463,7 @@ def cmd_stress(
                 _print_failure(case_number, case_seed, generated.stdout, your.stdout, brute_output.stdout, saved_dir)
                 return 1
 
-            print(f"[{case_number}] OK")
+            print_text(f"[{case_number}] OK")
     except StressError as e:
         error(f"Error: {e}")
         return 1
@@ -466,6 +474,6 @@ def cmd_stress(
             except OSError:
                 pass
 
-    print()
+    print_text()
     ok(f"PASS: all {count} cases matched")
     return 0

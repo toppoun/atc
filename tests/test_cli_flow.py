@@ -90,7 +90,7 @@ def test_cli_manual_run_rerun_success_flow(tmp_path):
     _assert_success(rerun)
 
 
-def test_cli_single_run_prints_each_case_once_before_summary(tmp_path):
+def test_cli_single_run_prints_compact_result_table(tmp_path):
     _write_test_config(tmp_path)
     (tmp_path / "A.py").write_text("print(input())\n", encoding="utf-8")
     testdir = tmp_path / "tests" / "A"
@@ -103,15 +103,44 @@ def test_cli_single_run_prints_each_case_once_before_summary(tmp_path):
     run = _run_cli(tmp_path, "t", "A", "py")
 
     _assert_success(run)
-    first = run.stdout.find("=== sample-1.in ===")
-    second = run.stdout.find("=== sample-2.in ===")
+    first = run.stdout.find("sample-1.in")
+    second = run.stdout.find("sample-2.in")
     summary = run.stdout.find("結果: 2/2 AC")
+    assert "Test Results" in run.stdout
+    assert "=== sample-1.in ===" not in run.stdout
+    assert "=== sample-2.in ===" not in run.stdout
     assert first != -1
     assert second != -1
     assert summary != -1
     assert first < second < summary
-    assert run.stdout.count("=== sample-1.in ===") == 1
-    assert run.stdout.count("=== sample-2.in ===") == 1
+    assert run.stdout.count("sample-1.in") == 1
+    assert run.stdout.count("sample-2.in") == 1
+
+
+def test_cli_single_run_prints_failure_detail_after_compact_table(tmp_path):
+    _write_test_config(tmp_path)
+    (tmp_path / "A.py").write_text("print(input())\n", encoding="utf-8")
+    testdir = tmp_path / "tests" / "A"
+    testdir.mkdir(parents=True)
+    (testdir / "sample-1.in").write_text("alpha\n", encoding="utf-8")
+    (testdir / "sample-1.out").write_text("alpha\n", encoding="utf-8")
+    (testdir / "sample-2.in").write_text("beta-input\n", encoding="utf-8")
+    (testdir / "sample-2.out").write_text("beta-expected\n", encoding="utf-8")
+
+    run = _run_cli(tmp_path, "test", "A", "py")
+
+    combined = _assert_error_without_traceback(run)
+    assert "Test Results" in combined
+    assert "=== sample-1.in ===" not in combined
+    assert "=== sample-2.in ===" not in combined
+    assert combined.find("sample-1.in") < combined.find("sample-2.in") < combined.find("結果: 1/2 AC")
+    assert "sample-2.in WA" in combined
+    assert "input" in combined
+    assert "beta-input" in combined
+    assert "expected" in combined
+    assert "beta-expected" in combined
+    assert "actual" in combined
+    assert combined.count("sample-1.in") == 1
 
 
 def test_cli_run_all_writes_log_and_rerun_failed_problem(tmp_path):
