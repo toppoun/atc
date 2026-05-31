@@ -3,9 +3,15 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 try:
+    from .atcoder import (
+        ATCODER_BASE_URL,
+        AtCoderProblem,
+        fetch_atcoder_tasks,
+        parse_atcoder_tasks_html,
+    )
     from .config import (
         config_root,
         _find_project_root,
@@ -17,6 +23,12 @@ try:
     from .samples import download_samples, print_sample_download_summary
     from .templates import load_template
 except ImportError:
+    from atcoder import (
+        ATCODER_BASE_URL,
+        AtCoderProblem,
+        fetch_atcoder_tasks,
+        parse_atcoder_tasks_html,
+    )
     from config import (
         config_root,
         _find_project_root,
@@ -54,34 +66,100 @@ def cmd_contest(contest: str, lang: Optional[str] = None):
 
 def create_contest_files(contest_id: str, base: Path, lang: str, config: Optional[dict] = None):
     config = config or load_config(Path.cwd())
-    problems = config_problems(config)
+    problems = load_contest_problems(contest_id, config)
     tests = base / "tests"
     base.mkdir(parents=True, exist_ok=True)
 
     template_content = load_template(lang, config, Path.cwd())
 
     failed_downloads = []
-    for p in problems:
-        source_file = base / f"{p}.{lang}"
+    for problem in problems:
+        source_file = base / f"{problem.index}.{lang}"
         if not source_file.exists():
             source_file.write_text(template_content, encoding="utf-8")
 
-        print(f"fetching {p} ...", end=" ", flush=True)
-        sample_ok, reason = download_samples(contest_id, p, tests / p)
+        print(f"fetching {problem.index} ...", end=" ", flush=True)
+        sample_ok, reason = download_samples(contest_id, problem.index, tests / problem.index, url=problem.url)
         if sample_ok:
             print_ok("done")
         else:
             error("failed")
             if reason:
                 print(f"  reason: {reason}")
-            failed_downloads.append((p, reason))
+            failed_downloads.append((problem.index, reason))
 
-    print_sample_download_summary(problems, failed_downloads)
+    write_contest_metadata(contest_id, base, lang, problems)
+    print_sample_download_summary([problem.index for problem in problems], failed_downloads)
 
     if failed_downloads:
         print(f"\n{contest_id} ({lang}) files ready, but sample download incomplete.")
     else:
         print(f"\n{contest_id} ({lang}) ready.")
+
+
+def guessed_problem_url(contest_id: str, problem_index: str) -> str:
+    return f"{ATCODER_BASE_URL}/contests/{contest_id}/tasks/{contest_id}_{problem_index.lower()}"
+
+
+def fallback_contest_problems(contest_id: str, problem_indexes: List[str]) -> List[AtCoderProblem]:
+    return [
+        AtCoderProblem(
+            index=problem_index,
+            title="",
+            url=guessed_problem_url(contest_id, problem_index),
+            task_id=f"{contest_id}_{problem_index.lower()}",
+        )
+        for problem_index in problem_indexes
+    ]
+
+
+def load_contest_problems(contest_id: str, config: dict) -> List[AtCoderProblem]:
+    fetch_failed = False
+    try:
+        problems = fetch_atcoder_tasks(contest_id)
+    except Exception as e:
+        warn(f"Failed to fetch AtCoder tasks page: {e}")
+        fetch_failed = True
+        problems = []
+
+    if problems:
+        return problems
+
+    if not fetch_failed:
+        warn("Failed to parse the problem list table from the AtCoder tasks page.")
+    warn("Falling back to configured problem letters and guessed URLs. ADT contests may fail with this fallback.")
+    return fallback_contest_problems(contest_id, config_problems(config))
+
+
+def _toml_string(value: str) -> str:
+    return json.dumps(value, ensure_ascii=False)
+
+
+def write_contest_metadata(contest_id: str, base: Path, lang: str, problems: List[AtCoderProblem]):
+    atc_dir = base / ".atc"
+    atc_dir.mkdir(parents=True, exist_ok=True)
+    contest_file = atc_dir / "contest.toml"
+
+    lines = [
+        f"contest_id = {_toml_string(contest_id)}",
+        "",
+    ]
+    for problem in problems:
+        lines.extend(
+            [
+                "[[problems]]",
+                f"index = {_toml_string(problem.index)}",
+                f"title = {_toml_string(problem.title)}",
+                f"task_id = {_toml_string(problem.task_id)}",
+                f"url = {_toml_string(problem.url)}",
+                f"source = {_toml_string(f'{problem.index}.{lang}')}",
+                f"tests = {_toml_string(f'tests/{problem.index}')}",
+                "",
+            ]
+        )
+
+    contest_file.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    return contest_file
 
 
 def contest_category_key(contest: str) -> Optional[str]:
