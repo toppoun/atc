@@ -1,4 +1,5 @@
 from atc.problems import (
+    contest_metadata_error,
     contest_metadata_problems,
     resolve_available_problems,
     resolve_sample_download_problems,
@@ -49,10 +50,25 @@ def test_resolve_available_problems_uses_source_files_without_metadata(tmp_path)
     assert resolve_available_problems(tmp_path, config) == ["A", "B", "I"]
 
 
-def test_resolve_available_problems_falls_back_to_defaults_last(tmp_path):
+def test_resolve_available_problems_falls_back_to_defaults_last(tmp_path, capsys):
     config = {"defaults": {"problems": ["A", "B", "I"]}}
 
     assert resolve_available_problems(tmp_path, config) == ["A", "B", "I"]
+    assert "failed to read contest metadata" not in capsys.readouterr().out
+
+
+def test_resolve_available_problems_warns_when_metadata_is_broken(tmp_path, capsys):
+    atc_dir = tmp_path / ".atc"
+    atc_dir.mkdir()
+    (atc_dir / "contest.toml").write_text("[[problems]\n", encoding="utf-8")
+    config = {"defaults": {"problems": ["A", "B"]}}
+
+    assert resolve_available_problems(tmp_path, config) == ["A", "B"]
+
+    output = capsys.readouterr().out
+    assert "failed to read contest metadata" in output
+    assert "contest.toml" in output.replace("\n", "")
+    assert contest_metadata_error(tmp_path) is not None
 
 
 def test_resolve_sample_download_problems_uses_metadata_urls(tmp_path):

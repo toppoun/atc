@@ -221,6 +221,18 @@ def test_cli_config_doctor_non_table_paths_contests_reports_error(tmp_path):
     assert "[paths.contests] must be a table." in combined
 
 
+def test_cli_config_doctor_broken_contest_metadata_reports_error(tmp_path):
+    atc_dir = tmp_path / ".atc"
+    atc_dir.mkdir(parents=True)
+    (atc_dir / "contest.toml").write_text("[[problems]\n", encoding="utf-8")
+
+    result = _run_cli(tmp_path, "config", "doctor")
+    combined = _assert_error_without_traceback(result)
+
+    assert "Contest metadata" in combined
+    assert "failed to read contest metadata" in combined
+
+
 def test_cli_config_doctor_broken_template_manifest_reports_error(tmp_path):
     atc_dir = tmp_path / ".atc"
     atc_dir.mkdir(parents=True)

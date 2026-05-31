@@ -10,8 +10,10 @@ except ModuleNotFoundError:
 
 try:
     from .config import SOURCE_EXTS, config_problems, load_config
+    from .console import warn
 except ImportError:
     from config import SOURCE_EXTS, config_problems, load_config
+    from console import warn
 
 
 CONTEST_METADATA_PATH = Path(".atc") / "contest.toml"
@@ -63,7 +65,25 @@ def _is_problem_source_index(index: str) -> bool:
     return bool(re.fullmatch(r"(?:[A-Z]|EX|[0-9]+|[A-Z][0-9]+)", normalized))
 
 
-def read_contest_metadata(contest_dir: Path) -> dict:
+def _contest_metadata_error_message(metadata_file: Path, error: Exception) -> str:
+    return f"failed to read contest metadata: {metadata_file} ({error})"
+
+
+def contest_metadata_error(contest_dir: Path) -> Optional[str]:
+    metadata_file = contest_dir / CONTEST_METADATA_PATH
+    if not metadata_file.exists():
+        return None
+
+    try:
+        with metadata_file.open("rb") as f:
+            tomllib.load(f)
+    except (OSError, tomllib.TOMLDecodeError) as e:
+        return _contest_metadata_error_message(metadata_file, e)
+
+    return None
+
+
+def read_contest_metadata(contest_dir: Path, warn_on_error: bool = False) -> dict:
     metadata_file = contest_dir / CONTEST_METADATA_PATH
     if not metadata_file.exists():
         return {}
@@ -71,14 +91,16 @@ def read_contest_metadata(contest_dir: Path) -> dict:
     try:
         with metadata_file.open("rb") as f:
             data = tomllib.load(f)
-    except (OSError, tomllib.TOMLDecodeError):
+    except (OSError, tomllib.TOMLDecodeError) as e:
+        if warn_on_error:
+            warn(_contest_metadata_error_message(metadata_file, e))
         return {}
 
     return data if isinstance(data, dict) else {}
 
 
-def contest_metadata_problems(contest_dir: Path) -> List[ContestProblem]:
-    raw_problems = read_contest_metadata(contest_dir).get("problems", [])
+def contest_metadata_problems(contest_dir: Path, warn_on_error: bool = False) -> List[ContestProblem]:
+    raw_problems = read_contest_metadata(contest_dir, warn_on_error=warn_on_error).get("problems", [])
     if not isinstance(raw_problems, list):
         return []
 
@@ -117,7 +139,7 @@ def source_file_problems(contest_dir: Path) -> List[str]:
 
 
 def resolve_available_problems(contest_dir: Path, config: Optional[dict] = None) -> List[str]:
-    metadata_indexes = [problem.index for problem in contest_metadata_problems(contest_dir)]
+    metadata_indexes = [problem.index for problem in contest_metadata_problems(contest_dir, warn_on_error=True)]
     if metadata_indexes:
         return metadata_indexes
 
@@ -130,7 +152,7 @@ def resolve_available_problems(contest_dir: Path, config: Optional[dict] = None)
 
 
 def resolve_sample_download_problems(contest_dir: Path, config: Optional[dict] = None) -> List[ContestProblem]:
-    metadata_problems = contest_metadata_problems(contest_dir)
+    metadata_problems = contest_metadata_problems(contest_dir, warn_on_error=True)
     if metadata_problems:
         return metadata_problems
 

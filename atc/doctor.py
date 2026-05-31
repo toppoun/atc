@@ -27,6 +27,7 @@ try:
         resolve_executable,
         watch_settings,
     )
+    from .problems import contest_metadata_error, contest_metadata_problems
     from .templates import TemplateError, resolve_template_file as _resolve_template_file
 except ImportError:
     from config import (
@@ -43,6 +44,7 @@ except ImportError:
         resolve_executable,
         watch_settings,
     )
+    from problems import contest_metadata_error, contest_metadata_problems
     from templates import TemplateError, resolve_template_file as _resolve_template_file
 
 
@@ -475,6 +477,21 @@ def _doctor_check_current_contest(report: DoctorReport, config: dict, cwd: Path)
         report.item("WARN", f"contestDir does not exist: {contest_dir}", [f"Source: {current_file}"])
 
 
+def _doctor_check_contest_metadata(report: DoctorReport, cwd: Path):
+    report.section("Contest metadata")
+    error_message = contest_metadata_error(cwd)
+    metadata_file = cwd / ".atc" / "contest.toml"
+    if error_message:
+        report.item("ERROR", f"Contest metadata: {metadata_file}", [error_message])
+        return
+
+    if metadata_file.exists():
+        problems = contest_metadata_problems(cwd)
+        report.item("OK", f"Contest metadata: {metadata_file}", [f"problems: {len(problems)}"])
+    else:
+        report.item("INFO", "Contest metadata: not found.", [f"Expected path: {metadata_file}"])
+
+
 def cmd_config_doctor():
     cwd = Path.cwd()
     report = DoctorReport()
@@ -488,6 +505,7 @@ def cmd_config_doctor():
     _doctor_check_watch(report, config)
     _doctor_check_tools(report)
     _doctor_check_vscode(report)
+    _doctor_check_contest_metadata(report, cwd)
     _doctor_check_current_contest(report, config, cwd)
     report.summary()
 

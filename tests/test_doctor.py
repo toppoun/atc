@@ -89,3 +89,17 @@ def test_doctor_oj_login_unexpected_exception_warns(monkeypatch, capsys):
     assert "[WARN] oj login check failed." in output
     assert "boom" in output
     assert "Traceback" not in output
+
+
+def test_doctor_broken_contest_metadata_reports_error(tmp_path, capsys):
+    atc_dir = tmp_path / ".atc"
+    atc_dir.mkdir()
+    (atc_dir / "contest.toml").write_text("[[problems]\n", encoding="utf-8")
+
+    report = doctor.DoctorReport()
+    doctor._doctor_check_contest_metadata(report, tmp_path)
+    output = capsys.readouterr().out
+
+    assert report.counts["ERROR"] == 1
+    assert "[ERROR] Contest metadata:" in output
+    assert "failed to read contest metadata" in output
