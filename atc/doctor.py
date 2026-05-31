@@ -189,12 +189,14 @@ def _doctor_check_config(report: DoctorReport, config: dict, config_file: Option
     else:
         report.item("INFO", "paths.root is empty. atc contest will use the current directory.")
 
-    for key, label in [("abc", "ABC"), ("arc", "ARC"), ("agc", "AGC")]:
-        value = str(paths.get(key) or "")
-        if value:
-            report.item("OK", f"paths.{key}: {value}")
-        else:
-            report.item("INFO", f"paths.{key} is empty. {label} contests will be created directly under root.")
+    contests = paths.get("contests", {})
+    if "contests" in paths and not isinstance(contests, dict):
+        report.item("ERROR", "[paths.contests] must be a table.")
+    elif isinstance(contests, dict) and contests:
+        for pattern, directory in contests.items():
+            report.item("OK", f"paths.contests[{pattern!r}]: {directory}")
+    else:
+        report.item("INFO", "paths.contests is empty. Contests will be created directly under root.")
 
 
 def _doctor_check_templates(report: DoctorReport, config: dict, cwd: Path):

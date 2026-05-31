@@ -1,8 +1,12 @@
 import json
 import sys
 
+import atc.runner as runner_module
 from atc.models import CaseResult, ProblemResult
 from atc.runner import LOG_DIR, print_auto_summary, results_passed, run_problem_tests, write_test_log
+
+
+ADT_INDEXES = list("ABCDEFGHI")
 
 
 def _write_runner_config(cwd, timeout_seconds=None):
@@ -15,6 +19,27 @@ def _write_runner_config(cwd, timeout_seconds=None):
     if timeout_seconds is not None:
         lines.append(f"timeout_seconds = {timeout_seconds}")
     (atc_dir / "config.toml").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _write_contest_metadata(contest_dir, indexes=ADT_INDEXES):
+    atc_dir = contest_dir / ".atc"
+    atc_dir.mkdir(parents=True, exist_ok=True)
+    lines = [
+        'contest_id = "adt_easy_20260525_1"',
+        "",
+    ]
+    for index in indexes:
+        lines.extend(
+            [
+                "[[problems]]",
+                f'index = "{index}"',
+                f'url = "https://atcoder.jp/contests/adt_easy_20260525_1/tasks/task_{index.lower()}"',
+                f'source = "{index}.py"',
+                f'tests = "tests/{index}"',
+                "",
+            ]
+        )
+    (atc_dir / "contest.toml").write_text("\n".join(lines), encoding="utf-8")
 
 
 def _passed_result(problem="A"):
@@ -79,6 +104,22 @@ def test_run_problem_tests_returns_error_for_invalid_language(tmp_path, monkeypa
     assert result.error_status == "ERROR"
     assert "Invalid language" in result.error_message
     assert result.passed is False
+
+
+def test_cmd_run_all_uses_metadata_problem_list(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    _write_contest_metadata(tmp_path)
+    calls = []
+
+    def fake_run_auto_tests(problems, run_language, reason="", display_mode="normal"):
+        calls.append((problems, run_language, reason, display_mode))
+        return True
+
+    monkeypatch.setattr(runner_module, "_run_auto_tests", fake_run_auto_tests)
+
+    runner_module.cmd_run_all("py")
+
+    assert calls == [(ADT_INDEXES, "py", "manual", "normal")]
 
 
 def test_write_test_log_records_failed_cases(tmp_path, monkeypatch):

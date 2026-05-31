@@ -2,13 +2,15 @@ import sys
 from pathlib import Path
 
 try:
-    from .config import config_problems, default_language, load_config
+    from .config import default_language, load_config
     from .console import GREEN, color_text, error, ok as print_ok
+    from .problems import resolve_sample_download_problems
     from .samples import download_samples
     from .templates import load_template
 except ImportError:
-    from config import config_problems, default_language, load_config
+    from config import default_language, load_config
     from console import GREEN, color_text, error, ok as print_ok
+    from problems import resolve_sample_download_problems
     from samples import download_samples
     from templates import load_template
 
@@ -47,7 +49,7 @@ def cmd_manual(args):
 def cmd_manual_tests():
     cwd = Path.cwd()
     config = load_config(cwd)
-    problems = config_problems(config)
+    problems = resolve_sample_download_problems(cwd, config)
     contest = cwd.name.lower()
     tests = cwd / "tests"
 
@@ -56,9 +58,9 @@ def cmd_manual_tests():
         sys.exit(1)
 
     print(f"contest: {contest}")
-    for p in problems:
-        print(f"fetching {p} ...", end=" ", flush=True)
-        sample_ok, reason = download_samples(contest, p, tests / p)
+    for problem in problems:
+        print(f"fetching {problem.index} ...", end=" ", flush=True)
+        sample_ok, reason = download_samples(contest, problem.index, tests / problem.index, url=problem.url or None)
         if sample_ok:
             print_ok("done")
         else:

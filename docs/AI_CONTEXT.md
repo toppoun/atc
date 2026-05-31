@@ -152,8 +152,8 @@ VS Code 拡張:
 `atc contest abc335 cpp` の場合:
 
 - `paths.root` が空: `cwd/abc335`
-- `paths.root` があり `paths.abc` がある: `root/paths.abc/abc335`
-- `paths.root` があり `paths.abc = ""`: `root/abc335`
+- `paths.root` があり `[paths.contests]` の `"abc\\d+" = "ABC"` に一致: `root/ABC/abc335`
+- `paths.root` があり、どの rule にも一致しない: `root/<contest_id>`
 
 ## templates
 
@@ -266,7 +266,7 @@ terminal が開く条件:
 - `atc` command が PATH にあるか
 - 読み込まれる config file
 - resolved root
-- `paths.abc` / `paths.arc` / `paths.agc`
+- `paths.contests`
 - Python / C++ templates
 - runner.python / runner.pypy / runner.cpp_compiler / timeouts
 - watch settings

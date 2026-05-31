@@ -1,7 +1,7 @@
 import shutil
 import subprocess
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 try:
     from .console import warn
@@ -9,9 +9,9 @@ except ImportError:
     from console import warn
 
 
-def download_samples(contest: str, problem_char: str, dst_dir: Path):
+def download_samples(contest: str, problem_char: str, dst_dir: Path, url: Optional[str] = None):
     tmp = dst_dir.parent / f".oj_tmp_{problem_char}"
-    url = f"https://atcoder.jp/contests/{contest}/tasks/{contest}_{problem_char.lower()}"
+    url = url or f"https://atcoder.jp/contests/{contest}/tasks/{contest}_{problem_char.lower()}"
     shutil.rmtree(tmp, ignore_errors=True)
 
     oj = shutil.which("oj")
