@@ -65,9 +65,12 @@ atc config doctor
 ```toml
 [paths]
 root = "."
-abc = "ABC"
-arc = "ARC"
-agc = "AGC"
+
+[paths.contests]
+"abc\\d+" = "ABC"
+"arc\\d+" = "ARC"
+"agc\\d+" = "AGC"
+"adt_.*" = "ATD"
 
 [defaults]
 language = "cpp"

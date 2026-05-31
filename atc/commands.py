@@ -7,7 +7,7 @@ try:
     from .config import (
         CONFIG_FILE_NAME,
         _config_to_toml,
-        _default_config,
+        _default_config_template,
         _find_config_file,
         load_config,
     )
@@ -25,7 +25,7 @@ except ImportError:
     from config import (
         CONFIG_FILE_NAME,
         _config_to_toml,
-        _default_config,
+        _default_config_template,
         _find_config_file,
         load_config,
     )
@@ -105,7 +105,7 @@ def handle_config(args: List[str]):
         if config_file.exists():
             warn(f"already exists: {config_file.resolve()}")
             return 0
-        config_file.write_text(_config_to_toml(_default_config()), encoding="utf-8")
+        config_file.write_text(_config_to_toml(_default_config_template()), encoding="utf-8")
         print(f"created: {config_file.resolve()}")
     elif subcmd == "doctor":
         cmd_config_doctor()

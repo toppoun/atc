@@ -1,15 +1,14 @@
 import * as vscode from "vscode";
 
-const CONTEST_GROUPS: Record<string, string> = {
-  abc: "ABC(Atcoder Beginner Contest)",
-  arc: "ARC(Atcoder Regular Contest)",
-  agc: "AGC(Atcoder Grand Contest)"
-};
 const DEFAULT_PATHS: Record<string, string> = {
-  root: "",
-  ...CONTEST_GROUPS
+  root: ""
 };
-const CONTEST_GROUP_NAMES = Object.values(CONTEST_GROUPS);
+const DEFAULT_CONTEST_PATH_RULES: Record<string, string> = {
+  "abc\\d+": "ABC",
+  "arc\\d+": "ARC",
+  "agc\\d+": "AGC",
+  "adt_.*": "ATD"
+};
 const CONFIG_FILE_NAME = "config.toml";
 
 type CurrentContestResult =
@@ -17,7 +16,8 @@ type CurrentContestResult =
   | { kind: "found"; contestDir: vscode.Uri; requestId?: string; source: vscode.Uri }
   | { kind: "invalid"; message: string };
 type CurrentContestFileStatus = "missing" | "file" | "notFile";
-type AtcConfig = { uri: vscode.Uri; projectRoot: vscode.Uri; paths: Record<string, string> };
+type ParsedAtcConfig = { paths: Record<string, string>; contests?: Record<string, string> };
+type AtcConfig = { uri: vscode.Uri; projectRoot: vscode.Uri; paths: Record<string, string>; contests: Record<string, string> };
 
 type Utf8TextDecoder = new (label?: string) => { decode(input: Uint8Array): string };
 type ConsoleLogger = { log(message?: unknown, ...optionalParams: unknown[]): void };
@@ -69,10 +69,6 @@ function splitPathInput(input: string): string[] {
 function joinUriPath(baseUri: vscode.Uri, input: string): vscode.Uri {
   const segments = splitPathInput(input);
   return segments.length ? vscode.Uri.joinPath(baseUri, ...segments) : baseUri;
-}
-
-function pathSegments(uri: vscode.Uri): string[] {
-  return uri.fsPath.split(/[\\/]+/).filter(Boolean);
 }
 
 function parentUri(uri: vscode.Uri): vscode.Uri | undefined {
@@ -236,8 +232,10 @@ function parseTomlStringValue(value: string, lineNumber: number): string {
   }
 }
 
-function parseAtcConfig(content: string): Record<string, string> {
+function parseAtcConfig(content: string): ParsedAtcConfig {
   const paths: Record<string, string> = {};
+  let contests: Record<string, string> | undefined;
+  let contestSectionSeen = false;
   let section = "";
   const lines = content.split(/\r?\n/);
 
@@ -251,22 +249,36 @@ function parseAtcConfig(content: string): Record<string, string> {
     const sectionMatch = /^\[([A-Za-z0-9_.-]+)\]$/.exec(line);
     if (sectionMatch) {
       section = sectionMatch[1];
+      if (section === "paths.contests") {
+        contestSectionSeen = true;
+      }
       continue;
     }
 
-    if (section !== "paths") {
+    if (section !== "paths" && section !== "paths.contests") {
       continue;
     }
 
     const keyValueMatch = /^([A-Za-z0-9_-]+)\s*=\s*(.+)$/.exec(line);
-    if (!keyValueMatch) {
+    const contestKeyValueMatch = /^((?:"(?:\\.|[^"])*")|(?:'(?:[^']*)')|(?:[A-Za-z0-9_-]+))\s*=\s*(.+)$/.exec(line);
+    if (section === "paths" && !keyValueMatch) {
       throw new Error(`line ${lineNumber}: invalid [paths] syntax`);
     }
+    if (section === "paths.contests" && !contestKeyValueMatch) {
+      throw new Error(`line ${lineNumber}: invalid [paths.contests] syntax`);
+    }
 
-    paths[keyValueMatch[1]] = parseTomlStringValue(keyValueMatch[2], lineNumber);
+    if (section === "paths") {
+      paths[keyValueMatch![1]] = parseTomlStringValue(keyValueMatch![2], lineNumber);
+    } else {
+      if (!contests) {
+        contests = {};
+      }
+      contests[parseTomlStringValue(contestKeyValueMatch![1], lineNumber)] = parseTomlStringValue(contestKeyValueMatch![2], lineNumber);
+    }
   }
 
-  return paths;
+  return { paths, contests: contestSectionSeen ? contests ?? {} : undefined };
 }
 
 async function readAtcConfig(configFileUri: vscode.Uri): Promise<AtcConfig | undefined> {
@@ -279,13 +291,15 @@ async function readAtcConfig(configFileUri: vscode.Uri): Promise<AtcConfig | und
   }
 
   try {
+    const parsed = parseAtcConfig(content);
     return {
       uri: configFileUri,
       projectRoot: configProjectRoot(configFileUri),
       paths: {
         ...DEFAULT_PATHS,
-        ...parseAtcConfig(content)
-      }
+        ...parsed.paths
+      },
+      contests: parsed.contests ?? { ...DEFAULT_CONTEST_PATH_RULES }
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -370,29 +384,6 @@ async function getAtcoderRoots(): Promise<vscode.Uri[]> {
     pushUniqueUri(roots, seen, workspaceFolder.uri);
   }
 
-  if (!configs.length) {
-    for (const workspaceFolder of workspaceFolders) {
-      const segments = pathSegments(workspaceFolder.uri);
-      const currentName = segments[segments.length - 1];
-      const parentName = segments[segments.length - 2];
-
-      if (currentName && CONTEST_GROUP_NAMES.includes(currentName)) {
-        const parent = parentUri(workspaceFolder.uri);
-        if (parent) {
-          pushUniqueUri(roots, seen, parent);
-        }
-      }
-
-      if (parentName && CONTEST_GROUP_NAMES.includes(parentName)) {
-        const parent = parentUri(workspaceFolder.uri);
-        const grandParent = parent ? parentUri(parent) : undefined;
-        if (grandParent) {
-          pushUniqueUri(roots, seen, grandParent);
-        }
-      }
-    }
-  }
-
   return roots;
 }
 
@@ -446,20 +437,35 @@ async function getCurrentContestJsonCandidates(): Promise<vscode.Uri[]> {
   return (await getCurrentContestRootCandidates()).map(currentContestUri);
 }
 
-function contestCategoryKey(contest: string): string | undefined {
-  const match = /^(abc|arc|agc)\d+$/i.exec(contest);
-  return match?.[1].toLowerCase();
+function contestGroupFor(contest: string, contests: Record<string, string>, configFileUri: vscode.Uri): string | undefined {
+  const lowered = contest.toLowerCase();
+  let matchedGroup: string | undefined;
+
+  for (const [pattern, group] of Object.entries(contests)) {
+    let regex: RegExp;
+    try {
+      regex = new RegExp(`^(?:${pattern})$`);
+    } catch {
+      reportConfigError(configFileUri, `invalid contest path regex: ${pattern}`);
+      return undefined;
+    }
+
+    if (regex.test(lowered) && matchedGroup === undefined) {
+      matchedGroup = group.trim();
+    }
+  }
+
+  return matchedGroup;
 }
 
 async function resolveContestDirFromConfig(input: string): Promise<vscode.Uri | undefined> {
-  const categoryKey = contestCategoryKey(input);
   for (const config of await getAtcConfigs()) {
     const root = resolvePathFromConfigRoot(config, config.paths.root ?? "");
     if (!root) {
       continue;
     }
 
-    const categoryDir = categoryKey ? (config.paths[categoryKey] ?? "").trim() : "";
+    const categoryDir = contestGroupFor(input, config.contests, config.uri);
     const contestDir = categoryDir ? joinUriPath(root, `${categoryDir}/${input}`) : joinUriPath(root, input);
     if (await isDirectory(contestDir)) {
       return contestDir;
@@ -483,15 +489,6 @@ async function resolveContestDir(input: string): Promise<vscode.Uri | undefined>
   const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
   if (!workspaceFolder) {
     return undefined;
-  }
-
-  const contestIdMatch = /^(abc|arc|agc)\d+$/i.exec(input);
-  if (contestIdMatch) {
-    const group = CONTEST_GROUPS[contestIdMatch[1].toLowerCase()];
-    const contestGroupUri = vscode.Uri.joinPath(workspaceFolder.uri, group, input);
-    if (await isDirectory(contestGroupUri)) {
-      return contestGroupUri;
-    }
   }
 
   const workspaceRelativeUri = joinUriPath(workspaceFolder.uri, input);

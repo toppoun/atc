@@ -41,6 +41,10 @@ except ImportError:
     from templates import load_template
 
 
+class ContestPathConfigError(ValueError):
+    pass
+
+
 def cmd_new(contest: str, lang: Optional[str] = None):
     config = load_config(Path.cwd())
     lang = lang or default_language(config)
@@ -50,7 +54,11 @@ def cmd_new(contest: str, lang: Optional[str] = None):
 def cmd_contest(contest: str, lang: Optional[str] = None):
     config = load_config(Path.cwd())
     lang = lang or default_language(config)
-    contest_dir = resolve_contest_dir(contest, config)
+    try:
+        contest_dir = resolve_contest_dir(contest, config)
+    except ContestPathConfigError as e:
+        error(f"Error: {e}")
+        sys.exit(1)
 
     if contest_dir.exists():
         if not contest_dir.is_dir():
@@ -162,9 +170,23 @@ def write_contest_metadata(contest_id: str, base: Path, lang: str, problems: Lis
     return contest_file
 
 
-def contest_category_key(contest: str) -> Optional[str]:
-    match = re.fullmatch(r"(abc|arc|agc)\d+", contest.lower())
-    return match.group(1) if match else None
+def resolve_contest_group(contest: str, paths: dict) -> Optional[str]:
+    contests = paths.get("contests")
+    if isinstance(contests, dict) and contests:
+        lowered = contest.lower()
+        matched_group = None
+        for pattern, group in contests.items():
+            pattern = str(pattern)
+            try:
+                matched = re.fullmatch(pattern, lowered)
+            except re.error:
+                raise ContestPathConfigError(f"invalid contest path regex: {pattern}")
+            if matched and matched_group is None:
+                matched_group = str(group or "").strip()
+        if matched_group is not None:
+            return matched_group
+
+    return None
 
 
 def resolve_contest_dir(contest: str, config: dict):
@@ -174,8 +196,7 @@ def resolve_contest_dir(contest: str, config: dict):
 
     paths = config.get("paths", {})
     root_path = config_root(config)
-    category_key = contest_category_key(contest)
-    category_dir = str(paths.get(category_key) or "").strip() if category_key else ""
+    category_dir = resolve_contest_group(contest, paths)
 
     if root_path:
         if category_dir:
@@ -209,6 +230,6 @@ def write_current_contest(contest_dir: Path, config: Optional[dict] = None):
 
 
 _create_contest_files = create_contest_files
-_contest_category_key = contest_category_key
+_resolve_contest_group = resolve_contest_group
 _resolve_contest_dir = resolve_contest_dir
 _write_current_contest = write_current_contest

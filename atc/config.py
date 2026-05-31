@@ -29,15 +29,11 @@ WATCH_DEBOUNCE_SECONDS_MAX = 10.0
 CONFIG_FILE_NAME = "config.toml"
 CONFIG_FILE_META_KEY = "__config_file__"
 INTERNAL_CONFIG_KEYS = {CONFIG_FILE_META_KEY}
-LEGACY_ATCODER_CATEGORY_DIRS = {
-    "ABC(Atcoder Beginner Contest)",
-    "ARC(Atcoder Regular Contest)",
-    "AGC(Atcoder Grand Contest)",
-    "ABS(Atcoder Beginner Selection)",
-    "ALPC(AtCoder Library Practice Contest)",
-    "EDPC",
-    "typical90",
-    "tessoku-book",
+DEFAULT_CONTEST_PATH_RULES = {
+    "abc\\d+": "ABC",
+    "arc\\d+": "ARC",
+    "agc\\d+": "AGC",
+    "adt_.*": "ATD",
 }
 
 
@@ -45,14 +41,7 @@ def _default_config() -> dict:
     return {
         "paths": {
             "root": "",
-            "abc": "ABC(Atcoder Beginner Contest)",
-            "arc": "ARC(Atcoder Regular Contest)",
-            "agc": "AGC(Atcoder Grand Contest)",
-            "abs": "ABS(Atcoder Beginner Selection)",
-            "alpc": "ALPC(AtCoder Library Practice Contest)",
-            "edpc": "EDPC",
-            "tessoku": "tessoku-book",
-            "typical90": "typical90",
+            "contests": copy.deepcopy(DEFAULT_CONTEST_PATH_RULES),
         },
         "templates": {
             "py": "templates/template.py",
@@ -75,6 +64,12 @@ def _default_config() -> dict:
             "debounce_seconds": WATCH_DEBOUNCE_SECONDS,
         },
     }
+
+
+def _default_config_template() -> dict:
+    config = _default_config()
+    config["paths"]["root"] = "."
+    return config
 
 
 def _find_config_file(start: Path) -> Optional[Path]:
@@ -119,6 +114,9 @@ def load_config(start: Path = Path.cwd()) -> dict:
         print(f"  {e}")
         sys.exit(1)
 
+    if isinstance(loaded.get("paths"), dict) and "contests" in loaded["paths"]:
+        config["paths"]["contests"] = {}
+
     merged = _deep_merge_config(config, loaded)
     merged[CONFIG_FILE_META_KEY] = str(config_file.resolve())
     return merged
@@ -159,8 +157,6 @@ def _find_project_root(start: Path, config: Optional[dict] = None):
         return config_root
 
     marker_candidate = None
-    category_parent_candidate = None
-
     start = start.resolve()
     home = Path.home().resolve()
     for path in [start, *start.parents]:
@@ -173,13 +169,8 @@ def _find_project_root(start: Path, config: Optional[dict] = None):
         ):
             marker_candidate = path
 
-        if path.name in LEGACY_ATCODER_CATEGORY_DIRS and category_parent_candidate is None:
-            category_parent_candidate = path.parent
-
     if marker_candidate:
         return marker_candidate
-    if category_parent_candidate:
-        return category_parent_candidate
     return start
 
 
@@ -309,18 +300,42 @@ def _toml_value(value):
     return json.dumps(value, ensure_ascii=False)
 
 
+def _toml_key(key):
+    key = str(key)
+    allowed = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
+    if key and all(char in allowed for char in key):
+        return key
+    return json.dumps(key, ensure_ascii=False)
+
+
 def _config_to_toml(config: dict) -> str:
     lines = []
     for section, values in config.items():
         if section in INTERNAL_CONFIG_KEYS:
             continue
-        if lines:
-            lines.append("")
-        lines.append(f"[{section}]")
         if isinstance(values, dict):
-            for key, value in values.items():
-                lines.append(f"{key} = {_toml_value(value)}")
+            scalar_values = [(key, value) for key, value in values.items() if not isinstance(value, dict)]
+            nested_values = [(key, value) for key, value in values.items() if isinstance(value, dict)]
+
+            if scalar_values or not nested_values:
+                if lines:
+                    lines.append("")
+                lines.append(f"[{section}]")
+                for key, value in scalar_values:
+                    lines.append(f"{_toml_key(key)} = {_toml_value(value)}")
+
+            for nested_key, nested in nested_values:
+                if not nested:
+                    continue
+                if lines:
+                    lines.append("")
+                lines.append(f"[{section}.{nested_key}]")
+                for key, value in nested.items():
+                    lines.append(f"{_toml_key(key)} = {_toml_value(value)}")
         else:
+            if lines:
+                lines.append("")
+            lines.append(f"[{section}]")
             lines.append(f"value = {_toml_value(values)}")
     return "\n".join(lines) + "\n"
 
@@ -330,6 +345,7 @@ config_file_path = _config_file_path
 # Public aliases used by feature modules.
 config_root = _config_root
 config_project_root = _config_project_root
+default_config_template = _default_config_template
 find_project_root = _find_project_root
 config_problems = _config_problems
 default_language = _default_language
