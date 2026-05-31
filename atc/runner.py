@@ -15,7 +15,6 @@ try:
         _runner_compile_timeout,
         _runner_cpp_flags,
         _runner_timeout,
-        config_problems,
         load_config,
         resolve_executable,
     )
@@ -29,6 +28,7 @@ try:
         warn,
     )
     from .models import CaseResult, ProblemResult
+    from .problems import resolve_available_problems
 except ImportError:
     from config import (
         SOURCE_EXTS,
@@ -37,7 +37,6 @@ except ImportError:
         _runner_compile_timeout,
         _runner_cpp_flags,
         _runner_timeout,
-        config_problems,
         load_config,
         resolve_executable,
     )
@@ -51,6 +50,7 @@ except ImportError:
         warn,
     )
     from models import CaseResult, ProblemResult
+    from problems import resolve_available_problems
 
 
 LOG_DIR = Path(".atc") / "test-runs"
@@ -61,7 +61,9 @@ def _normalize_problem(problem: str):
 
 
 def _available_problems(cwd: Path, problems: Optional[List[str]] = None):
-    problems = problems or config_problems(load_config(cwd))
+    if problems is None:
+        return resolve_available_problems(cwd, load_config(cwd))
+
     found = []
     for problem in problems:
         has_source = any((cwd / f"{problem}.{ext}").exists() for ext in SOURCE_EXTS)
@@ -388,7 +390,7 @@ def cmd_run(problem: str, run_language: Optional[str] = None):
 def cmd_run_all(run_language: Optional[str] = None):
     cwd = Path.cwd()
     config = load_config(cwd)
-    problems = _available_problems(cwd, config_problems(config))
+    problems = resolve_available_problems(cwd, config)
     if not _run_auto_tests(problems, run_language, reason="manual"):
         sys.exit(1)
 

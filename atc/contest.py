@@ -172,6 +172,9 @@ def write_contest_metadata(contest_id: str, base: Path, lang: str, problems: Lis
 
 def resolve_contest_group(contest: str, paths: dict) -> Optional[str]:
     contests = paths.get("contests")
+    if "contests" in paths and not isinstance(contests, dict):
+        raise ContestPathConfigError("[paths.contests] must be a table.")
+
     if isinstance(contests, dict) and contests:
         lowered = contest.lower()
         matched_group = None

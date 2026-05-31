@@ -77,17 +77,25 @@ language = "cpp"
 problems = ["A", "B", "C", "D", "E"]
 
 [templates]
-manifest = "templates/manifest.json"
-py = "fast"
-cpp = "acl"
+py = "templates/template.py"
+cpp = "templates/template.cpp"
 ```
 
-従来通り、直接テンプレートファイルを指定する形式も使えます。
+コンテストの作成先は `[paths].root` と `[paths.contests]` の正規表現ルールで決まります。
+
+```text
+abc460 -> <root>/ABC/abc460
+adt_all_20260525_1 -> <root>/ATD/adt_all_20260525_1
+unknown -> <root>/unknown
+```
+
+テンプレートを名前で選びたい場合は、manifest 方式も使えます。
 
 ```toml
 [templates]
-py = "templates/template.py"
-cpp = "templates/template.cpp"
+manifest = "templates/manifest.json"
+py = "fast"
+cpp = "acl"
 ```
 
 詳細は [docs/CONFIG.md](docs/CONFIG.md) を見てください。

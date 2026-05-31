@@ -190,7 +190,9 @@ def _doctor_check_config(report: DoctorReport, config: dict, config_file: Option
         report.item("INFO", "paths.root is empty. atc contest will use the current directory.")
 
     contests = paths.get("contests", {})
-    if isinstance(contests, dict) and contests:
+    if "contests" in paths and not isinstance(contests, dict):
+        report.item("ERROR", "[paths.contests] must be a table.")
+    elif isinstance(contests, dict) and contests:
         for pattern, directory in contests.items():
             report.item("OK", f"paths.contests[{pattern!r}]: {directory}")
     else:

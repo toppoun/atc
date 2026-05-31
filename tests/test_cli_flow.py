@@ -167,6 +167,24 @@ def test_cli_run_all_writes_log_and_rerun_failed_problem(tmp_path):
     assert failed_path.read_text(encoding="utf-8") == ""
 
 
+def test_cli_config_init_writes_paths_contests_without_legacy_paths(tmp_path):
+    result = _run_cli(tmp_path, "config", "init")
+    _assert_success(result)
+
+    config_text = (tmp_path / ".atc" / "config.toml").read_text(encoding="utf-8")
+    assert "[paths.contests]" in config_text
+    assert '"abc\\\\d+" = "ABC"' in config_text
+    assert '"arc\\\\d+" = "ARC"' in config_text
+    assert '"agc\\\\d+" = "AGC"' in config_text
+    assert '"adt_.*" = "ATD"' in config_text
+    for legacy_key in [
+        'abc = "ABC(Atcoder Beginner Contest)"',
+        'arc = "ARC(Atcoder Regular Contest)"',
+        'agc = "AGC(Atcoder Grand Contest)"',
+    ]:
+        assert legacy_key not in config_text
+
+
 def test_cli_config_doctor_broken_config_reports_error(tmp_path):
     atc_dir = tmp_path / ".atc"
     atc_dir.mkdir(parents=True)
@@ -180,6 +198,27 @@ def test_cli_config_doctor_broken_config_reports_error(tmp_path):
 
     assert "ERROR" in combined
     assert "config" in combined.lower() or "toml" in combined.lower()
+
+
+def test_cli_config_doctor_non_table_paths_contests_reports_error(tmp_path):
+    atc_dir = tmp_path / ".atc"
+    atc_dir.mkdir(parents=True)
+    (atc_dir / "config.toml").write_text(
+        "\n".join(
+            [
+                "[paths]",
+                f'root = "{tmp_path.as_posix()}"',
+                'contests = "ATD"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_cli(tmp_path, "config", "doctor")
+    combined = _assert_error_without_traceback(result)
+
+    assert "[paths.contests] must be a table." in combined
 
 
 def test_cli_config_doctor_broken_template_manifest_reports_error(tmp_path):

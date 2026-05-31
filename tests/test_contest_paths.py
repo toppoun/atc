@@ -78,6 +78,40 @@ def test_resolve_contest_dir_preserves_paths_contests_order_from_toml(tmp_path, 
     assert resolve_contest_dir("abc459", config) == tmp_path / "ABC" / "abc459"
 
 
+def test_resolve_contest_dir_uses_config_init_style_paths_contests(tmp_path, monkeypatch):
+    monkeypatch.setattr(config_module.Path, "home", lambda: tmp_path / "home")
+    atc_dir = tmp_path / ".atc"
+    atc_dir.mkdir()
+    (atc_dir / "config.toml").write_text(
+        "\n".join(
+            [
+                "[paths]",
+                f'root = "{tmp_path.as_posix()}"',
+                "",
+                "[paths.contests]",
+                '"abc\\\\d+" = "ABC"',
+                '"arc\\\\d+" = "ARC"',
+                '"agc\\\\d+" = "AGC"',
+                '"adt_.*" = "ATD"',
+                "",
+                "[templates]",
+                'py = "templates/template.py"',
+                'cpp = "templates/template.cpp"',
+                "",
+                "[defaults]",
+                'language = "cpp"',
+                'problems = ["A", "B", "C", "D", "E"]',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    config = config_module.load_config(tmp_path)
+
+    assert resolve_contest_dir("abc460", config) == tmp_path / "ABC" / "abc460"
+    assert resolve_contest_dir("adt_all_20260525_1", config) == tmp_path / "ATD" / "adt_all_20260525_1"
+
+
 def test_resolve_contest_dir_uses_fullmatch_for_paths_contests(tmp_path):
     config = _config(tmp_path, {"contests": {"abc\\d+": "ABC"}})
 
@@ -112,6 +146,13 @@ def test_resolve_contest_dir_reports_invalid_paths_contests_regex(tmp_path):
 
     with pytest.raises(ContestPathConfigError, match=r"invalid contest path regex: abc\("):
         resolve_contest_dir("abc460", config)
+
+
+def test_resolve_contest_dir_reports_non_table_paths_contests(tmp_path):
+    config = _config(tmp_path, {"contests": "ATD"})
+
+    with pytest.raises(ContestPathConfigError, match=r"\[paths\.contests\] must be a table\."):
+        resolve_contest_dir("adt_all_20260525_1", config)
 
 
 def test_resolve_contest_dir_reports_invalid_paths_contests_regex_after_match(tmp_path):

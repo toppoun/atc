@@ -4,11 +4,13 @@ from typing import Dict, List, Optional, Set
 
 try:
     from .console import print_text, print_watch_header
-    from .config import SOURCE_EXTS, config_problems, load_config, watch_settings
+    from .config import SOURCE_EXTS, load_config, watch_settings
+    from .problems import resolve_available_problems
     from .runner import LOG_DIR, available_problems, normalize_problem, run_auto_tests
 except ImportError:
     from console import print_text, print_watch_header
-    from config import SOURCE_EXTS, config_problems, load_config, watch_settings
+    from config import SOURCE_EXTS, load_config, watch_settings
+    from problems import resolve_available_problems
     from runner import LOG_DIR, available_problems, normalize_problem, run_auto_tests
 
 
@@ -39,7 +41,8 @@ def _watch_snapshot(cwd: Path, problems: Optional[List[str]] = None):
 
 
 def _watch_paths(cwd: Path, problems: Optional[List[str]] = None):
-    problems = problems or config_problems(load_config(cwd))
+    if problems is None:
+        problems = resolve_available_problems(cwd, load_config(cwd))
     for problem in problems:
         for ext in SOURCE_EXTS:
             source = cwd / f"{problem}.{ext}"
@@ -71,7 +74,8 @@ def _changed_paths(before: Dict[Path, tuple], after: Dict[Path, tuple]):
 
 
 def _problem_from_changed_path(cwd: Path, path: Path, problems: Optional[List[str]] = None):
-    problems = problems or config_problems(load_config(cwd))
+    if problems is None:
+        problems = resolve_available_problems(cwd, load_config(cwd))
     problem_set = set(problems)
 
     try:
@@ -97,7 +101,8 @@ def _problem_from_changed_path(cwd: Path, path: Path, problems: Optional[List[st
 def _changed_problems(cwd: Path, paths: Set[Path], selected: List[str], problems: Optional[List[str]] = None):
     selected_set = set(selected)
     changed = set()
-    problems = problems or config_problems(load_config(cwd))
+    if problems is None:
+        problems = resolve_available_problems(cwd, load_config(cwd))
 
     for path in paths:
         problem = _problem_from_changed_path(cwd, path, problems)
@@ -114,7 +119,7 @@ def _changed_problems(cwd: Path, paths: Set[Path], selected: List[str], problems
 def cmd_watch(args):
     cwd = Path.cwd()
     config = load_config(cwd)
-    configured_problems = config_problems(config)
+    resolved_problems = resolve_available_problems(cwd, config)
     poll_seconds, debounce_seconds, _watch_warnings = watch_settings(config)
     run_language = None
     selected = []
@@ -128,8 +133,8 @@ def cmd_watch(args):
         else:
             selected.append(normalize_problem(arg))
 
-    watch_problems = selected or configured_problems
-    problems = selected or available_problems(cwd, configured_problems)
+    watch_problems = selected or resolved_problems
+    problems = selected or resolved_problems
     print_watch_header(cwd, poll_seconds, debounce_seconds, LOG_DIR / "last.log", problems)
     run_auto_tests(problems, run_language, reason="initial", display_mode="watch")
 

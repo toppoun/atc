@@ -25,9 +25,8 @@ root = "."
 "adt_.*" = "ATD"
 
 [templates]
-manifest = "templates/manifest.json"
-py = "fast"
-cpp = "acl"
+py = "templates/template.py"
+cpp = "templates/template.cpp"
 
 [defaults]
 language = "cpp"
@@ -70,8 +69,9 @@ root = "."
 
 ### `paths.contests`
 
-contest ID に応じたカテゴリフォルダを正規表現で指定できます。
-上から順に `re.fullmatch()` で照合し、最初に一致したルールを使います。
+contest ID に応じたカテゴリフォルダを決める regex map です。
+上から順に `re.fullmatch(pattern, contest_id.lower())` で照合し、最初に一致した保存先を使います。
+どのルールにも一致しない contest ID は root 直下に作られます。
 
 ```toml
 [paths]
@@ -86,13 +86,32 @@ root = "/Users/friend/atcoder"
 
 この場合、`atc contest abc335 cpp` は `/Users/friend/atcoder/ABC/abc335` を使い、`atc contest adt_all_20260525_1 cpp` は `/Users/friend/atcoder/ATD/adt_all_20260525_1` を使います。
 
-どのルールにも一致しない contest ID は root 直下に作られます。
+`"abc\\d+"` は Python の正規表現としては `abc\d+` です。TOML 文字列内では `\` をエスケープするため、`\\d+` と書きます。
+
+例:
+
+```text
+abc460             -> "abc\\d+" に一致
+abc460_extra       -> "abc\\d+" に一致しない
+adt_all_20260525_1 -> "adt_.*" に一致
+```
+
+不正な正規表現はエラーになります。
+
+```toml
+[paths.contests]
+"abc(" = "ABC"
+```
+
+```text
+Error: invalid contest path regex: abc(
+```
 
 ## `[templates]`
 
 問題ファイル作成時のテンプレートです。
 
-### manifest 方式
+### manifest 方式の応用例
 
 ```toml
 [templates]
@@ -148,14 +167,21 @@ language = "cpp"
 
 ### `defaults.problems`
 
-作成・取得・watch 対象の問題一覧です。
+問題一覧を自動解決できない場合の最後の fallback です。
 
 ```toml
 [defaults]
 problems = ["A", "B", "C", "D", "E"]
 ```
 
-F 以降を使う場合は増やしてください。
+`atc contest` / `atc c` は AtCoder の tasks ページから取得した問題一覧を `.atc/contest.toml` に保存します。
+`atc run all` と `atc watch` は、通常はその metadata の `[[problems]]` を優先し、metadata がない場合は `A.py` / `A.cpp` など実在する source files から対象を推測します。
+`defaults.problems` は metadata も source files もない場合だけ使われます。
+
+`atc manual tests` も metadata がある場合は `[[problems]].url` を使います。
+metadata がない場合は source files または `defaults.problems` の問題記号から従来どおり URL を推測します。
+
+古い contest フォルダや手動作成フォルダで F 以降を fallback 対象にしたい場合は増やしてください。
 
 ```toml
 problems = ["A", "B", "C", "D", "E", "F"]
@@ -206,6 +232,6 @@ debounce_seconds = 2.0
 
 ## VS Code 拡張機能との関係
 
-VS Code 拡張機能は主に `[paths]` を読み、`.atc/current-contest.json` の場所を決めます。
+VS Code 拡張機能は主に `[paths].root` と `[paths.contests]` を読み、`.atc/current-contest.json` の場所を決めます。
 
 config を変更した場合は、VS Code で `Developer: Reload Window` を実行するか、VS Code を再起動してください。
