@@ -185,6 +185,24 @@ def test_cli_config_init_writes_paths_contests_without_legacy_paths(tmp_path):
         assert legacy_key not in config_text
 
 
+def test_cli_without_args_prints_categorized_usage(tmp_path):
+    result = _run_cli(tmp_path)
+    combined = _assert_error_without_traceback(result)
+
+    assert "AtC" in combined
+    assert "Contest" in combined
+    assert "Run" in combined
+    assert "Config" in combined
+    assert "Stress" in combined
+    assert "Manual" in combined
+    assert "Visual" in combined
+    assert "atc contest" in combined
+    assert "atc run" in combined
+    assert "atc config doctor" in combined
+    assert "atc visual [options]" in combined
+    assert "--live-preview-url" not in combined
+
+
 def test_cli_config_doctor_broken_config_reports_error(tmp_path):
     atc_dir = tmp_path / ".atc"
     atc_dir.mkdir(parents=True)

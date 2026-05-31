@@ -1,4 +1,4 @@
-from atc.commands import resolve_command, usage_lines
+from atc.commands import resolve_command, usage_lines, usage_sections
 
 
 def test_resolve_command_aliases():
@@ -38,3 +38,22 @@ def test_usage_lines_include_main_commands():
     assert "atc stress promote A" in usage
     assert "atc visual" in usage
     assert "atc manual" in usage
+
+
+def test_usage_sections_group_main_commands():
+    parts = []
+    for title, rows in usage_sections():
+        parts.append(title)
+        parts.extend(command for command, _description in rows)
+    usage = "\n".join(parts)
+
+    assert "AtC" not in usage
+    assert "Contest" in usage
+    assert "Run" in usage
+    assert "Config" in usage
+    assert "Stress" in usage
+    assert "Manual" in usage
+    assert "Visual" in usage
+    assert "atc contest" in usage
+    assert "atc run" in usage
+    assert "atc config doctor" in usage

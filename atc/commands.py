@@ -328,3 +328,62 @@ def usage_lines() -> List[str]:
     for spec in COMMANDS:
         lines.extend(spec.usage)
     return lines
+
+
+USAGE_SECTIONS: Tuple[Tuple[str, Tuple[Tuple[str, str], ...]], ...] = (
+    (
+        "Contest",
+        (
+            ("atc contest <contest> [py|cpp]", "Create/open contest"),
+            ("atc new <contest> [py|cpp]", "Create contest files"),
+        ),
+    ),
+    (
+        "Run",
+        (
+            ("atc run <A|all> [python|pypy|cpp]", "Run tests"),
+            ("atc rerun [python|pypy|cpp]", "Rerun last failed case"),
+            ("atc watch [A] [python|pypy|cpp]", "Watch and run on save"),
+        ),
+    ),
+    (
+        "Config",
+        (
+            ("atc config show", "Show resolved config"),
+            ("atc config init", "Create config file"),
+            ("atc config doctor", "Diagnose environment"),
+        ),
+    ),
+    (
+        "Template",
+        (
+            ("atc template list [py|cpp|stress]", "List templates"),
+            ("atc template show <kind> <name>", "Show template content"),
+        ),
+    ),
+    (
+        "Stress",
+        (
+            ("atc stress A [py|cpp] [--count N] [--seed S]", "Run stress test"),
+            ("atc stress init A", "Create stress files"),
+            ("atc stress promote A [--name NAME] [--force]", "Promote failed case"),
+        ),
+    ),
+    (
+        "Manual",
+        (
+            ("atc manual A B C", "Create manual problems"),
+            ("atc manual tests", "Download samples for current folder contest"),
+        ),
+    ),
+    (
+        "Visual",
+        (
+            ("atc visual [options]", "Start visualizer"),
+        ),
+    ),
+)
+
+
+def usage_sections() -> List[Tuple[str, List[Tuple[str, str]]]]:
+    return [(title, list(rows)) for title, rows in USAGE_SECTIONS]
