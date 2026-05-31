@@ -157,7 +157,7 @@ def test_watch_display_mode_prints_compact_success_summary(capsys):
     print_auto_summary([result], LOG_DIR / "last.log", display_mode="watch")
 
     output = capsys.readouterr().out
-    assert "PASS A: 1 tests" in output
+    assert "PASS A: 1/1 AC" in output
     assert "Test Results" not in output
     assert "Full log" not in output
 
@@ -180,11 +180,37 @@ def test_watch_display_mode_prints_compact_failure_summary(capsys):
     print_auto_summary([failed], LOG_DIR / "last.log", display_mode="watch")
 
     output = capsys.readouterr().out
-    assert "FAIL A: sample-1.in WA" in output
-    assert "Result: 0/1 AC" in output
-    assert "Run `atc test A` for details." in output
+    assert "FAIL A: 0/1 AC" in output
+    assert "sample-1.in" not in output
+    assert "Run `atc test A` for details." not in output
     assert "Test Results" not in output
     assert "Full log" not in output
+
+
+def test_watch_auto_tests_prints_two_line_summary_without_details(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+
+    def fake_run_problem_tests(problem, run_language, show_compile=False):
+        return ProblemResult(
+            problem=problem,
+            mode="py",
+            cases=[
+                CaseResult(name=f"sample-{i}.in", status="WA", elapsed_ms=1.0, expected="ok", output="ng")
+                for i in range(1, 5)
+            ],
+        )
+
+    monkeypatch.setattr(runner_module, "run_problem_tests", fake_run_problem_tests)
+
+    passed = runner_module.run_auto_tests(["A"], "python", reason="changed", display_mode="watch")
+
+    output = capsys.readouterr().out
+    assert passed is False
+    assert "changed: A" in output
+    assert "FAIL A: 0/4 AC" in output
+    assert "changed: running A" not in output
+    assert "sample-1.in" not in output
+    assert "Run `atc test A` for details." not in output
 
 
 def test_run_problem_tests_python_minimal_ac_case(tmp_path, monkeypatch):

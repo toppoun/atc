@@ -220,27 +220,10 @@ def print_watch_result(
     failed_items: Sequence[Tuple[str, str, str]],
 ) -> None:
     if not failed_items:
-        print_text(f"PASS {problems}: {total_cases} tests in {duration}", style="green")
+        print_text(f"PASS {problems}: {passed_cases}/{total_cases} AC", style="green")
         return
 
-    single_problem = "," not in problems
-    details = []
-    for problem, status, detail in failed_items[:3]:
-        if status in {"WA", "RE", "TLE", "CE"}:
-            details.append(f"{detail} {status}" if single_problem else f"{problem}: {detail} {status}")
-        else:
-            detail_text = f"{status} {detail}".rstrip()
-            details.append(detail_text if single_problem else f"{problem}: {detail_text}")
-
-    print_text(f"FAIL {problems}: {'; '.join(details)}", style="red")
-    print_text(f"Result: {passed_cases}/{total_cases} AC", style="red")
-    if len(failed_items) > 3:
-        print_text(f"... and {len(failed_items) - 3} more")
-
-    if single_problem and problems:
-        print_text(f"Run `atc test {problems}` for details.")
-    else:
-        print_text("Run `atc test <problem>` for details.")
+    print_text(f"FAIL {problems}: {passed_cases}/{total_cases} AC", style="red")
 
 
 def print_watch_header(cwd: Path, poll_seconds: float, debounce_seconds: float, log_path: Path, problems: Sequence[str]) -> None:

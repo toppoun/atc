@@ -433,7 +433,10 @@ def _run_auto_tests(problems: List[str], run_language: Optional[str] = None, rea
 
     label = ",".join(problems)
     prefix = f"{reason}: " if reason else ""
-    print_text(f"{prefix}running {label} ...")
+    if display_mode == "watch":
+        print_text(f"{prefix}{label}")
+    else:
+        print_text(f"{prefix}running {label} ...")
     results = [run_problem_tests(problem, run_language, show_compile=False) for problem in problems]
     log_path = _write_test_log(results)
     _print_auto_summary(results, log_path, display_mode=display_mode)
