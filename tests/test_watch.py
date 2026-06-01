@@ -1,6 +1,13 @@
 import atc.watch as watch_module
-from atc.console import print_watch_header
-from atc.watch import _changed_problems, _problem_from_changed_path
+from atc.models import CaseResult, ProblemResult
+from atc.watch import (
+    WatchState,
+    _changed_problems,
+    _problem_from_changed_path,
+    _problem_to_run_after_change,
+    _run_watch_loop,
+    build_watch_view,
+)
 
 
 ADT_INDEXES = list("ABCDEFGHI")
@@ -19,6 +26,7 @@ def _write_contest_metadata(contest_dir, indexes=ADT_INDEXES):
             [
                 "[[problems]]",
                 f'index = "{index}"',
+                f'title = "Problem {index}"',
                 f'url = "https://atcoder.jp/contests/adt_easy_20260525_1/tasks/task_{index.lower()}"',
                 f'source = "{index}.py"',
                 f'tests = "tests/{index}"',
@@ -78,98 +86,135 @@ def test_changed_problems_filters_selected_problem(tmp_path):
     assert changed == ["A"]
 
 
-def test_cmd_watch_without_args_uses_metadata_problem_list(tmp_path, monkeypatch):
+def _disable_live(monkeypatch):
+    monkeypatch.setattr(watch_module, "Live", None)
+    monkeypatch.setattr(watch_module, "RICH_AVAILABLE", False)
+
+
+def _passed_result(problem):
+    return ProblemResult(
+        problem=problem,
+        mode="py",
+        cases=[CaseResult(name="sample-1.in", status="AC", elapsed_ms=1.0, expected="", output="")],
+        duration_ms=1.0,
+    )
+
+
+def _render_text(renderable):
+    if isinstance(renderable, str):
+        return renderable
+    from rich.console import Console
+
+    test_console = Console(record=True, width=120)
+    test_console.print(renderable)
+    return test_console.export_text()
+
+
+def test_cmd_watch_without_args_does_not_initial_run_all(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     _write_contest_metadata(tmp_path)
     calls = []
 
-    def fake_run_auto_tests(problems, run_language, reason="", display_mode="normal"):
-        calls.append((problems, run_language, reason, display_mode))
-        return True
-
     def stop_watch(_seconds):
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(watch_module, "run_auto_tests", fake_run_auto_tests)
+    _disable_live(monkeypatch)
+    monkeypatch.setattr(watch_module, "run_problem_tests", lambda *args, **kwargs: calls.append(args))
     monkeypatch.setattr(watch_module, "_watch_snapshot", lambda cwd, problems=None: {})
     monkeypatch.setattr(watch_module.time, "sleep", stop_watch)
 
     watch_module.cmd_watch([])
 
-    assert calls[0] == (ADT_INDEXES, None, "initial", "watch")
-
-
-def test_cmd_watch_without_args_uses_lazy_mode_for_many_metadata_problems(tmp_path, monkeypatch, capsys):
-    monkeypatch.chdir(tmp_path)
-    _write_contest_metadata(tmp_path, MANY_INDEXES)
-    calls = []
-
-    def stop_watch(_seconds):
-        raise KeyboardInterrupt
-
-    monkeypatch.setattr(watch_module, "run_auto_tests", lambda *args, **kwargs: calls.append((args, kwargs)))
-    monkeypatch.setattr(watch_module, "_watch_snapshot", lambda cwd, problems=None: {})
-    monkeypatch.setattr(watch_module.time, "sleep", stop_watch)
-
-    result = watch_module.cmd_watch([])
-    output = capsys.readouterr().out
-
-    assert result is None
     assert calls == []
-    assert "50 problems" in output
-    assert "lazy" in output
-    assert "skipped" in output
-    assert "Please specify a problem:" not in output
 
 
-def test_cmd_watch_explicit_problem_uses_only_that_problem_with_many_metadata(tmp_path, monkeypatch):
+def test_cmd_watch_runs_changed_problem_only(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    _write_contest_metadata(tmp_path)
+    source = tmp_path / "D.py"
+    calls = []
+    snapshots = [
+        {},
+        {source: (1, 1)},
+        {source: (1, 1)},
+    ]
+    sleep_calls = 0
+
+    def fake_run_problem_tests(problem, run_language, show_compile=False):
+        calls.append((problem, run_language, show_compile))
+        return _passed_result(problem)
+
+    def fake_snapshot(cwd, problems=None):
+        return snapshots.pop(0)
+
+    def fake_sleep(_seconds):
+        nonlocal sleep_calls
+        sleep_calls += 1
+        if sleep_calls >= 3:
+            raise KeyboardInterrupt
+
+    _disable_live(monkeypatch)
+    monkeypatch.setattr(watch_module, "run_problem_tests", fake_run_problem_tests)
+    monkeypatch.setattr(watch_module, "_watch_snapshot", fake_snapshot)
+    monkeypatch.setattr(watch_module, "watch_settings", lambda config: (0.01, 0.0, []))
+    monkeypatch.setattr(watch_module.time, "sleep", fake_sleep)
+    monkeypatch.setattr(watch_module.time, "perf_counter", lambda: sleep_calls)
+
+    watch_module.cmd_watch([])
+
+    assert calls == [("D", None, False)]
+
+
+def test_cmd_watch_explicit_problem_runs_initial_once(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     _write_contest_metadata(tmp_path, MANY_INDEXES)
     calls = []
 
-    def fake_run_auto_tests(problems, run_language, reason="", display_mode="normal"):
-        calls.append((problems, run_language, reason, display_mode))
-        return True
+    def fake_run_problem_tests(problem, run_language, show_compile=False):
+        calls.append((problem, run_language, show_compile))
+        return _passed_result(problem)
 
     def stop_watch(_seconds):
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(watch_module, "run_auto_tests", fake_run_auto_tests)
+    _disable_live(monkeypatch)
+    monkeypatch.setattr(watch_module, "run_problem_tests", fake_run_problem_tests)
     monkeypatch.setattr(watch_module, "_watch_snapshot", lambda cwd, problems=None: {})
     monkeypatch.setattr(watch_module.time, "sleep", stop_watch)
 
     watch_module.cmd_watch(["A01"])
 
-    assert calls[0] == (["A01"], None, "initial", "watch")
+    assert calls == [("A01", None, False)]
 
 
-def test_cmd_watch_all_uses_all_many_metadata_problems(tmp_path, monkeypatch):
+def test_cmd_watch_all_is_deprecated(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     _write_contest_metadata(tmp_path, MANY_INDEXES)
     calls = []
 
-    def fake_run_auto_tests(problems, run_language, reason="", display_mode="normal"):
-        calls.append((problems, run_language, reason, display_mode))
-        return True
-
-    def stop_watch(_seconds):
-        raise KeyboardInterrupt
-
-    monkeypatch.setattr(watch_module, "run_auto_tests", fake_run_auto_tests)
-    monkeypatch.setattr(watch_module, "_watch_snapshot", lambda cwd, problems=None: {})
-    monkeypatch.setattr(watch_module.time, "sleep", stop_watch)
+    monkeypatch.setattr(watch_module, "run_problem_tests", lambda *args, **kwargs: calls.append(args))
 
     watch_module.cmd_watch(["--all"])
-
-    assert calls[0] == (MANY_INDEXES, None, "initial", "watch")
-
-
-def test_watch_header_summarizes_many_problems(tmp_path, capsys):
-    print_watch_header(tmp_path, 0.25, 1.5, tmp_path / ".atc" / "test-runs" / "last.log", MANY_INDEXES)
     output = capsys.readouterr().out
 
-    assert "50 problems" in output
-    assert "A01,A02,A03" not in output
+    assert calls == []
+    assert "deprecated" in output
+    assert "atc test all" in output
+
+
+def test_cmd_watch_all_word_is_deprecated(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    _write_contest_metadata(tmp_path, MANY_INDEXES)
+    calls = []
+
+    monkeypatch.setattr(watch_module, "run_problem_tests", lambda *args, **kwargs: calls.append(args))
+
+    watch_module.cmd_watch(["all"])
+    output = capsys.readouterr().out
+
+    assert calls == []
+    assert "deprecated" in output
+    assert "atc test all" in output
 
 
 def test_cmd_watch_explicit_problem_runs_after_changed_source(tmp_path, monkeypatch):
@@ -184,9 +229,9 @@ def test_cmd_watch_explicit_problem_runs_after_changed_source(tmp_path, monkeypa
     ]
     sleep_calls = 0
 
-    def fake_run_auto_tests(problems, run_language, reason="", display_mode="normal"):
-        calls.append((problems, run_language, reason, display_mode))
-        return True
+    def fake_run_problem_tests(problem, run_language, show_compile=False):
+        calls.append((problem, run_language, show_compile))
+        return _passed_result(problem)
 
     def fake_snapshot(cwd, problems=None):
         return snapshots.pop(0)
@@ -197,7 +242,8 @@ def test_cmd_watch_explicit_problem_runs_after_changed_source(tmp_path, monkeypa
         if sleep_calls >= 3:
             raise KeyboardInterrupt
 
-    monkeypatch.setattr(watch_module, "run_auto_tests", fake_run_auto_tests)
+    _disable_live(monkeypatch)
+    monkeypatch.setattr(watch_module, "run_problem_tests", fake_run_problem_tests)
     monkeypatch.setattr(watch_module, "_watch_snapshot", fake_snapshot)
     monkeypatch.setattr(watch_module, "watch_settings", lambda config: (0.01, 0.0, []))
     monkeypatch.setattr(watch_module.time, "sleep", fake_sleep)
@@ -205,8 +251,8 @@ def test_cmd_watch_explicit_problem_runs_after_changed_source(tmp_path, monkeypa
 
     watch_module.cmd_watch(["A01"])
 
-    assert calls[0] == (["A01"], None, "initial", "watch")
-    assert calls[1] == (["A01"], None, "changed", "watch")
+    assert calls[0] == ("A01", None, False)
+    assert calls[1] == ("A01", None, False)
 
 
 def test_cmd_watch_many_without_args_runs_changed_problem_after_skipped_initial(tmp_path, monkeypatch):
@@ -221,9 +267,9 @@ def test_cmd_watch_many_without_args_runs_changed_problem_after_skipped_initial(
     ]
     sleep_calls = 0
 
-    def fake_run_auto_tests(problems, run_language, reason="", display_mode="normal"):
-        calls.append((problems, run_language, reason, display_mode))
-        return True
+    def fake_run_problem_tests(problem, run_language, show_compile=False):
+        calls.append((problem, run_language, show_compile))
+        return _passed_result(problem)
 
     def fake_snapshot(cwd, problems=None):
         return snapshots.pop(0)
@@ -234,7 +280,8 @@ def test_cmd_watch_many_without_args_runs_changed_problem_after_skipped_initial(
         if sleep_calls >= 3:
             raise KeyboardInterrupt
 
-    monkeypatch.setattr(watch_module, "run_auto_tests", fake_run_auto_tests)
+    _disable_live(monkeypatch)
+    monkeypatch.setattr(watch_module, "run_problem_tests", fake_run_problem_tests)
     monkeypatch.setattr(watch_module, "_watch_snapshot", fake_snapshot)
     monkeypatch.setattr(watch_module, "watch_settings", lambda config: (0.01, 0.0, []))
     monkeypatch.setattr(watch_module.time, "sleep", fake_sleep)
@@ -242,4 +289,126 @@ def test_cmd_watch_many_without_args_runs_changed_problem_after_skipped_initial(
 
     watch_module.cmd_watch([])
 
-    assert calls == [(["A01"], None, "changed", "watch")]
+    assert calls == [("A01", None, False)]
+
+
+def test_problem_to_run_after_config_change_uses_last_problem(tmp_path):
+    problem = _problem_to_run_after_change(
+        tmp_path,
+        {tmp_path / ".atc" / "config.toml"},
+        [],
+        ["A", "B"],
+        "B",
+    )
+
+    assert problem == "B"
+
+
+def test_watch_renderer_shows_sample_table_and_title(tmp_path):
+    result = ProblemResult(
+        problem="E",
+        mode="py",
+        cases=[CaseResult(name="sample-1.in", status="AC", elapsed_ms=58.79, expected="", output="")],
+        duration_ms=20000,
+    )
+    state = WatchState(
+        cwd=tmp_path,
+        problems=["E"],
+        problem="E",
+        title="hello",
+        result=result,
+        message="",
+    )
+
+    output = _render_text(build_watch_view(state))
+
+    assert "E - hello" in output
+    assert "Case" in output
+    assert "Result" in output
+    assert "Time" in output
+    assert "sample-1.in" in output
+    assert "AC" in output
+
+
+def test_watch_renderer_shows_zero_elapsed_after_update(tmp_path):
+    result = _passed_result("E")
+    state = WatchState(
+        cwd=tmp_path,
+        problems=["E"],
+        problem="E",
+        title="hello",
+        result=result,
+        updated_at=100.0,
+        message="",
+    )
+
+    output = _render_text(build_watch_view(state, now=100.0))
+
+    assert "E - hello (0s)" in output
+
+
+def test_watch_renderer_elapsed_increases_from_updated_at(tmp_path):
+    result = _passed_result("E")
+    state = WatchState(
+        cwd=tmp_path,
+        problems=["E"],
+        problem="E",
+        title="hello",
+        result=result,
+        updated_at=100.0,
+        message="",
+    )
+
+    output = _render_text(build_watch_view(state, now=120.0))
+
+    assert "E - hello (20s)" in output
+
+
+def test_watch_renderer_handles_missing_metadata_title(tmp_path):
+    result = _passed_result("E")
+    state = WatchState(cwd=tmp_path, problems=["E"], problem="E", result=result, message="")
+
+    output = _render_text(build_watch_view(state))
+
+    assert "E" in output
+    assert "Problem E" not in output
+
+
+def test_watch_renderer_handles_problem_error_status(tmp_path):
+    result = ProblemResult(problem="A", mode="cpp", error_status="CE", error_message="compile failed")
+    state = WatchState(cwd=tmp_path, problems=["A"], problem="A", result=result, message="")
+
+    output = _render_text(build_watch_view(state))
+
+    assert "CE" in output
+    assert "compile failed" in output
+
+
+def test_watch_loop_tick_does_not_run_problem_without_changes(tmp_path, monkeypatch):
+    run_calls = []
+    tick_calls = []
+    sleep_calls = 0
+
+    monkeypatch.setattr(watch_module, "_watch_snapshot", lambda cwd, problems=None: {})
+
+    def fake_sleep(_seconds):
+        nonlocal sleep_calls
+        sleep_calls += 1
+        if sleep_calls >= 3:
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(watch_module.time, "sleep", fake_sleep)
+    monkeypatch.setattr(watch_module.time, "monotonic", lambda: float(sleep_calls))
+
+    _run_watch_loop(
+        tmp_path,
+        ["A"],
+        [],
+        0.01,
+        0.0,
+        lambda problem: run_calls.append(problem),
+        on_tick=lambda now: tick_calls.append(now),
+    )
+
+    assert run_calls == []
+    assert tick_calls == [1.0, 2.0]

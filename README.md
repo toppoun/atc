@@ -58,7 +58,7 @@ atc config doctor
 
 詳しい使い方は [docs/USAGE.md](docs/USAGE.md) を見てください。
 
-tessoku-book のような大量問題集では、`atc watch` は initial run を skip し、保存した問題だけを実行します。全問題を対象にしたい場合は `atc watch --all` を使います。
+`atc watch` は保存した1問の sample 結果を固定表示で更新します。全問題をまとめて確認したい場合は `atc test all` を使います。
 
 ## config
 
