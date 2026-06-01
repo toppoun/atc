@@ -227,6 +227,9 @@ function parseAtcConfig(content) {
             throw new Error(`line ${lineNumber}: invalid [paths.contests] syntax`);
         }
         if (section === "paths") {
+            if (keyValueMatch[1] === "contests") {
+                throw new Error("[paths.contests] must be a table.");
+            }
             paths[keyValueMatch[1]] = parseTomlStringValue(keyValueMatch[2], lineNumber);
         }
         else {

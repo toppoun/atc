@@ -86,6 +86,7 @@ atc retry
 ```bash
 atc watch
 atc watch A
+atc watch --all
 atc watch A cpp
 atc watch all
 atc w
@@ -99,6 +100,29 @@ atc auto
 - config やビルド関連ファイルが変わった場合は検出できる問題をまとめて再実行
 - ログは `.atc/test-runs/last.log`
 - 失敗ケースは `.atc/test-runs/last_failed.txt`
+
+起動時の initial run は問題数によって変わります。
+
+- 少数問題では、`atc watch` は検出できる問題を initial run します。
+- tessoku-book / typical90 のような大量問題集では、`atc watch` は lazy mode で起動し、initial run を skip します。
+- lazy mode でも watch は終了せず、`A01.py` / `A01.cpp` など保存された問題だけを自動実行します。
+- `atc watch A01` のように明示した場合は、A01 だけ initial run し、保存時も A01 だけ実行します。
+- `atc watch --all` または `atc watch all` は、全問題を対象にし、initial run も明示的に許可します。
+
+大量問題集では、起動時に次のような短い表示になります。
+
+```text
+problems 151 problems
+mode     lazy
+initial  skipped
+```
+
+この状態で `A01.py` を保存すると、A01 だけが実行されます。
+
+```text
+changed: A01
+PASS A01: 3/3 AC
+```
 
 終了は `Ctrl+C` です。
 

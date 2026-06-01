@@ -58,6 +58,8 @@ atc config doctor
 
 詳しい使い方は [docs/USAGE.md](docs/USAGE.md) を見てください。
 
+tessoku-book のような大量問題集では、`atc watch` は initial run を skip し、保存した問題だけを実行します。全問題を対象にしたい場合は `atc watch --all` を使います。
+
 ## config
 
 `.atc/config.toml` の例:

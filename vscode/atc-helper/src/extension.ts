@@ -269,6 +269,9 @@ function parseAtcConfig(content: string): ParsedAtcConfig {
     }
 
     if (section === "paths") {
+      if (keyValueMatch![1] === "contests") {
+        throw new Error("[paths.contests] must be a table.");
+      }
       paths[keyValueMatch![1]] = parseTomlStringValue(keyValueMatch![2], lineNumber);
     } else {
       if (!contests) {

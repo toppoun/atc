@@ -3,13 +3,13 @@ from pathlib import Path
 
 try:
     from .config import default_language, load_config
-    from .console import GREEN, color_text, error, ok as print_ok
+    from .console import GREEN, color_text, error, ok as print_ok, warn
     from .problems import resolve_sample_download_problems
     from .samples import download_samples
     from .templates import load_template
 except ImportError:
     from config import default_language, load_config
-    from console import GREEN, color_text, error, ok as print_ok
+    from console import GREEN, color_text, error, ok as print_ok, warn
     from problems import resolve_sample_download_problems
     from samples import download_samples
     from templates import load_template
@@ -56,6 +56,12 @@ def cmd_manual_tests():
     if not contest:
         error("コンテストIDを現在のフォルダ名から取得できません。")
         sys.exit(1)
+
+    if contest.startswith("adt_") and any(not problem.url for problem in problems):
+        warn(
+            f"using guessed task URLs for ADT. This may fail. "
+            f"Run `atc contest {contest}` first to fetch task metadata."
+        )
 
     print(f"contest: {contest}")
     for problem in problems:
