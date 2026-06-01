@@ -1,4 +1,4 @@
-from atc.atcoder import parse_atcoder_tasks_html
+from atc.atcoder import build_fallback_task_url, parse_atcoder_tasks_html
 
 
 ADT_TASKS_HTML = """
@@ -168,3 +168,15 @@ def test_parse_atcoder_tasks_html_accepts_english_task_name_header():
     assert problems[0].index == "A"
     assert problems[0].task_id == "abc460_a"
     assert problems[0].title == "Mod While Positive"
+
+
+def test_build_fallback_task_url_uses_contest_problem_pattern():
+    assert build_fallback_task_url("abc460", "A") == "https://atcoder.jp/contests/abc460/tasks/abc460_a"
+    assert build_fallback_task_url("abc460", "B") == "https://atcoder.jp/contests/abc460/tasks/abc460_b"
+
+
+def test_build_fallback_task_url_keeps_existing_adt_fallback_shape():
+    assert (
+        build_fallback_task_url("adt_easy_20260525_1", "A")
+        == "https://atcoder.jp/contests/adt_easy_20260525_1/tasks/adt_easy_20260525_1_a"
+    )

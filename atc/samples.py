@@ -4,14 +4,16 @@ from pathlib import Path
 from typing import List, Optional
 
 try:
+    from .atcoder import build_fallback_task_url
     from .console import warn
 except ImportError:
+    from atcoder import build_fallback_task_url
     from console import warn
 
 
 def download_samples(contest: str, problem_char: str, dst_dir: Path, url: Optional[str] = None):
     tmp = dst_dir.parent / f".oj_tmp_{problem_char}"
-    url = url or f"https://atcoder.jp/contests/{contest}/tasks/{contest}_{problem_char.lower()}"
+    url = url or build_fallback_task_url(contest, problem_char)
     shutil.rmtree(tmp, ignore_errors=True)
 
     oj = shutil.which("oj")

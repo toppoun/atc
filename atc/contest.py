@@ -7,8 +7,8 @@ from typing import List, Optional
 
 try:
     from .atcoder import (
-        ATCODER_BASE_URL,
         AtCoderProblem,
+        build_fallback_task_url,
         fetch_atcoder_tasks,
         parse_atcoder_tasks_html,
     )
@@ -24,8 +24,8 @@ try:
     from .templates import load_template
 except ImportError:
     from atcoder import (
-        ATCODER_BASE_URL,
         AtCoderProblem,
+        build_fallback_task_url,
         fetch_atcoder_tasks,
         parse_atcoder_tasks_html,
     )
@@ -106,7 +106,7 @@ def create_contest_files(contest_id: str, base: Path, lang: str, config: Optiona
 
 
 def guessed_problem_url(contest_id: str, problem_index: str) -> str:
-    return f"{ATCODER_BASE_URL}/contests/{contest_id}/tasks/{contest_id}_{problem_index.lower()}"
+    return build_fallback_task_url(contest_id, problem_index)
 
 
 def fallback_contest_problems(contest_id: str, problem_indexes: List[str]) -> List[AtCoderProblem]:

@@ -8,6 +8,10 @@ from urllib.request import Request, urlopen
 ATCODER_BASE_URL = "https://atcoder.jp"
 
 
+def build_fallback_task_url(contest_id: str, problem_index: str) -> str:
+    return f"{ATCODER_BASE_URL}/contests/{contest_id}/tasks/{contest_id}_{problem_index.lower()}"
+
+
 @dataclass
 class AtCoderProblem:
     index: str
