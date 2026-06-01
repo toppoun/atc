@@ -259,7 +259,7 @@ class DoctorReport:
                 line = Text("  ")
                 line.append(f"[{item.status}]", style=STATUS_STYLES.get(item.status, ""))
                 line.append(" ")
-                self._append_message(line, item.display_message)
+                self._append_item_message(line, item)
                 console.print(line)
                 for detail in item.details:
                     console.print(Text(f"       {detail}", style="dim"))
@@ -284,6 +284,15 @@ class DoctorReport:
             line.append(value, style="dim")
             return
         line.append(message)
+
+    def _append_item_message(self, line, item: DoctorItem):
+        if item.label:
+            line.append(item.label, style="bold")
+            if item.value:
+                line.append(":")
+                line.append(f" {item.value}", style="dim")
+            return
+        self._append_message(line, item.message)
 
     def _items_for_section(self, section: str):
         return [item for item in self.items if item.section == section]

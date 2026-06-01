@@ -171,3 +171,16 @@ def test_doctor_dashboard_uses_key_not_label_prefix():
     assert rows["Root"] == "D:/atcoder"
     assert rows["Config"] == "D:/atcoder/.atc/config.toml"
     assert rows["Current"] == "D:/atcoder/ABC/abc460"
+
+
+def test_doctor_report_render_details_supports_label_value_and_message_fallback(capsys):
+    report = doctor.DoctorReport(immediate=False)
+    report.section("Environment")
+    report.item("OK", key="python", label="Python", value="xxx")
+    report.item("INFO", "message-only item")
+
+    report.render()
+    output = capsys.readouterr().out
+
+    assert "[OK] Python: xxx" in output
+    assert "[INFO] message-only item" in output
