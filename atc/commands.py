@@ -205,8 +205,8 @@ def handle_stress(args: List[str]):
 
 
 def handle_watch(args: List[str]):
-    cmd_watch(args)
-    return 0
+    result = cmd_watch(args)
+    return result if result is not None else 0
 
 
 def handle_visual(args: List[str]):
@@ -272,7 +272,7 @@ COMMANDS: Tuple[CommandSpec, ...] = (
     CommandSpec(
         name="watch",
         aliases=("w", "auto"),
-        usage=("atc watch [A] [python|pypy|cpp]",),
+        usage=("atc watch [A|--all] [python|pypy|cpp]",),
         description="Watch files and rerun tests automatically.",
         handler=handle_watch,
     ),
@@ -343,7 +343,7 @@ USAGE_SECTIONS: Tuple[Tuple[str, Tuple[Tuple[str, str], ...]], ...] = (
         (
             ("atc run <A|all> [python|pypy|cpp]", "Run tests"),
             ("atc rerun [python|pypy|cpp]", "Rerun last failed case"),
-            ("atc watch [A] [python|pypy|cpp]", "Watch and run on save"),
+            ("atc watch [A|--all] [python|pypy|cpp]", "Watch and run on save"),
         ),
     ),
     (

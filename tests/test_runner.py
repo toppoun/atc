@@ -213,6 +213,28 @@ def test_watch_auto_tests_prints_two_line_summary_without_details(tmp_path, monk
     assert "Run `atc test A` for details." not in output
 
 
+def test_watch_auto_tests_summarizes_many_problem_names(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    problems = [f"A{i:02d}" for i in range(1, 51)]
+
+    def fake_run_problem_tests(problem, run_language, show_compile=False):
+        return ProblemResult(
+            problem=problem,
+            mode="py",
+            cases=[CaseResult(name="sample-1.in", status="AC", elapsed_ms=1.0, expected="", output="")],
+        )
+
+    monkeypatch.setattr(runner_module, "run_problem_tests", fake_run_problem_tests)
+
+    passed = runner_module.run_auto_tests(problems, "python", reason="initial", display_mode="watch")
+    output = capsys.readouterr().out
+
+    assert passed is True
+    assert "initial: 50 problems" in output
+    assert "PASS all: 50/50 AC" in output
+    assert "A01,A02,A03" not in output
+
+
 def test_run_problem_tests_python_minimal_ac_case(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "A.py").write_text("print(input())\n", encoding="utf-8")

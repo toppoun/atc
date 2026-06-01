@@ -19,6 +19,7 @@ try:
         resolve_executable,
     )
     from .console import (
+        compact_problem_list,
         error,
         ok,
         print_auto_summary as console_print_auto_summary,
@@ -41,6 +42,7 @@ except ImportError:
         resolve_executable,
     )
     from console import (
+        compact_problem_list,
         error,
         ok,
         print_auto_summary as console_print_auto_summary,
@@ -358,8 +360,10 @@ def _print_auto_summary(results: List[ProblemResult], log_path: Path, display_mo
         for case in result.failed_cases:
             failed_items.append((result.problem, case.status, case.name))
 
-    problems = ",".join(result.problem for result in results)
+    problem_names = [result.problem for result in results]
+    problems = ",".join(problem_names)
     if display_mode == "watch":
+        problems = compact_problem_list(problem_names, overflow_label="all")
         print_watch_result(problems, passed_cases, total_cases, _format_seconds(total_ms), failed_items)
         return
 
@@ -434,6 +438,7 @@ def _run_auto_tests(problems: List[str], run_language: Optional[str] = None, rea
     label = ",".join(problems)
     prefix = f"{reason}: " if reason else ""
     if display_mode == "watch":
+        label = compact_problem_list(problems)
         print_text(f"{prefix}{label}")
     else:
         print_text(f"{prefix}running {label} ...")

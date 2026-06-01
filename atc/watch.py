@@ -3,16 +3,18 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set
 
 try:
-    from .console import print_text, print_watch_header
+    from .console import PROBLEM_LIST_DISPLAY_LIMIT, print_text, print_watch_header
     from .config import SOURCE_EXTS, load_config, watch_settings
     from .problems import resolve_available_problems
     from .runner import LOG_DIR, available_problems, normalize_problem, run_auto_tests
 except ImportError:
-    from console import print_text, print_watch_header
+    from console import PROBLEM_LIST_DISPLAY_LIMIT, print_text, print_watch_header
     from config import SOURCE_EXTS, load_config, watch_settings
     from problems import resolve_available_problems
     from runner import LOG_DIR, available_problems, normalize_problem, run_auto_tests
 
+
+WATCH_ALL_PROBLEM_LIMIT = PROBLEM_LIST_DISPLAY_LIMIT
 
 CONFIG_FILES = {
     "pyproject.toml",
@@ -123,20 +125,43 @@ def cmd_watch(args):
     poll_seconds, debounce_seconds, _watch_warnings = watch_settings(config)
     run_language = None
     selected = []
+    watch_all = False
+    skip_initial = False
 
     for arg in args:
         low = arg.lower()
         if low in ["python", "py", "pypy", "cpp"]:
             run_language = low
         elif low in ["all", "--all"]:
-            selected = []
+            watch_all = True
         else:
             selected.append(normalize_problem(arg))
 
-    watch_problems = selected or resolved_problems
-    problems = selected or resolved_problems
-    print_watch_header(cwd, poll_seconds, debounce_seconds, LOG_DIR / "last.log", problems)
-    run_auto_tests(problems, run_language, reason="initial", display_mode="watch")
+    if selected:
+        watch_problems = selected
+        problems = selected
+    elif watch_all:
+        watch_problems = resolved_problems
+        problems = resolved_problems
+    elif len(resolved_problems) > WATCH_ALL_PROBLEM_LIMIT:
+        watch_problems = resolved_problems
+        problems = resolved_problems
+        skip_initial = True
+    else:
+        watch_problems = resolved_problems
+        problems = resolved_problems
+
+    print_watch_header(
+        cwd,
+        poll_seconds,
+        debounce_seconds,
+        LOG_DIR / "last.log",
+        problems,
+        mode="lazy" if skip_initial else None,
+        initial="skipped" if skip_initial else None,
+    )
+    if not skip_initial:
+        run_auto_tests(problems, run_language, reason="initial", display_mode="watch")
 
     snapshot = _watch_snapshot(cwd, watch_problems)
     pending = set()

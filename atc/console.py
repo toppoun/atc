@@ -2,6 +2,8 @@ from pathlib import Path
 from typing import Iterable, Optional, Sequence, Tuple
 
 
+PROBLEM_LIST_DISPLAY_LIMIT = 12
+
 RED = "\033[31m"
 GREEN = "\033[32m"
 YELLOW = "\033[33m"
@@ -91,6 +93,21 @@ def panel(title: str, message: str, style: str = "cyan") -> None:
 
 def _path_text(path) -> str:
     return str(path)
+
+
+def compact_problem_list(
+    problems: Sequence[str],
+    *,
+    limit: int = PROBLEM_LIST_DISPLAY_LIMIT,
+    overflow_label: str = "count",
+) -> str:
+    if not problems:
+        return "(none)"
+    if len(problems) <= limit:
+        return ",".join(problems)
+    if overflow_label == "all":
+        return "all"
+    return f"{len(problems)} problems"
 
 
 def print_key_value_panel(title: str, rows: Sequence[Tuple[str, object]], style: str = "cyan") -> None:
@@ -226,16 +243,34 @@ def print_watch_result(
     print_text(f"FAIL {problems}: {passed_cases}/{total_cases} AC", style="red")
 
 
-def print_watch_header(cwd: Path, poll_seconds: float, debounce_seconds: float, log_path: Path, problems: Sequence[str]) -> None:
-    print_key_value_panel(
-        "Watch",
+def print_watch_header(
+    cwd: Path,
+    poll_seconds: float,
+    debounce_seconds: float,
+    log_path: Path,
+    problems: Sequence[str],
+    *,
+    mode: Optional[str] = None,
+    initial: Optional[str] = None,
+) -> None:
+    rows = [
+        ("cwd", cwd),
+        ("problems", compact_problem_list(problems)),
+    ]
+    if mode:
+        rows.append(("mode", mode))
+    if initial:
+        rows.append(("initial", initial))
+    rows.extend(
         [
-            ("cwd", cwd),
-            ("problems", ",".join(problems) if problems else "(none)"),
             ("poll", f"{poll_seconds:.2f}s"),
             ("debounce", f"{debounce_seconds:.2f}s"),
             ("log", log_path),
-        ],
+        ]
+    )
+    print_key_value_panel(
+        "Watch",
+        rows,
         style="cyan",
     )
     print_text("Ctrl+C で終了します。")
