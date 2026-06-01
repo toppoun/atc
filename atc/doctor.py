@@ -70,8 +70,19 @@ DASHBOARD_CARD_WIDTH = 24
 class DoctorItem:
     section: str
     status: str
-    message: str
+    message: str = ""
     details: List[str] = field(default_factory=list)
+    key: str = ""
+    label: str = ""
+    value: str = ""
+
+    @property
+    def display_message(self) -> str:
+        if self.label and self.value:
+            return f"{self.label}: {self.value}"
+        if self.label:
+            return self.label
+        return self.message
 
 
 class DoctorReport:
@@ -90,9 +101,26 @@ class DoctorReport:
             print()
             print(title)
 
-    def item(self, status: str, message: str, details: Optional[List[str]] = None):
+    def item(
+        self,
+        status: str,
+        message: str = "",
+        details: Optional[List[str]] = None,
+        *,
+        key: str = "",
+        label: str = "",
+        value: object = "",
+    ):
         self.counts[status] = self.counts.get(status, 0) + 1
-        item = DoctorItem(self.current_section, status, message, list(details or []))
+        item = DoctorItem(
+            self.current_section,
+            status,
+            message,
+            list(details or []),
+            key,
+            label,
+            "" if value is None else str(value),
+        )
         self.items.append(item)
         if self.immediate:
             self._print_plain_item(item)
@@ -110,7 +138,7 @@ class DoctorReport:
         self._render_plain()
 
     def _print_plain_item(self, item: DoctorItem):
-        print(f"  [{item.status}] {item.message}")
+        print(f"  [{item.status}] {item.display_message}")
         for detail in item.details:
             print(f"       {detail}")
 
@@ -231,7 +259,7 @@ class DoctorReport:
                 line = Text("  ")
                 line.append(f"[{item.status}]", style=STATUS_STYLES.get(item.status, ""))
                 line.append(" ")
-                self._append_message(line, item.message)
+                self._append_message(line, item.display_message)
                 console.print(line)
                 for detail in item.details:
                     console.print(Text(f"       {detail}", style="dim"))
@@ -264,9 +292,10 @@ class DoctorReport:
         for item in self.items:
             if section and item.section != section:
                 continue
-            if prefixes and not any(item.message.startswith(prefix) for prefix in prefixes):
+            message = item.display_message
+            if prefixes and not any(message.startswith(prefix) for prefix in prefixes):
                 continue
-            if contains and not any(part in item.message for part in contains):
+            if contains and not any(part in message for part in contains):
                 continue
             return item
         return None
@@ -275,22 +304,46 @@ class DoctorReport:
         item = self._find_item(section=section, prefixes=(prefix,))
         if not item:
             return None
-        return item.message[len(prefix):].strip()
+        return item.display_message[len(prefix):].strip()
+
+    def item_by_key(self, key: str) -> Optional[DoctorItem]:
+        for item in self.items:
+            if item.key == key:
+                return item
+        return None
+
+    def value_for(self, key: str, default: str = "") -> str:
+        item = self.item_by_key(key)
+        if not item:
+            return default
+        return item.value or default
+
+    def status_for_key(self, key: str, default: str = "INFO") -> str:
+        item = self.item_by_key(key)
+        return item.status if item else default
 
     def _dashboard_rows(self):
-        root = self._message_after("Resolved root: ", section="Config")
+        root = self.value_for("resolved_root")
+        if not root:
+            root = self.value_for("resolved_root_missing")
+        if not root:
+            root = self._message_after("Resolved root: ", section="Config")
         if not root:
             root = self._message_after("Resolved root does not exist: ", section="Config")
-        if not root and self._find_item(section="Config", prefixes=("paths.root is empty.",)):
+        if not root and (self.item_by_key("paths_root_empty") or self._find_item(section="Config", prefixes=("paths.root is empty.",))):
             root = "current directory"
 
-        config_file = self._message_after("Config file: ", section="Config")
-        current = self._message_after("contestDir: ", section="Current contest")
-        if not current and self._find_item(section="Current contest", prefixes=("current-contest.json not found yet.",)):
+        config_file = self.value_for("config_file")
+        if not config_file:
+            config_file = self._message_after("Config file: ", section="Config")
+        current = self.value_for("current_contest_dir")
+        if not current:
+            current = self._message_after("contestDir: ", section="Current contest")
+        if not current and (self.item_by_key("current_contest_missing") or self._find_item(section="Current contest", prefixes=("current-contest.json not found yet.",))):
             current = "(none)"
 
         oj_login = "unknown"
-        login_item = self._find_item(section="Tools", prefixes=("oj login:", "oj login check"))
+        login_item = self.item_by_key("oj_login") or self._find_item(section="Tools", prefixes=("oj login:", "oj login check"))
         if login_item:
             if login_item.status == "OK":
                 oj_login = "logged in"
@@ -298,7 +351,14 @@ class DoctorReport:
                 oj_login = "not logged in or check failed"
             else:
                 oj_login = login_item.status.lower()
-        elif self._find_item(section="Tools", prefixes=("oj was not found.",)):
+        oj_item = self.item_by_key("oj")
+        if (
+            not login_item
+            and (
+                (oj_item and oj_item.display_message.startswith("oj was not found."))
+                or self._find_item(section="Tools", prefixes=("oj was not found.",))
+            )
+        ):
             oj_login = "oj not found"
 
         return [
@@ -310,28 +370,36 @@ class DoctorReport:
 
     def _tool_rows(self):
         return [
-            ("Python", self._status_for(section="Environment", prefixes=("Python:",))),
-            ("PyPy", self._status_for(section="Runner", prefixes=("PyPy:",))),
-            ("g++", self._status_for(section="Runner", prefixes=("C++ compiler:", "Configured C++ compiler", "C++ compiler not found."))),
-            ("oj", self._status_for(section="Tools", prefixes=("oj:", "oj command", "oj was not found."))),
-            ("oj login", self._status_for(section="Tools", prefixes=("oj login:", "oj login check"))),
-            ("VS Code", self._status_for(section="VS Code", prefixes=("VS Code extension:",))),
+            ("Python", self.status_for_key("python", self._status_for(section="Environment", prefixes=("Python:",)))),
+            ("PyPy", self.status_for_key("pypy", self._status_for(section="Runner", prefixes=("PyPy:",)))),
+            (
+                "g++",
+                self.status_for_key(
+                    "cpp_compiler",
+                    self._status_for(section="Runner", prefixes=("C++ compiler:", "Configured C++ compiler", "C++ compiler not found.")),
+                ),
+            ),
+            ("oj", self.status_for_key("oj", self._status_for(section="Tools", prefixes=("oj:", "oj command", "oj was not found.")))),
+            ("oj login", self.status_for_key("oj_login", self._status_for(section="Tools", prefixes=("oj login:", "oj login check")))),
+            ("VS Code", self.status_for_key("vscode_extension", self._status_for(section="VS Code", prefixes=("VS Code extension:",)))),
         ]
 
     def _status_rows(self):
         return [(self._status_text(status), str(self.counts.get(status, 0))) for status in STATUS_ORDER]
 
     def _current_rows(self):
-        contest_dir = self._message_after("contestDir: ", section="Current contest")
+        contest_dir = self.value_for("current_contest_dir")
+        if not contest_dir:
+            contest_dir = self._message_after("contestDir: ", section="Current contest")
         if contest_dir:
             contest = Path(contest_dir).name
-        elif self._find_item(section="Current contest", prefixes=("current-contest.json not found yet.",)):
+        elif self.item_by_key("current_contest_missing") or self._find_item(section="Current contest", prefixes=("current-contest.json not found yet.",)):
             contest = "(none)"
         else:
             contest = "(unknown)"
 
         metadata = "unknown"
-        metadata_item = self._find_item(section="Contest metadata", prefixes=("Contest metadata:",))
+        metadata_item = self.item_by_key("contest_metadata") or self._find_item(section="Contest metadata", prefixes=("Contest metadata:",))
         if metadata_item:
             if metadata_item.status == "OK":
                 metadata = "found"
@@ -340,20 +408,27 @@ class DoctorReport:
             else:
                 metadata = metadata_item.status
 
-        current_status = self._status_for(
-            section="Current contest",
-            prefixes=(
-                "current-contest.json",
-                "contestDir",
-                "Failed to read current-contest.json",
-            ),
-        )
+        current_status = "INFO"
+        for key in ("current_contest_dir", "current_contest_file", "current_contest_missing"):
+            item = self.item_by_key(key)
+            if item:
+                current_status = item.status
+                break
+        if current_status == "INFO" and not self.item_by_key("current_contest_missing"):
+            current_status = self._status_for(
+                section="Current contest",
+                prefixes=(
+                    "current-contest.json",
+                    "contestDir",
+                    "Failed to read current-contest.json",
+                ),
+            )
 
         return [
             ("contest", contest),
             ("metadata", metadata),
             ("current", current_status),
-            ("VS Code", self._status_for(section="VS Code", prefixes=("VS Code extension:",))),
+            ("VS Code", self.status_for_key("vscode_extension", self._status_for(section="VS Code", prefixes=("VS Code extension:",)))),
         ]
 
     def _status_for(self, *, section: str, prefixes=()):
@@ -414,12 +489,14 @@ def _doctor_check_oj_login(report: DoctorReport, oj: str):
             "WARN",
             "oj login check failed.",
             [str(e), "check manually: oj login --check https://atcoder.jp/"],
+            key="oj_login",
+            label="oj login check failed.",
         )
         return
 
     output = "\n".join(part for part in [stdout, stderr] if part)
     if code == 0:
-        report.item("OK", "oj login: logged in to atcoder.jp")
+        report.item("OK", key="oj_login", label="oj login", value="logged in to atcoder.jp")
         return
 
     if "timed out" in output.lower() or "timeout" in output.lower():
@@ -427,6 +504,8 @@ def _doctor_check_oj_login(report: DoctorReport, oj: str):
             "WARN",
             "oj login check failed or timed out.",
             ["check manually: oj login --check https://atcoder.jp/"],
+            key="oj_login",
+            label="oj login check failed or timed out.",
         )
         return
 
@@ -438,6 +517,9 @@ def _doctor_check_oj_login(report: DoctorReport, oj: str):
             "run: oj login https://atcoder.jp/",
             "check manually: oj login --check https://atcoder.jp/",
         ],
+        key="oj_login",
+        label="oj login",
+        value="not logged in to atcoder.jp or login check failed.",
     )
 
 
@@ -451,38 +533,45 @@ def _display_path(path: Optional[Path]):
 
 def _doctor_check_python(report: DoctorReport):
     report.section("Environment")
-    report.item("OK", f"Python: {sys.executable} ({platform.python_version()})")
+    report.item("OK", key="python", label="Python", value=f"{sys.executable} ({platform.python_version()})")
 
     atc = shutil.which("atc")
     if atc:
-        report.item("OK", f"atc command: {atc}")
+        report.item("OK", key="atc_command", label="atc command", value=atc)
     else:
         report.item(
             "WARN",
             "atc command was not found in PATH.",
             ["Try reopening your terminal, or check your pip scripts path."],
+            key="atc_command",
+            label="atc command was not found in PATH.",
         )
 
 
 def _doctor_check_config(report: DoctorReport, config: dict, config_file: Optional[Path], config_error: Optional[str]):
     report.section("Config")
     if config_error:
-        report.item("ERROR", f"Config file: {_display_path(config_file)}", [config_error])
+        report.item("ERROR", details=[config_error], key="config_file", label="Config file", value=_display_path(config_file))
     elif config_file:
-        report.item("OK", f"Config file: {config_file.resolve()}")
+        report.item("OK", key="config_file", label="Config file", value=config_file.resolve())
     else:
-        report.item("INFO", "Config file: (default config)")
+        report.item("INFO", key="config_file", label="Config file", value="(default config)")
 
     paths = config.get("paths", {})
     root_value = str(paths.get("root") or "").strip()
     root = config_root(config)
     if root_value:
         if root and root.exists():
-            report.item("OK", f"Resolved root: {root}")
+            report.item("OK", key="resolved_root", label="Resolved root", value=root)
         elif root:
-            report.item("WARN", f"Resolved root does not exist: {root}")
+            report.item("WARN", key="resolved_root_missing", label="Resolved root does not exist", value=root)
     else:
-        report.item("INFO", "paths.root is empty. atc contest will use the current directory.")
+        report.item(
+            "INFO",
+            "paths.root is empty. atc contest will use the current directory.",
+            key="paths_root_empty",
+            label="paths.root is empty. atc contest will use the current directory.",
+        )
 
     contests = paths.get("contests", {})
     if "contests" in paths and not isinstance(contests, dict):
@@ -517,36 +606,45 @@ def _doctor_check_runner(report: DoctorReport, config: dict):
     python_cmd = _runner_command(config, "python", "python")
     python_runner = resolve_executable(python_cmd)
     if python_runner:
-        report.item("OK", f"Python runner: {python_runner}")
+        report.item("OK", key="python_runner", label="Python runner", value=python_runner)
     else:
-        report.item("OK", f"Python runner: {sys.executable}", [f"Configured runner.python was not found: {python_cmd}", "Using current Python as fallback."])
+        report.item(
+            "OK",
+            details=[f"Configured runner.python was not found: {python_cmd}", "Using current Python as fallback."],
+            key="python_runner",
+            label="Python runner",
+            value=sys.executable,
+        )
 
     pypy_cmd = _runner_command(config, "pypy", "pypy")
     pypy_runner = resolve_executable(pypy_cmd)
     if not pypy_runner and pypy_cmd == "pypy":
         pypy_runner = shutil.which("pypy3")
     if pypy_runner:
-        report.item("OK", f"PyPy: {pypy_runner}")
+        report.item("OK", key="pypy", label="PyPy", value=pypy_runner)
     else:
-        report.item("WARN", "PyPy: not found. Python mode still works.")
+        report.item("WARN", key="pypy", label="PyPy", value="not found. Python mode still works.")
 
     compiler_cmd = _runner_command(config, "cpp_compiler", "g++")
     compiler = resolve_executable(compiler_cmd)
     if compiler:
-        report.item("OK", f"C++ compiler: {compiler}")
+        report.item("OK", key="cpp_compiler", label="C++ compiler", value=compiler)
     else:
         fallback_compiler = shutil.which("clang++") or shutil.which("g++")
         if fallback_compiler:
             report.item(
                 "WARN",
-                f"Configured C++ compiler not found: {compiler_cmd}",
-                [f"Available compiler: {fallback_compiler}", "Update runner.cpp_compiler in config.toml if you use C++."],
+                details=[f"Available compiler: {fallback_compiler}", "Update runner.cpp_compiler in config.toml if you use C++."],
+                key="cpp_compiler",
+                label="Configured C++ compiler not found",
+                value=compiler_cmd,
             )
         else:
             report.item(
                 "WARN",
-                "C++ compiler not found.",
-                ["If you use C++, install Xcode Command Line Tools:", "xcode-select --install"],
+                details=["If you use C++, install Xcode Command Line Tools:", "xcode-select --install"],
+                key="cpp_compiler",
+                label="C++ compiler not found.",
             )
 
     report.item("OK", f"C++ flags: {' '.join(_runner_cpp_flags(config))}")
@@ -572,15 +670,26 @@ def _doctor_check_tools(report: DoctorReport):
         code, stdout, stderr = _run_doctor_command([oj, "--version"])
         version = _first_line(stdout or stderr)
         if code == 0:
-            report.item("OK", f"oj: {oj}" + (f" ({version})" if version else ""))
+            report.item("OK", key="oj", label="oj", value=f"{oj}" + (f" ({version})" if version else ""))
         else:
-            report.item("WARN", f"oj command exists but failed: {oj}", [stderr or stdout or "oj --version failed"])
+            report.item(
+                "WARN",
+                details=[stderr or stdout or "oj --version failed"],
+                key="oj",
+                label="oj command exists but failed",
+                value=oj,
+            )
         _doctor_check_oj_login(report, oj)
     else:
         report.item(
             "WARN",
-            "oj was not found.",
-            ["Sample download will not work.", "Install: python3 -m pip install online-judge-tools", "Login: oj login https://atcoder.jp/"],
+            details=[
+                "Sample download will not work.",
+                "Install: python3 -m pip install online-judge-tools",
+                "Login: oj login https://atcoder.jp/",
+            ],
+            key="oj",
+            label="oj was not found.",
         )
 
 
@@ -712,13 +821,21 @@ def _doctor_check_vscode(report: DoctorReport):
     else:
         report.item(
             "INFO",
-            f"VS Code CLI candidate: {code_cmd}",
-            ["Not executed by doctor to avoid opening VS Code."],
+            details=["Not executed by doctor to avoid opening VS Code."],
+            key="vscode_cli",
+            label="VS Code CLI candidate",
+            value=code_cmd,
         )
 
     installed_path, related, searched = _find_vscode_extension_on_disk(extension_id)
     if installed_path:
-        report.item("OK", f"VS Code extension: {extension_id}", [f"Found: {installed_path}"])
+        report.item(
+            "OK",
+            details=[f"Found: {installed_path}"],
+            key="vscode_extension",
+            label="VS Code extension",
+            value=extension_id,
+        )
     else:
         details = [
             "Could not verify the VS Code extension without running VS Code CLI.",
@@ -732,7 +849,7 @@ def _doctor_check_vscode(report: DoctorReport):
             details.append("Searched extension directories:")
             details.extend([f"  - {path}" for path in searched])
         details.append("You can verify manually from VS Code Extensions.")
-        report.item("WARN", "VS Code extension: could not verify", details)
+        report.item("WARN", details=details, key="vscode_extension", label="VS Code extension", value="could not verify")
 
 
 def _doctor_current_contest_root(config: dict, cwd: Path):
@@ -745,7 +862,13 @@ def _doctor_check_current_contest(report: DoctorReport, config: dict, cwd: Path)
     root = _doctor_current_contest_root(config, cwd)
     current_file = root / ".atc" / "current-contest.json"
     if not current_file.exists():
-        report.item("INFO", "current-contest.json not found yet.", ["Run: atc contest abc335 cpp", f"Expected path: {current_file}"])
+        report.item(
+            "INFO",
+            "current-contest.json not found yet.",
+            ["Run: atc contest abc335 cpp", f"Expected path: {current_file}"],
+            key="current_contest_missing",
+            label="current-contest.json not found yet.",
+        )
         return
 
     try:
@@ -764,10 +887,10 @@ def _doctor_check_current_contest(report: DoctorReport, config: dict, cwd: Path)
 
     contest_dir = Path(contest_dir_value)
     if contest_dir.exists():
-        report.item("OK", f"current-contest.json: {current_file}")
-        report.item("OK", f"contestDir: {contest_dir}")
+        report.item("OK", key="current_contest_file", label="current-contest.json", value=current_file)
+        report.item("OK", key="current_contest_dir", label="contestDir", value=contest_dir)
     else:
-        report.item("WARN", f"contestDir does not exist: {contest_dir}", [f"Source: {current_file}"])
+        report.item("WARN", details=[f"Source: {current_file}"], key="current_contest_dir", label="contestDir does not exist", value=contest_dir)
 
 
 def _doctor_check_contest_metadata(report: DoctorReport, cwd: Path):
@@ -775,14 +898,14 @@ def _doctor_check_contest_metadata(report: DoctorReport, cwd: Path):
     error_message = contest_metadata_error(cwd)
     metadata_file = cwd / ".atc" / "contest.toml"
     if error_message:
-        report.item("ERROR", f"Contest metadata: {metadata_file}", [error_message])
+        report.item("ERROR", details=[error_message], key="contest_metadata", label="Contest metadata", value=metadata_file)
         return
 
     if metadata_file.exists():
         problems = contest_metadata_problems(cwd)
-        report.item("OK", f"Contest metadata: {metadata_file}", [f"problems: {len(problems)}"])
+        report.item("OK", details=[f"problems: {len(problems)}"], key="contest_metadata", label="Contest metadata", value=metadata_file)
     else:
-        report.item("INFO", "Contest metadata: not found.", [f"Expected path: {metadata_file}"])
+        report.item("INFO", details=[f"Expected path: {metadata_file}"], key="contest_metadata", label="Contest metadata", value="not found.")
 
 
 def cmd_config_doctor():

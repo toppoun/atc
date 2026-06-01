@@ -133,3 +133,41 @@ def test_doctor_report_render_prints_dashboard(capsys):
     assert "Environment" in output
     assert "[OK] Python:" in output
     assert "Summary" in output
+
+
+def test_doctor_report_item_keeps_message_backward_compatibility(capsys):
+    report = doctor.DoctorReport()
+
+    report.section("Environment")
+    report.item("OK", "Python: xxx")
+    output = capsys.readouterr().out
+
+    assert "[OK] Python: xxx" in output
+    assert report.items[0].display_message == "Python: xxx"
+    assert report.counts["OK"] == 1
+
+
+def test_doctor_report_item_supports_key_label_value():
+    report = doctor.DoctorReport(immediate=False)
+
+    report.item("OK", key="resolved_root", label="Resolved root", value="D:/atcoder")
+
+    assert report.value_for("resolved_root") == "D:/atcoder"
+    assert report.status_for_key("resolved_root") == "OK"
+    assert report.items[0].display_message == "Resolved root: D:/atcoder"
+    assert report.counts["OK"] == 1
+
+
+def test_doctor_dashboard_uses_key_not_label_prefix():
+    report = doctor.DoctorReport(immediate=False)
+    report.section("Config")
+    report.item("OK", key="resolved_root", label="Workspace root", value="D:/atcoder")
+    report.item("OK", key="config_file", label="Config path", value="D:/atcoder/.atc/config.toml")
+    report.section("Current contest")
+    report.item("OK", key="current_contest_dir", label="Current directory", value="D:/atcoder/ABC/abc460")
+
+    rows = dict(report._dashboard_rows())
+
+    assert rows["Root"] == "D:/atcoder"
+    assert rows["Config"] == "D:/atcoder/.atc/config.toml"
+    assert rows["Current"] == "D:/atcoder/ABC/abc460"
