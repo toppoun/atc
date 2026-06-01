@@ -13,6 +13,7 @@ RESET = "\033[0m"
 try:
     from rich import box
     from rich.console import Console
+    from rich.live import Live
     from rich.panel import Panel
     from rich.table import Table
     from rich.text import Text
@@ -22,6 +23,7 @@ try:
 except ImportError:  # pragma: no cover - exercised when rich is not installed
     box = None
     Console = None
+    Live = None
     Panel = None
     Table = None
     Text = None
