@@ -5,14 +5,14 @@ from typing import Dict, List, Optional, Set
 try:
     from .console import Live, RICH_AVAILABLE, console, print_text
     from .config import SOURCE_EXTS, load_config, watch_settings
-    from .metadata import contest_metadata_problems
+    from .metadata import CONTEST_METADATA_PATH, contest_metadata_problems
     from .problems import resolve_available_problems
     from .runner import LOG_DIR, normalize_problem, run_problem_tests, write_test_log
     from .watch_render import WATCH_WAIT_MESSAGE, WatchState, build_plain_watch_view, build_watch_view
 except ImportError:
     from console import Live, RICH_AVAILABLE, console, print_text
     from config import SOURCE_EXTS, load_config, watch_settings
-    from metadata import contest_metadata_problems
+    from metadata import CONTEST_METADATA_PATH, contest_metadata_problems
     from problems import resolve_available_problems
     from runner import LOG_DIR, normalize_problem, run_problem_tests, write_test_log
     from watch_render import WATCH_WAIT_MESSAGE, WatchState, build_plain_watch_view, build_watch_view
@@ -31,10 +31,64 @@ CONFIG_FILES = {
 CONFIG_PATHS = {
     Path(".atc") / "config.toml",
 }
+METADATA_CHANGE = "METADATA"
+METADATA_PATHS = {
+    CONTEST_METADATA_PATH,
+}
 
 
 def _problem_titles(cwd: Path):
     return {problem.index: problem.title for problem in contest_metadata_problems(cwd, warn_on_error=True) if problem.title}
+
+
+def _reload_watch_metadata(cwd: Path, config: dict):
+    return resolve_available_problems(cwd, config), _problem_titles(cwd)
+
+
+def _watch_problems_after_metadata_reload(available_problems: List[str], selected: List[str]):
+    if not selected:
+        return available_problems
+
+    available_set = set(available_problems)
+    return [problem for problem in selected if problem in available_set]
+
+
+def _update_watch_state_after_metadata_reload(
+    state: WatchState,
+    selected: List[str],
+    available_problems: List[str],
+    titles: Dict[str, str],
+    last_problem: str = "",
+):
+    watch_problems = _watch_problems_after_metadata_reload(available_problems, selected)
+    state.problems = watch_problems
+
+    if state.problem:
+        state.title = titles.get(state.problem, "")
+
+    if selected:
+        missing = [problem for problem in selected if problem not in set(available_problems)]
+        if missing:
+            state.problem = missing[0]
+            state.title = ""
+            state.result = None
+            state.updated_at = time.monotonic()
+            state.message = f"Metadata updated. {missing[0]} is not available; waiting for save."
+            return watch_problems
+
+    if last_problem and last_problem not in set(watch_problems):
+        state.problem = last_problem
+        state.title = ""
+        state.result = None
+        state.updated_at = time.monotonic()
+        state.message = f"Metadata updated. {last_problem} is not available; waiting for save."
+        return watch_problems
+
+    if last_problem:
+        state.message = "Metadata updated."
+    else:
+        state.message = "Metadata updated. Waiting for save."
+    return watch_problems
 
 
 def _watch_snapshot(cwd: Path, problems: Optional[List[str]] = None):
@@ -71,6 +125,10 @@ def _watch_paths(cwd: Path, problems: Optional[List[str]] = None):
         config = cwd / rel_path
         if config.exists():
             yield config
+    for rel_path in METADATA_PATHS:
+        metadata = cwd / rel_path
+        if metadata.exists():
+            yield metadata
 
 
 def _changed_paths(before: Dict[Path, tuple], after: Dict[Path, tuple]):
@@ -94,6 +152,8 @@ def _problem_from_changed_path(cwd: Path, path: Path, problems: Optional[List[st
     parts = rel.parts
     if rel in CONFIG_PATHS:
         return "ALL"
+    if rel in METADATA_PATHS:
+        return METADATA_CHANGE
     if len(parts) == 1:
         if rel.name in CONFIG_FILES:
             return "ALL"
@@ -116,11 +176,14 @@ def _select_problem_after_change(
     selected_set = set(selected)
     changed = set()
     has_all_change = False
+    has_metadata_change = False
 
     for path in paths:
         problem = _problem_from_changed_path(cwd, path, problems)
         if problem == "ALL":
             has_all_change = True
+        elif problem == METADATA_CHANGE:
+            has_metadata_change = True
         elif problem:
             changed.add(problem)
 
@@ -128,8 +191,10 @@ def _select_problem_after_change(
         changed &= selected_set
     if changed:
         return sorted(changed)[0]
-    if has_all_change:
-        return last_problem or None
+    if has_all_change or has_metadata_change:
+        if last_problem and last_problem in set(problems):
+            return last_problem
+        return None
     return None
 
 
@@ -160,6 +225,7 @@ def _run_watch_loop(
     debounce_seconds: float,
     run_one,
     on_tick=None,
+    on_metadata_change=None,
 ):
     snapshot = _watch_snapshot(cwd, watch_problems)
     pending = set()
@@ -181,6 +247,12 @@ def _run_watch_loop(
                 continue
 
             if pending and last_change_at and now - last_change_at >= debounce_seconds:
+                if any(_problem_from_changed_path(cwd, path, watch_problems) == METADATA_CHANGE for path in pending):
+                    if on_metadata_change:
+                        refreshed_problems = on_metadata_change(last_problem)
+                        if refreshed_problems is not None:
+                            watch_problems = refreshed_problems
+                            snapshot = _watch_snapshot(cwd, watch_problems)
                 problem = _select_problem_after_change(cwd, pending, selected, watch_problems, last_problem)
                 if problem:
                     last_problem = problem
@@ -198,7 +270,7 @@ def _run_watch_loop(
 def cmd_watch(args):
     cwd = Path.cwd()
     config = load_config(cwd)
-    resolved_problems = resolve_available_problems(cwd, config)
+    resolved_problems, titles = _reload_watch_metadata(cwd, config)
     poll_seconds, debounce_seconds, _watch_warnings = watch_settings(config)
     run_language = None
     selected = []
@@ -219,7 +291,6 @@ def cmd_watch(args):
     else:
         watch_problems = resolved_problems
 
-    titles = _problem_titles(cwd)
     state = WatchState(cwd=cwd, problems=watch_problems, log_path=LOG_DIR / "last.log")
 
     if RICH_AVAILABLE and Live:
@@ -236,6 +307,23 @@ def cmd_watch(args):
                 last_render_at = state.updated_at or time.monotonic()
                 live.update(build_watch_view(state, now=last_render_at))
 
+            def reload_metadata(last_problem: str):
+                nonlocal config, titles, last_render_at
+                config = load_config(cwd)
+                available_problems, titles = _reload_watch_metadata(cwd, config)
+                refreshed = _update_watch_state_after_metadata_reload(
+                    state,
+                    selected,
+                    available_problems,
+                    titles,
+                    last_problem,
+                )
+                if not last_problem or last_problem not in set(refreshed):
+                    now = time.monotonic()
+                    live.update(build_watch_view(state, now=now))
+                    last_render_at = now
+                return refreshed
+
             def tick(now: float):
                 nonlocal last_render_at
                 if state.updated_at is None or now - last_render_at < 1.0:
@@ -245,7 +333,16 @@ def cmd_watch(args):
 
             if selected:
                 run_one(selected[0])
-            _run_watch_loop(cwd, watch_problems, selected, poll_seconds, debounce_seconds, run_one, on_tick=tick)
+            _run_watch_loop(
+                cwd,
+                watch_problems,
+                selected,
+                poll_seconds,
+                debounce_seconds,
+                run_one,
+                on_tick=tick,
+                on_metadata_change=reload_metadata,
+            )
         return 0
 
     print_text(f"Watching {cwd}")
@@ -255,7 +352,30 @@ def cmd_watch(args):
         _run_watch_problem(problem, run_language, titles, state)
         _print_plain_watch_result(state)
 
+    def reload_metadata_plain(last_problem: str):
+        nonlocal config, titles
+        config = load_config(cwd)
+        available_problems, titles = _reload_watch_metadata(cwd, config)
+        refreshed = _update_watch_state_after_metadata_reload(
+            state,
+            selected,
+            available_problems,
+            titles,
+            last_problem,
+        )
+        if not last_problem or last_problem not in set(refreshed):
+            _print_plain_watch_result(state)
+        return refreshed
+
     if selected:
         run_one_plain(selected[0])
-    _run_watch_loop(cwd, watch_problems, selected, poll_seconds, debounce_seconds, run_one_plain)
+    _run_watch_loop(
+        cwd,
+        watch_problems,
+        selected,
+        poll_seconds,
+        debounce_seconds,
+        run_one_plain,
+        on_metadata_change=reload_metadata_plain,
+    )
     return 0

@@ -1,9 +1,12 @@
 import atc.watch as watch_module
 from atc.models import CaseResult, ProblemResult
 from atc.watch import (
+    METADATA_CHANGE,
     _problem_from_changed_path,
+    _reload_watch_metadata,
     _run_watch_loop,
     _select_problem_after_change,
+    _update_watch_state_after_metadata_reload,
 )
 from atc.watch_render import WatchState, build_watch_view
 
@@ -12,7 +15,8 @@ ADT_INDEXES = list("ABCDEFGHI")
 MANY_INDEXES = [f"A{i:02d}" for i in range(1, 51)]
 
 
-def _write_contest_metadata(contest_dir, indexes=ADT_INDEXES):
+def _write_contest_metadata(contest_dir, indexes=ADT_INDEXES, titles=None):
+    titles = titles or {}
     atc_dir = contest_dir / ".atc"
     atc_dir.mkdir(parents=True, exist_ok=True)
     lines = [
@@ -24,7 +28,7 @@ def _write_contest_metadata(contest_dir, indexes=ADT_INDEXES):
             [
                 "[[problems]]",
                 f'index = "{index}"',
-                f'title = "Problem {index}"',
+                f'title = "{titles.get(index, f"Problem {index}")}"',
                 f'url = "https://atcoder.jp/contests/adt_easy_20260525_1/tasks/task_{index.lower()}"',
                 f'source = "{index}.py"',
                 f'tests = "tests/{index}"',
@@ -50,6 +54,10 @@ def test_problem_from_changed_test_files(tmp_path):
 
 def test_problem_from_changed_config_is_all(tmp_path):
     assert _problem_from_changed_path(tmp_path, tmp_path / ".atc" / "config.toml", ["A", "B"]) == "ALL"
+
+
+def test_problem_from_changed_metadata_is_metadata(tmp_path):
+    assert _problem_from_changed_path(tmp_path, tmp_path / ".atc" / "contest.toml", ["A", "B"]) == METADATA_CHANGE
 
 
 def test_problem_from_changed_unrelated_file(tmp_path):
@@ -297,6 +305,116 @@ def test_select_problem_after_config_change_uses_last_problem(tmp_path):
     )
 
     assert problem == "B"
+
+
+def test_watch_loop_metadata_change_reloads_and_reruns_last_problem(tmp_path, monkeypatch):
+    metadata = tmp_path / ".atc" / "contest.toml"
+    source = tmp_path / "A.py"
+    snapshots = [
+        {metadata: (1, 100)},
+        {metadata: (1, 100), source: (1, 1)},
+        {metadata: (1, 100), source: (1, 1)},
+        {metadata: (2, 200), source: (1, 1)},
+        {metadata: (2, 200), source: (1, 1)},
+        {metadata: (2, 200), source: (1, 1)},
+    ]
+    run_calls = []
+    reload_calls = []
+    sleep_calls = 0
+
+    monkeypatch.setattr(watch_module, "_watch_snapshot", lambda cwd, problems=None: snapshots.pop(0))
+
+    def fake_sleep(_seconds):
+        nonlocal sleep_calls
+        sleep_calls += 1
+        if sleep_calls >= 5:
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(watch_module.time, "sleep", fake_sleep)
+    monkeypatch.setattr(watch_module.time, "monotonic", lambda: float(sleep_calls))
+
+    def reload_metadata(last_problem):
+        reload_calls.append(last_problem)
+        return ["A", "B"]
+
+    _run_watch_loop(
+        tmp_path,
+        ["A"],
+        [],
+        0.01,
+        0.0,
+        lambda problem: run_calls.append(problem),
+        on_metadata_change=reload_metadata,
+    )
+
+    assert reload_calls == ["A"]
+    assert run_calls == ["A", "A"]
+
+
+def test_watch_loop_metadata_change_without_current_problem_does_not_run_all(tmp_path, monkeypatch):
+    metadata = tmp_path / ".atc" / "contest.toml"
+    snapshots = [
+        {metadata: (1, 100)},
+        {metadata: (2, 200)},
+        {metadata: (2, 200)},
+        {metadata: (2, 200)},
+    ]
+    run_calls = []
+    reload_calls = []
+    sleep_calls = 0
+
+    monkeypatch.setattr(watch_module, "_watch_snapshot", lambda cwd, problems=None: snapshots.pop(0))
+
+    def fake_sleep(_seconds):
+        nonlocal sleep_calls
+        sleep_calls += 1
+        if sleep_calls >= 3:
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(watch_module.time, "sleep", fake_sleep)
+    monkeypatch.setattr(watch_module.time, "monotonic", lambda: float(sleep_calls))
+
+    def reload_metadata(last_problem):
+        reload_calls.append(last_problem)
+        return ["A", "B"]
+
+    _run_watch_loop(
+        tmp_path,
+        ["A", "B"],
+        [],
+        0.01,
+        0.0,
+        lambda problem: run_calls.append(problem),
+        on_metadata_change=reload_metadata,
+    )
+
+    assert reload_calls == [""]
+    assert run_calls == []
+
+
+def test_reload_watch_metadata_updates_title_map(tmp_path):
+    _write_contest_metadata(tmp_path, ["A"], titles={"A": "Old Title"})
+    state = WatchState(cwd=tmp_path, problems=["A"], problem="A", title="Old Title", result=_passed_result("A"), message="")
+    _write_contest_metadata(tmp_path, ["A"], titles={"A": "New Title"})
+
+    available, titles = _reload_watch_metadata(tmp_path, {"paths": {}, "defaults": {"problems": ["A"]}})
+    refreshed = _update_watch_state_after_metadata_reload(state, [], available, titles, "A")
+
+    assert refreshed == ["A"]
+    assert titles["A"] == "New Title"
+    assert state.title == "New Title"
+
+
+def test_selected_watch_metadata_removal_warns_and_waits(tmp_path):
+    _write_contest_metadata(tmp_path, ["B"])
+    state = WatchState(cwd=tmp_path, problems=["A"], problem="A", result=_passed_result("A"), message="")
+
+    available, titles = _reload_watch_metadata(tmp_path, {"paths": {}, "defaults": {"problems": ["A"]}})
+    refreshed = _update_watch_state_after_metadata_reload(state, ["A"], available, titles, "A")
+
+    assert refreshed == []
+    assert state.result is None
+    assert "A is not available" in state.message
 
 
 def test_watch_renderer_shows_sample_table_and_title(tmp_path):
