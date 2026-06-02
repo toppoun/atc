@@ -19,13 +19,11 @@ try:
         resolve_executable,
     )
     from .console import (
-        compact_problem_list,
         error,
         ok,
         print_auto_summary as console_print_auto_summary,
         print_test_results,
         print_text,
-        print_watch_result,
         warn,
     )
     from .models import CaseResult, ProblemResult
@@ -42,13 +40,11 @@ except ImportError:
         resolve_executable,
     )
     from console import (
-        compact_problem_list,
         error,
         ok,
         print_auto_summary as console_print_auto_summary,
         print_test_results,
         print_text,
-        print_watch_result,
         warn,
     )
     from models import CaseResult, ProblemResult
@@ -348,7 +344,7 @@ def _write_test_log(results: List[ProblemResult]):
     return log_path
 
 
-def _print_auto_summary(results: List[ProblemResult], log_path: Path, display_mode: str = "normal"):
+def _print_auto_summary(results: List[ProblemResult], log_path: Path):
     total_cases = sum(result.total_count for result in results)
     passed_cases = sum(result.ok_count for result in results)
     failed_items = []
@@ -362,10 +358,6 @@ def _print_auto_summary(results: List[ProblemResult], log_path: Path, display_mo
 
     problem_names = [result.problem for result in results]
     problems = ",".join(problem_names)
-    if display_mode == "watch":
-        problems = compact_problem_list(problem_names, overflow_label="all")
-        print_watch_result(problems, passed_cases, total_cases, _format_seconds(total_ms), failed_items)
-        return
 
     for result in results:
         if not result.error_status and result.cases:
@@ -395,7 +387,7 @@ def cmd_run_all(run_language: Optional[str] = None):
     cwd = Path.cwd()
     config = load_config(cwd)
     problems = resolve_available_problems(cwd, config)
-    if not _run_auto_tests(problems, run_language, reason="manual"):
+    if not _run_batch_tests(problems, run_language, reason="manual"):
         sys.exit(1)
 
 
@@ -430,28 +422,28 @@ def cmd_rerun(run_language: Optional[str] = None):
         sys.exit(1)
 
 
-def _run_auto_tests(problems: List[str], run_language: Optional[str] = None, reason="", display_mode: str = "normal"):
+def _run_batch_tests(problems: List[str], run_language: Optional[str] = None, reason=""):
     if not problems:
         warn("テスト対象が見つかりません。")
         return False
 
     label = ",".join(problems)
     prefix = f"{reason}: " if reason else ""
-    if display_mode == "watch":
-        label = compact_problem_list(problems)
-        print_text(f"{prefix}{label}")
-    else:
-        print_text(f"{prefix}running {label} ...")
+    print_text(f"{prefix}running {label} ...")
     results = [run_problem_tests(problem, run_language, show_compile=False) for problem in problems]
     log_path = _write_test_log(results)
-    _print_auto_summary(results, log_path, display_mode=display_mode)
+    _print_auto_summary(results, log_path)
     return _results_passed(results)
 
 
-# Public aliases used by watch.py and lightweight tests.
+def run_auto_tests(problems: List[str], run_language: Optional[str] = None, reason=""):
+    return _run_batch_tests(problems, run_language, reason=reason)
+
+
+# Public aliases used by command modules and lightweight tests.
 normalize_problem = _normalize_problem
 available_problems = _available_problems
 write_test_log = _write_test_log
 print_auto_summary = _print_auto_summary
 results_passed = _results_passed
-run_auto_tests = _run_auto_tests
+run_batch_tests = _run_batch_tests

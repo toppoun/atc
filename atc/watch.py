@@ -1,23 +1,20 @@
 import time
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
 try:
-    from .console import Live, Panel, RICH_AVAILABLE, Table, Text, box, console, print_text
+    from .console import Live, RICH_AVAILABLE, console, print_text
     from .config import SOURCE_EXTS, load_config, watch_settings
-    from .models import ProblemResult
     from .problems import contest_metadata_problems, resolve_available_problems
-    from .runner import LOG_DIR, available_problems, normalize_problem, run_problem_tests, write_test_log
+    from .runner import LOG_DIR, normalize_problem, run_problem_tests, write_test_log
+    from .watch_render import WATCH_WAIT_MESSAGE, WatchState, build_plain_watch_view, build_watch_view
 except ImportError:
-    from console import Live, Panel, RICH_AVAILABLE, Table, Text, box, console, print_text
+    from console import Live, RICH_AVAILABLE, console, print_text
     from config import SOURCE_EXTS, load_config, watch_settings
-    from models import ProblemResult
     from problems import contest_metadata_problems, resolve_available_problems
-    from runner import LOG_DIR, available_problems, normalize_problem, run_problem_tests, write_test_log
+    from runner import LOG_DIR, normalize_problem, run_problem_tests, write_test_log
+    from watch_render import WATCH_WAIT_MESSAGE, WatchState, build_plain_watch_view, build_watch_view
 
-
-WATCH_WAIT_MESSAGE = "Save a source file to run its samples."
 
 CONFIG_FILES = {
     "pyproject.toml",
@@ -32,121 +29,6 @@ CONFIG_FILES = {
 CONFIG_PATHS = {
     Path(".atc") / "config.toml",
 }
-
-
-@dataclass
-class WatchState:
-    cwd: Path
-    problems: List[str]
-    log_path: Path = LOG_DIR / "last.log"
-    problem: str = ""
-    title: str = ""
-    result: Optional[ProblemResult] = None
-    updated_at: Optional[float] = None
-    message: str = WATCH_WAIT_MESSAGE
-
-
-def _status_style(status: str):
-    if status == "AC":
-        return "green"
-    if status in {"WA", "RE", "TLE", "CE", "ERROR", "NO_TESTS"}:
-        return "red"
-    return "yellow"
-
-
-def _format_case_time(elapsed_ms: Optional[float]):
-    if elapsed_ms is None:
-        return "-"
-    return f"{elapsed_ms:.2f} ms"
-
-
-def _format_problem_elapsed(state: WatchState, now: float):
-    if state.updated_at is None:
-        return ""
-    elapsed_seconds = max(0, int(now - state.updated_at))
-    return f" ({elapsed_seconds}s)"
-
-
-def _problem_heading(state: WatchState, now: float):
-    if not state.problem:
-        return "Waiting for changes"
-    heading = state.problem
-    if state.title:
-        heading = f"{heading} - {state.title}"
-    return f"{heading}{_format_problem_elapsed(state, now)}"
-
-
-def _plain_watch_view(state: WatchState, *, now: Optional[float] = None):
-    now = time.monotonic() if now is None else now
-    lines = [
-        f"Watching {state.cwd}",
-        state.message or _problem_heading(state, now),
-        f"log {state.log_path}",
-        "",
-        "Case          Result   Time",
-    ]
-    result = state.result
-    if not result:
-        lines.append("waiting       -        -")
-        return "\n".join(lines)
-    if result.error_status:
-        lines.append(f"problem       {result.error_status:<8} -")
-        if result.error_message:
-            lines.append(result.error_message)
-        return "\n".join(lines)
-    for case in result.cases:
-        lines.append(f"{case.name:<13} {case.status:<8} {_format_case_time(case.elapsed_ms)}")
-    return "\n".join(lines)
-
-
-def _watch_result_table(state: WatchState):
-    table = Table(box=box.SIMPLE)
-    table.add_column("Case")
-    table.add_column("Result")
-    table.add_column("Time", justify="right")
-
-    result = state.result
-    if not result:
-        table.add_row("waiting", Text("-", style="dim"), "-")
-        return table
-
-    if result.error_status:
-        table.add_row(
-            "problem",
-            Text(result.error_status, style=_status_style(result.error_status)),
-            "-",
-        )
-        return table
-
-    for case in result.cases:
-        table.add_row(
-            case.name,
-            Text(case.status, style=_status_style(case.status)),
-            _format_case_time(case.elapsed_ms),
-        )
-    return table
-
-
-def build_watch_view(state: WatchState, *, now: Optional[float] = None):
-    now = time.monotonic() if now is None else now
-    if not RICH_AVAILABLE:
-        return _plain_watch_view(state, now=now)
-
-    header = Table.grid(padding=(0, 1), expand=True)
-    header.add_column(style="bold", no_wrap=True)
-    header.add_column(ratio=1)
-    header.add_row("status", _problem_heading(state, now))
-    header.add_row("cwd", str(state.cwd))
-    header.add_row("log", str(state.log_path))
-    if state.message:
-        header.add_row("message", state.message)
-    elif state.result and state.result.error_message:
-        header.add_row("message", state.result.error_message)
-
-    view = Table.grid(expand=True)
-    view.add_row(Panel(header, title="Watch", border_style="cyan", box=box.ROUNDED))
-    view.add_row(_watch_result_table(state))
-    return view
 
 
 def _problem_titles(cwd: Path):
@@ -222,25 +104,7 @@ def _problem_from_changed_path(cwd: Path, path: Path, problems: Optional[List[st
     return None
 
 
-def _changed_problems(cwd: Path, paths: Set[Path], selected: List[str], problems: Optional[List[str]] = None):
-    selected_set = set(selected)
-    changed = set()
-    if problems is None:
-        problems = resolve_available_problems(cwd, load_config(cwd))
-
-    for path in paths:
-        problem = _problem_from_changed_path(cwd, path, problems)
-        if problem == "ALL":
-            return selected or available_problems(cwd, problems)
-        if problem:
-            changed.add(problem)
-
-    if selected_set:
-        changed &= selected_set
-    return sorted(changed)
-
-
-def _problem_to_run_after_change(
+def _select_problem_after_change(
     cwd: Path,
     paths: Set[Path],
     selected: List[str],
@@ -263,7 +127,7 @@ def _problem_to_run_after_change(
     if changed:
         return sorted(changed)[0]
     if has_all_change:
-        return last_problem
+        return last_problem or None
     return None
 
 
@@ -283,7 +147,7 @@ def _run_watch_problem(problem: str, run_language: Optional[str], titles: Dict[s
 
 
 def _print_plain_watch_result(state: WatchState):
-    print_text(_plain_watch_view(state))
+    print_text(build_plain_watch_view(state))
 
 
 def _run_watch_loop(
@@ -315,7 +179,7 @@ def _run_watch_loop(
                 continue
 
             if pending and last_change_at and now - last_change_at >= debounce_seconds:
-                problem = _problem_to_run_after_change(cwd, pending, selected, watch_problems, last_problem)
+                problem = _select_problem_after_change(cwd, pending, selected, watch_problems, last_problem)
                 if problem:
                     last_problem = problem
                     run_one(problem)

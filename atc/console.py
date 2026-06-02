@@ -231,20 +231,6 @@ def print_auto_summary(
     print_text(f"Full log: {log_path}")
 
 
-def print_watch_result(
-    problems: str,
-    passed_cases: int,
-    total_cases: int,
-    duration: str,
-    failed_items: Sequence[Tuple[str, str, str]],
-) -> None:
-    if not failed_items:
-        print_text(f"PASS {problems}: {passed_cases}/{total_cases} AC", style="green")
-        return
-
-    print_text(f"FAIL {problems}: {passed_cases}/{total_cases} AC", style="red")
-
-
 def print_watch_header(
     cwd: Path,
     poll_seconds: float,

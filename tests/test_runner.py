@@ -111,15 +111,15 @@ def test_cmd_run_all_uses_metadata_problem_list(tmp_path, monkeypatch):
     _write_contest_metadata(tmp_path)
     calls = []
 
-    def fake_run_auto_tests(problems, run_language, reason="", display_mode="normal"):
-        calls.append((problems, run_language, reason, display_mode))
+    def fake_run_batch_tests(problems, run_language, reason=""):
+        calls.append((problems, run_language, reason))
         return True
 
-    monkeypatch.setattr(runner_module, "_run_auto_tests", fake_run_auto_tests)
+    monkeypatch.setattr(runner_module, "_run_batch_tests", fake_run_batch_tests)
 
     runner_module.cmd_run_all("py")
 
-    assert calls == [(ADT_INDEXES, "py", "manual", "normal")]
+    assert calls == [(ADT_INDEXES, "py", "manual")]
 
 
 def test_write_test_log_records_failed_cases(tmp_path, monkeypatch):
@@ -151,18 +151,18 @@ def test_write_test_log_records_failed_cases(tmp_path, monkeypatch):
     assert (tmp_path / ".atc" / "test-runs" / "last_failed.txt").read_text(encoding="utf-8") == "A sample-1.in\nB *"
 
 
-def test_watch_display_mode_prints_compact_success_summary(capsys):
+def test_auto_summary_prints_batch_success_summary(capsys):
     result = _passed_result("A")
 
-    print_auto_summary([result], LOG_DIR / "last.log", display_mode="watch")
+    print_auto_summary([result], LOG_DIR / "last.log")
 
     output = capsys.readouterr().out
-    assert "PASS A: 1/1 AC" in output
-    assert "Test Results" not in output
-    assert "Full log" not in output
+    assert "Test Results: A" in output
+    assert "PASS A: 1 tests" in output
+    assert "Full log" in output
 
 
-def test_watch_display_mode_prints_compact_failure_summary(capsys):
+def test_auto_summary_prints_batch_failure_summary(capsys):
     failed = ProblemResult(
         problem="A",
         mode="py",
@@ -177,17 +177,16 @@ def test_watch_display_mode_prints_compact_failure_summary(capsys):
         ],
     )
 
-    print_auto_summary([failed], LOG_DIR / "last.log", display_mode="watch")
+    print_auto_summary([failed], LOG_DIR / "last.log")
 
     output = capsys.readouterr().out
     assert "FAIL A: 0/1 AC" in output
-    assert "sample-1.in" not in output
-    assert "Run `atc test A` for details." not in output
-    assert "Test Results" not in output
-    assert "Full log" not in output
+    assert "sample-1.in" in output
+    assert "Test Results: A" in output
+    assert "Full log" in output
 
 
-def test_watch_auto_tests_prints_two_line_summary_without_details(tmp_path, monkeypatch, capsys):
+def test_batch_tests_prints_full_summary(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
 
     def fake_run_problem_tests(problem, run_language, show_compile=False):
@@ -202,18 +201,16 @@ def test_watch_auto_tests_prints_two_line_summary_without_details(tmp_path, monk
 
     monkeypatch.setattr(runner_module, "run_problem_tests", fake_run_problem_tests)
 
-    passed = runner_module.run_auto_tests(["A"], "python", reason="changed", display_mode="watch")
+    passed = runner_module.run_batch_tests(["A"], "python", reason="manual")
 
     output = capsys.readouterr().out
     assert passed is False
-    assert "changed: A" in output
+    assert "manual: running A" in output
     assert "FAIL A: 0/4 AC" in output
-    assert "changed: running A" not in output
-    assert "sample-1.in" not in output
-    assert "Run `atc test A` for details." not in output
+    assert "sample-1.in" in output
 
 
-def test_watch_auto_tests_summarizes_many_problem_names(tmp_path, monkeypatch, capsys):
+def test_batch_tests_prints_all_problem_names(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     problems = [f"A{i:02d}" for i in range(1, 51)]
 
@@ -226,13 +223,13 @@ def test_watch_auto_tests_summarizes_many_problem_names(tmp_path, monkeypatch, c
 
     monkeypatch.setattr(runner_module, "run_problem_tests", fake_run_problem_tests)
 
-    passed = runner_module.run_auto_tests(problems, "python", reason="initial", display_mode="watch")
+    passed = runner_module.run_batch_tests(problems, "python", reason="manual")
     output = capsys.readouterr().out
+    compact_output = "".join(output.split())
 
     assert passed is True
-    assert "initial: 50 problems" in output
-    assert "PASS all: 50/50 AC" in output
-    assert "A01,A02,A03" not in output
+    assert "manual:runningA01,A02,A03" in compact_output
+    assert "PASSA01,A02,A03" in compact_output
 
 
 def test_run_problem_tests_python_minimal_ac_case(tmp_path, monkeypatch):

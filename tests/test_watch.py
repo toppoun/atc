@@ -1,13 +1,11 @@
 import atc.watch as watch_module
 from atc.models import CaseResult, ProblemResult
 from atc.watch import (
-    WatchState,
-    _changed_problems,
     _problem_from_changed_path,
-    _problem_to_run_after_change,
     _run_watch_loop,
-    build_watch_view,
+    _select_problem_after_change,
 )
+from atc.watch_render import WatchState, build_watch_view
 
 
 ADT_INDEXES = list("ABCDEFGHI")
@@ -58,22 +56,8 @@ def test_problem_from_changed_unrelated_file(tmp_path):
     assert _problem_from_changed_path(tmp_path, tmp_path / "README.md", ["A", "B"]) is None
 
 
-def test_changed_problems_config_change_uses_all_available(tmp_path):
-    (tmp_path / "A.py").write_text("print(input())\n", encoding="utf-8")
-    (tmp_path / "tests" / "B").mkdir(parents=True)
-
-    changed = _changed_problems(
-        tmp_path,
-        {tmp_path / ".atc" / "config.toml"},
-        [],
-        ["A", "B", "C"],
-    )
-
-    assert changed == ["A", "B"]
-
-
-def test_changed_problems_filters_selected_problem(tmp_path):
-    changed = _changed_problems(
+def test_select_problem_after_change_filters_selected_problem(tmp_path):
+    problem = _select_problem_after_change(
         tmp_path,
         {
             tmp_path / "A.py",
@@ -83,7 +67,18 @@ def test_changed_problems_filters_selected_problem(tmp_path):
         ["A", "B"],
     )
 
-    assert changed == ["A"]
+    assert problem == "A"
+
+
+def test_select_problem_after_config_change_without_last_problem_returns_none(tmp_path):
+    problem = _select_problem_after_change(
+        tmp_path,
+        {tmp_path / ".atc" / "config.toml"},
+        [],
+        ["A", "B"],
+    )
+
+    assert problem is None
 
 
 def _disable_live(monkeypatch):
@@ -292,8 +287,8 @@ def test_cmd_watch_many_without_args_runs_changed_problem_after_skipped_initial(
     assert calls == [("A01", None, False)]
 
 
-def test_problem_to_run_after_config_change_uses_last_problem(tmp_path):
-    problem = _problem_to_run_after_change(
+def test_select_problem_after_config_change_uses_last_problem(tmp_path):
+    problem = _select_problem_after_change(
         tmp_path,
         {tmp_path / ".atc" / "config.toml"},
         [],
