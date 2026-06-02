@@ -1,7 +1,9 @@
 import pytest
 
 import atc.config as config_module
-from atc.contest import ContestPathConfigError, resolve_contest_dir
+import atc.contest as contest_module
+import atc.paths as paths_module
+from atc.paths import ContestPathConfigError, is_workspace_root, resolve_contest_dir
 
 
 def _config(root, paths):
@@ -21,6 +23,12 @@ def test_resolve_contest_dir_uses_paths_contests_for_abc(tmp_path):
     config = _config(tmp_path, {"contests": {"abc\\d+": "ABC"}})
 
     assert resolve_contest_dir("abc460", config) == tmp_path / "ABC" / "abc460"
+
+
+def test_contest_module_reexports_path_helpers():
+    assert contest_module.ContestPathConfigError is paths_module.ContestPathConfigError
+    assert contest_module.resolve_contest_dir is paths_module.resolve_contest_dir
+    assert contest_module.resolve_contest_group is paths_module.resolve_contest_group
 
 
 def test_resolve_contest_dir_uses_paths_contests_for_adt(tmp_path):
@@ -168,3 +176,12 @@ def test_resolve_contest_dir_reports_invalid_paths_contests_regex_after_match(tm
 
     with pytest.raises(ContestPathConfigError, match=r"invalid contest path regex: abc\("):
         resolve_contest_dir("abc460", config)
+
+
+def test_is_workspace_root_detects_configured_root(tmp_path):
+    config = _config(tmp_path, {"contests": _default_contest_paths()})
+    contest_dir = tmp_path / "ABC" / "abc460"
+    contest_dir.mkdir(parents=True)
+
+    assert is_workspace_root(tmp_path, config) is True
+    assert is_workspace_root(contest_dir, config) is False

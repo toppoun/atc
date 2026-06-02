@@ -4,20 +4,22 @@ from typing import List, Optional, Tuple
 
 try:
     from .atcoder import AtCoderProblem, fetch_atcoder_tasks
-    from .config import config_root, default_language, find_project_root, load_config
+    from .config import default_language, load_config
     from .console import RICH_AVAILABLE, Table, console, error, ok as print_ok
-    from .contest import (
+    from .paths import (
         ContestPathConfigError,
+        is_workspace_root,
         resolve_contest_dir,
     )
     from .metadata import infer_source_name_for_metadata, write_contest_metadata
     from .samples import download_samples
 except ImportError:
     from atcoder import AtCoderProblem, fetch_atcoder_tasks
-    from config import config_root, default_language, find_project_root, load_config
+    from config import default_language, load_config
     from console import RICH_AVAILABLE, Table, console, error, ok as print_ok
-    from contest import (
+    from paths import (
         ContestPathConfigError,
+        is_workspace_root,
         resolve_contest_dir,
     )
     from metadata import infer_source_name_for_metadata, write_contest_metadata
@@ -72,36 +74,6 @@ def _workspace_root_error_message(root: Path) -> str:
         f"  {config_file}\n"
         "\n"
         "Move to a contest folder such as abc329, or run `atc refresh abc329`."
-    )
-
-
-def _is_workspace_root(path: Path, config: dict) -> bool:
-    configured_root = config_root(config)
-    try:
-        resolved_path = path.resolve()
-    except OSError:
-        return False
-
-    try:
-        if configured_root and resolved_path == configured_root.resolve():
-            return True
-    except OSError:
-        return False
-
-    root = find_project_root(path, config)
-    try:
-        resolved_root = root.resolve()
-    except OSError:
-        return False
-
-    if resolved_path != resolved_root:
-        return False
-
-    return (
-        (resolved_path / ".atc" / "config.toml").exists()
-        or (resolved_path / ".git").exists()
-        or (resolved_path / "pyproject.toml").exists()
-        or (resolved_path / ".vscode").exists()
     )
 
 
@@ -172,7 +144,7 @@ def refresh_contest(contest_id: str, contest_dir: Path, config: dict, *, yes: bo
         raise RefreshError(f"Contest directory does not exist: {contest_dir}")
     if not contest_dir.is_dir():
         raise RefreshError(f"Contest path is not a directory: {contest_dir}")
-    if _is_workspace_root(contest_dir, config):
+    if is_workspace_root(contest_dir, config):
         raise RefreshError(_workspace_root_error_message(contest_dir))
 
     result = RefreshResult(contest_id=contest_id, contest_dir=contest_dir.resolve())
@@ -272,3 +244,4 @@ _fetch_contest_problems_strict = fetch_contest_problems_strict
 _infer_source_name_for_metadata = infer_source_name_for_metadata
 _download_missing_samples = download_missing_samples
 _refresh_contest = refresh_contest
+_is_workspace_root = is_workspace_root

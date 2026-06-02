@@ -1,5 +1,4 @@
 import json
-import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -12,7 +11,6 @@ try:
         fetch_atcoder_tasks,
     )
     from .config import (
-        config_root,
         _find_project_root,
         config_problems,
         default_language,
@@ -20,6 +18,7 @@ try:
     )
     from .console import error, ok as print_ok, warn
     from .metadata import write_contest_metadata
+    from .paths import ContestPathConfigError, resolve_contest_dir, resolve_contest_group
     from .samples import download_samples, print_sample_download_summary
     from .templates import load_template
 except ImportError:
@@ -29,7 +28,6 @@ except ImportError:
         fetch_atcoder_tasks,
     )
     from config import (
-        config_root,
         _find_project_root,
         config_problems,
         default_language,
@@ -37,12 +35,9 @@ except ImportError:
     )
     from console import error, ok as print_ok, warn
     from metadata import write_contest_metadata
+    from paths import ContestPathConfigError, resolve_contest_dir, resolve_contest_group
     from samples import download_samples, print_sample_download_summary
     from templates import load_template
-
-
-class ContestPathConfigError(ValueError):
-    pass
 
 
 def cmd_new(contest: str, lang: Optional[str] = None):
@@ -137,45 +132,6 @@ def load_contest_problems(contest_id: str, config: dict) -> List[AtCoderProblem]
         warn("Failed to parse the problem list table from the AtCoder tasks page.")
     warn("Falling back to configured problem letters and guessed URLs. ADT contests may fail with this fallback.")
     return fallback_contest_problems(contest_id, config_problems(config))
-
-
-def resolve_contest_group(contest: str, paths: dict) -> Optional[str]:
-    contests = paths.get("contests")
-    if "contests" in paths and not isinstance(contests, dict):
-        raise ContestPathConfigError("[paths.contests] must be a table.")
-
-    if isinstance(contests, dict) and contests:
-        lowered = contest.lower()
-        matched_group = None
-        for pattern, group in contests.items():
-            pattern = str(pattern)
-            try:
-                matched = re.fullmatch(pattern, lowered)
-            except re.error:
-                raise ContestPathConfigError(f"invalid contest path regex: {pattern}")
-            if matched and matched_group is None:
-                matched_group = str(group or "").strip()
-        if matched_group is not None:
-            return matched_group
-
-    return None
-
-
-def resolve_contest_dir(contest: str, config: dict):
-    contest_path = Path(contest)
-    if contest_path.is_absolute():
-        return contest_path
-
-    paths = config.get("paths", {})
-    root_path = config_root(config)
-    category_dir = resolve_contest_group(contest, paths)
-
-    if root_path:
-        if category_dir:
-            return root_path / category_dir / contest
-        return root_path / contest
-
-    return contest_path
 
 
 def write_current_contest(contest_dir: Path, config: Optional[dict] = None):
