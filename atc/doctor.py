@@ -29,7 +29,7 @@ try:
         resolve_executable,
         watch_settings,
     )
-    from .problems import contest_metadata_error, contest_metadata_problems
+    from .metadata import contest_metadata_error, contest_metadata_problems
     from .templates import TemplateError, resolve_template_file as _resolve_template_file
 except ImportError:
     from console import RICH_AVAILABLE, Text, Table, Panel, box, console
@@ -47,7 +47,7 @@ except ImportError:
         resolve_executable,
         watch_settings,
     )
-    from problems import contest_metadata_error, contest_metadata_problems
+    from metadata import contest_metadata_error, contest_metadata_problems
     from templates import TemplateError, resolve_template_file as _resolve_template_file
 
 try:

@@ -4,23 +4,23 @@ from typing import List, Optional, Tuple
 
 try:
     from .atcoder import AtCoderProblem, fetch_atcoder_tasks
-    from .config import SOURCE_EXTS, config_root, default_language, find_project_root, load_config
+    from .config import config_root, default_language, find_project_root, load_config
     from .console import RICH_AVAILABLE, Table, console, error, ok as print_ok
     from .contest import (
         ContestPathConfigError,
         resolve_contest_dir,
-        write_contest_metadata,
     )
+    from .metadata import infer_source_name_for_metadata, write_contest_metadata
     from .samples import download_samples
 except ImportError:
     from atcoder import AtCoderProblem, fetch_atcoder_tasks
-    from config import SOURCE_EXTS, config_root, default_language, find_project_root, load_config
+    from config import config_root, default_language, find_project_root, load_config
     from console import RICH_AVAILABLE, Table, console, error, ok as print_ok
     from contest import (
         ContestPathConfigError,
         resolve_contest_dir,
-        write_contest_metadata,
     )
+    from metadata import infer_source_name_for_metadata, write_contest_metadata
     from samples import download_samples
 
 
@@ -103,14 +103,6 @@ def _is_workspace_root(path: Path, config: dict) -> bool:
         or (resolved_path / "pyproject.toml").exists()
         or (resolved_path / ".vscode").exists()
     )
-
-
-def infer_source_name_for_metadata(contest_dir: Path, problem_index: str, default_lang: str) -> str:
-    for ext in SOURCE_EXTS:
-        candidate = contest_dir / f"{problem_index}.{ext}"
-        if candidate.is_file():
-            return candidate.name
-    return f"{problem_index}.{default_lang}"
 
 
 def _tests_need_download(dst_dir: Path) -> bool:

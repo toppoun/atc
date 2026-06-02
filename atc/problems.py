@@ -1,32 +1,23 @@
 import re
-from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
 try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib
-
-try:
     from .config import SOURCE_EXTS, config_problems, load_config
-    from .console import warn
+    from .metadata import (
+        ContestProblem,
+        contest_metadata_error,
+        contest_metadata_problems,
+        read_contest_metadata,
+    )
 except ImportError:
     from config import SOURCE_EXTS, config_problems, load_config
-    from console import warn
-
-
-CONTEST_METADATA_PATH = Path(".atc") / "contest.toml"
-
-
-@dataclass(frozen=True)
-class ContestProblem:
-    index: str
-    title: str = ""
-    task_id: str = ""
-    url: str = ""
-    source: str = ""
-    tests: str = ""
+    from metadata import (
+        ContestProblem,
+        contest_metadata_error,
+        contest_metadata_problems,
+        read_contest_metadata,
+    )
 
 
 def _normalize_problem_index(problem: object) -> str:
@@ -63,69 +54,6 @@ def _problem_sort_key(index: str):
 def _is_problem_source_index(index: str) -> bool:
     normalized = _normalize_problem_index(index)
     return bool(re.fullmatch(r"(?:[A-Z]|EX|[0-9]+|[A-Z][0-9]+)", normalized))
-
-
-def _contest_metadata_error_message(metadata_file: Path, error: Exception) -> str:
-    return f"failed to read contest metadata: {metadata_file} ({error})"
-
-
-def contest_metadata_error(contest_dir: Path) -> Optional[str]:
-    metadata_file = contest_dir / CONTEST_METADATA_PATH
-    if not metadata_file.exists():
-        return None
-
-    try:
-        with metadata_file.open("rb") as f:
-            tomllib.load(f)
-    except (OSError, tomllib.TOMLDecodeError) as e:
-        return _contest_metadata_error_message(metadata_file, e)
-
-    return None
-
-
-def read_contest_metadata(contest_dir: Path, warn_on_error: bool = False) -> dict:
-    metadata_file = contest_dir / CONTEST_METADATA_PATH
-    if not metadata_file.exists():
-        return {}
-
-    try:
-        with metadata_file.open("rb") as f:
-            data = tomllib.load(f)
-    except (OSError, tomllib.TOMLDecodeError) as e:
-        if warn_on_error:
-            warn(_contest_metadata_error_message(metadata_file, e))
-        return {}
-
-    return data if isinstance(data, dict) else {}
-
-
-def contest_metadata_problems(contest_dir: Path, warn_on_error: bool = False) -> List[ContestProblem]:
-    raw_problems = read_contest_metadata(contest_dir, warn_on_error=warn_on_error).get("problems", [])
-    if not isinstance(raw_problems, list):
-        return []
-
-    problems = []
-    seen = set()
-    for raw_problem in raw_problems:
-        if not isinstance(raw_problem, dict):
-            continue
-
-        index = _normalize_problem_index(raw_problem.get("index"))
-        if not index or index in seen:
-            continue
-
-        seen.add(index)
-        problems.append(
-            ContestProblem(
-                index=index,
-                title=str(raw_problem.get("title") or ""),
-                task_id=str(raw_problem.get("task_id") or ""),
-                url=str(raw_problem.get("url") or ""),
-                source=str(raw_problem.get("source") or ""),
-                tests=str(raw_problem.get("tests") or ""),
-            )
-        )
-    return problems
 
 
 def source_file_problems(contest_dir: Path) -> List[str]:

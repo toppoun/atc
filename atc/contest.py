@@ -3,14 +3,13 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 try:
     from .atcoder import (
         AtCoderProblem,
         build_fallback_task_url,
         fetch_atcoder_tasks,
-        parse_atcoder_tasks_html,
     )
     from .config import (
         config_root,
@@ -20,6 +19,7 @@ try:
         load_config,
     )
     from .console import error, ok as print_ok, warn
+    from .metadata import write_contest_metadata
     from .samples import download_samples, print_sample_download_summary
     from .templates import load_template
 except ImportError:
@@ -27,7 +27,6 @@ except ImportError:
         AtCoderProblem,
         build_fallback_task_url,
         fetch_atcoder_tasks,
-        parse_atcoder_tasks_html,
     )
     from config import (
         config_root,
@@ -37,6 +36,7 @@ except ImportError:
         load_config,
     )
     from console import error, ok as print_ok, warn
+    from metadata import write_contest_metadata
     from samples import download_samples, print_sample_download_summary
     from templates import load_template
 
@@ -137,44 +137,6 @@ def load_contest_problems(contest_id: str, config: dict) -> List[AtCoderProblem]
         warn("Failed to parse the problem list table from the AtCoder tasks page.")
     warn("Falling back to configured problem letters and guessed URLs. ADT contests may fail with this fallback.")
     return fallback_contest_problems(contest_id, config_problems(config))
-
-
-def _toml_string(value: str) -> str:
-    return json.dumps(value, ensure_ascii=False)
-
-
-def write_contest_metadata(
-    contest_id: str,
-    base: Path,
-    lang: str,
-    problems: List[AtCoderProblem],
-    source_by_index: Optional[Dict[str, str]] = None,
-):
-    atc_dir = base / ".atc"
-    atc_dir.mkdir(parents=True, exist_ok=True)
-    contest_file = atc_dir / "contest.toml"
-
-    lines = [
-        f"contest_id = {_toml_string(contest_id)}",
-        "",
-    ]
-    for problem in problems:
-        source = source_by_index.get(problem.index, f"{problem.index}.{lang}") if source_by_index else f"{problem.index}.{lang}"
-        lines.extend(
-            [
-                "[[problems]]",
-                f"index = {_toml_string(problem.index)}",
-                f"title = {_toml_string(problem.title)}",
-                f"task_id = {_toml_string(problem.task_id)}",
-                f"url = {_toml_string(problem.url)}",
-                f"source = {_toml_string(source)}",
-                f"tests = {_toml_string(f'tests/{problem.index}')}",
-                "",
-            ]
-        )
-
-    contest_file.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
-    return contest_file
 
 
 def resolve_contest_group(contest: str, paths: dict) -> Optional[str]:
