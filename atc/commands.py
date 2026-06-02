@@ -15,6 +15,7 @@ try:
     from .contest import cmd_contest, cmd_new
     from .doctor import cmd_config_doctor
     from .manual import cmd_manual, cmd_manual_tests
+    from .refresh import cmd_refresh
     from .runner import cmd_rerun, cmd_run, cmd_run_all
     from .stress import cmd_stress, cmd_stress_init, cmd_stress_promote
     from .template_commands import cmd_template_list, cmd_template_show
@@ -33,6 +34,7 @@ except ImportError:
     from contest import cmd_contest, cmd_new
     from doctor import cmd_config_doctor
     from manual import cmd_manual, cmd_manual_tests
+    from refresh import cmd_refresh
     from runner import cmd_rerun, cmd_run, cmd_run_all
     from stress import cmd_stress, cmd_stress_init, cmd_stress_promote
     from template_commands import cmd_template_list, cmd_template_show
@@ -85,6 +87,16 @@ def handle_contest(args: List[str]):
         return USAGE_ERROR
     cmd_contest(parsed.contest, parsed.lang)
     return 0
+
+
+def handle_refresh(args: List[str]):
+    parser = AtcArgumentParser(prog="atc refresh")
+    parser.add_argument("-y", "--yes", action="store_true")
+    parser.add_argument("contest", nargs="?")
+    parsed = _parse_handler_args(parser, args)
+    if parsed is None:
+        return USAGE_ERROR
+    return cmd_refresh(parsed.contest, yes=parsed.yes)
 
 
 def handle_config(args: List[str]):
@@ -249,6 +261,13 @@ COMMANDS: Tuple[CommandSpec, ...] = (
         handler=handle_contest,
     ),
     CommandSpec(
+        name="refresh",
+        aliases=(),
+        usage=("atc refresh [contest] [--yes]",),
+        description="Refresh contest metadata and missing samples without touching sources.",
+        handler=handle_refresh,
+    ),
+    CommandSpec(
         name="config",
         aliases=(),
         usage=("atc config show", "atc config init", "atc config doctor"),
@@ -336,6 +355,7 @@ USAGE_SECTIONS: Tuple[Tuple[str, Tuple[Tuple[str, str], ...]], ...] = (
         (
             ("atc contest <contest> [py|cpp]", "Create/open contest"),
             ("atc new <contest> [py|cpp]", "Create contest files"),
+            ("atc refresh [contest] [--yes]", "Refresh metadata/samples"),
         ),
     ),
     (

@@ -3,7 +3,7 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 try:
     from .atcoder import (
@@ -143,7 +143,13 @@ def _toml_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
-def write_contest_metadata(contest_id: str, base: Path, lang: str, problems: List[AtCoderProblem]):
+def write_contest_metadata(
+    contest_id: str,
+    base: Path,
+    lang: str,
+    problems: List[AtCoderProblem],
+    source_by_index: Optional[Dict[str, str]] = None,
+):
     atc_dir = base / ".atc"
     atc_dir.mkdir(parents=True, exist_ok=True)
     contest_file = atc_dir / "contest.toml"
@@ -153,6 +159,7 @@ def write_contest_metadata(contest_id: str, base: Path, lang: str, problems: Lis
         "",
     ]
     for problem in problems:
+        source = source_by_index.get(problem.index, f"{problem.index}.{lang}") if source_by_index else f"{problem.index}.{lang}"
         lines.extend(
             [
                 "[[problems]]",
@@ -160,7 +167,7 @@ def write_contest_metadata(contest_id: str, base: Path, lang: str, problems: Lis
                 f"title = {_toml_string(problem.title)}",
                 f"task_id = {_toml_string(problem.task_id)}",
                 f"url = {_toml_string(problem.url)}",
-                f"source = {_toml_string(f'{problem.index}.{lang}')}",
+                f"source = {_toml_string(source)}",
                 f"tests = {_toml_string(f'tests/{problem.index}')}",
                 "",
             ]

@@ -10,6 +10,7 @@ def test_resolve_command_aliases():
     assert resolve_command("contest").name == "contest"
     assert resolve_command("contests").name == "contest"
     assert resolve_command("c").name == "contest"
+    assert resolve_command("refresh").name == "refresh"
 
     assert resolve_command("visual").name == "visual"
     assert resolve_command("vis").name == "visual"
@@ -26,6 +27,7 @@ def test_usage_lines_include_main_commands():
 
     assert "atc new" in usage
     assert "atc contest" in usage
+    assert "atc refresh" in usage
     assert "atc config doctor" in usage
     assert "atc run A" in usage
     assert "atc run all" in usage
@@ -55,5 +57,6 @@ def test_usage_sections_group_main_commands():
     assert "Manual" in usage
     assert "Visual" in usage
     assert "atc contest" in usage
+    assert "atc refresh" in usage
     assert "atc run" in usage
     assert "atc config doctor" in usage

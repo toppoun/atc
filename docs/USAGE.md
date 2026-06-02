@@ -35,6 +35,38 @@ atc c abc335 cpp
 
 既に contest フォルダがある場合、作成とサンプル取得はスキップします。
 
+## `atc refresh`
+
+古い contest フォルダを現在の `atc` 形式に更新します。
+
+```bash
+cd abc335
+atc refresh
+atc refresh --yes
+atc refresh -y
+```
+
+config の `[paths.contests]` から contest フォルダを解決したい場合は、contest ID も指定できます。
+
+```bash
+atc refresh abc335
+```
+
+`atc refresh` は AtCoder の tasks page を取得し、tasks page に載っている全問題を対象にします。
+
+- `.atc/contest.toml` を再生成
+- 不足している `tests/<problem>` だけサンプル取得
+- 既に中身がある `tests/<problem>` はスキップ
+- `A.py` / `A.cpp` などの source files は作成・上書き・削除しない
+- `.atc/current-contest.json` は更新しない
+
+`atc refresh` は contest ディレクトリ内で実行してください。
+contest を active にしたり、VS Code の分割ターミナルを起動したりはしません。
+
+デフォルトでは確認が出ます。確認を省略する場合は `--yes` または `-y` を付けます。
+
+tasks page の取得や parse に失敗した場合、`defaults.problems` には fallback せず終了します。
+
 ## `atc run` / `atc r` / `atc test` / `atc t`
 
 ```bash

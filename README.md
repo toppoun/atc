@@ -5,6 +5,7 @@ AtCoder 用の CLI + VS Code 補助 + グラフ可視化ツールです。
 できること:
 
 - contest フォルダ作成
+- 既存 contest フォルダの metadata / samples 更新
 - template 展開
 - sample download
 - local test
@@ -46,6 +47,7 @@ atc config doctor
 | - | - |
 | `atc contest abc335 cpp` | contest 作成または既存 contest をアクティブ化 |
 | `atc c abc335 cpp` | `atc contest` の省略形 |
+| `atc refresh` | 既存 contest の `.atc/contest.toml` と不足 samples を更新 |
 | `atc run A` | A 問題をテスト |
 | `atc run all` | 検出できる全問題をテスト |
 | `atc rerun` | 直前に失敗したケースだけ再実行 |
@@ -57,6 +59,8 @@ atc config doctor
 | `atc visual` | visualizer を開く |
 
 詳しい使い方は [docs/USAGE.md](docs/USAGE.md) を見てください。
+
+`atc refresh` は contest ディレクトリ内で実行してください。contest を active にしたり、VS Code の分割ターミナルを起動したりはしません。
 
 `atc watch` は保存した1問の sample 結果を固定表示で更新します。全問題をまとめて確認したい場合は `atc test all` を使います。
 
