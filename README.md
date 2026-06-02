@@ -60,7 +60,9 @@ atc config doctor
 
 詳しい使い方は [docs/USAGE.md](docs/USAGE.md) を見てください。
 
-`atc refresh` は contest ディレクトリ内で実行してください。contest を active にしたり、VS Code の分割ターミナルを起動したりはしません。
+`atc refresh` は contest ディレクトリ内で実行してください。workspace root では、root の `.atc/config.toml` を contest-local metadata と混同しないように禁止しています。contest を active にしたり、VS Code の分割ターミナルを起動したりはしません。
+
+sample の取得が一部失敗した場合でも、metadata の更新結果と失敗した問題を表示します。
 
 `atc watch` は保存した1問の sample 結果を固定表示で更新します。全問題をまとめて確認したい場合は `atc test all` を使います。
 

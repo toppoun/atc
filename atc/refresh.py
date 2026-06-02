@@ -63,9 +63,14 @@ def _tasks_fetch_error_message(contest_id: str, reason: str = "") -> str:
     return "\n".join(lines)
 
 
-def _workspace_root_error_message() -> str:
+def _workspace_root_error_message(root: Path) -> str:
+    config_file = root / ".atc" / "config.toml"
     return (
         "`atc refresh` must be run inside a contest directory, not the workspace root.\n"
+        "\n"
+        "This protects your workspace config:\n"
+        f"  {config_file}\n"
+        "\n"
         "Move to a contest folder such as abc329, or run `atc refresh abc329`."
     )
 
@@ -112,11 +117,11 @@ def _tests_need_download(dst_dir: Path) -> bool:
     if not dst_dir.exists():
         return True
     if not dst_dir.is_dir():
-        return False
+        raise RefreshError(f"{dst_dir} exists but is not a directory")
     try:
         return not any(dst_dir.iterdir())
     except OSError:
-        return False
+        raise RefreshError(f"failed to inspect {dst_dir}")
 
 
 def download_missing_samples(contest_id: str, contest_dir: Path, problems: List[AtCoderProblem]):
@@ -127,7 +132,13 @@ def download_missing_samples(contest_id: str, contest_dir: Path, problems: List[
 
     for problem in problems:
         dst_dir = tests_dir / problem.index
-        if not _tests_need_download(dst_dir):
+        try:
+            needs_download = _tests_need_download(dst_dir)
+        except RefreshError as e:
+            failed.append((problem.index, str(e)))
+            continue
+
+        if not needs_download:
             skipped.append(problem.index)
             continue
 
@@ -170,7 +181,7 @@ def refresh_contest(contest_id: str, contest_dir: Path, config: dict, *, yes: bo
     if not contest_dir.is_dir():
         raise RefreshError(f"Contest path is not a directory: {contest_dir}")
     if _is_workspace_root(contest_dir, config):
-        raise RefreshError(_workspace_root_error_message())
+        raise RefreshError(_workspace_root_error_message(contest_dir))
 
     result = RefreshResult(contest_id=contest_id, contest_dir=contest_dir.resolve())
     if not yes and not confirm_refresh(contest_id, result.contest_dir):
@@ -191,9 +202,6 @@ def refresh_contest(contest_id: str, contest_dir: Path, config: dict, *, yes: bo
     result.samples_downloaded = downloaded
     result.samples_skipped = skipped
     result.samples_failed = failed
-    if failed:
-        raise RefreshError(f"Sample download failed for: {_problem_list([problem for problem, _reason in failed])}")
-
     return result
 
 
@@ -216,6 +224,7 @@ def print_refresh_summary(result: RefreshResult) -> None:
     ]
     if result.samples_failed:
         rows.append(("Failed", _problem_list([problem for problem, _reason in result.samples_failed])))
+    rows.append(("Result", "partial failure" if result.samples_failed else "success"))
 
     print()
     if RICH_AVAILABLE:
@@ -226,11 +235,22 @@ def print_refresh_summary(result: RefreshResult) -> None:
         for key, value in rows:
             table.add_row(key, value)
         console.print(table)
+        if result.samples_failed:
+            console.print()
+            console.print("Failed samples:", style="bold")
+            for problem, reason in result.samples_failed:
+                console.print(f"  {problem}: {reason or 'unknown error'}")
         return
 
     print(f"Refresh {result.contest_id}")
     for key, value in rows:
         print(f"{key:<10} {value}")
+
+    if result.samples_failed:
+        print()
+        print("Failed samples:")
+        for problem, reason in result.samples_failed:
+            print(f"  {problem}: {reason or 'unknown error'}")
 
 
 def cmd_refresh(contest: Optional[str] = None, *, yes: bool = False) -> int:
@@ -253,7 +273,7 @@ def cmd_refresh(contest: Optional[str] = None, *, yes: bool = False) -> int:
         return 1
 
     print_refresh_summary(result)
-    return 0
+    return 1 if result.samples_failed else 0
 
 
 _fetch_contest_problems_strict = fetch_contest_problems_strict

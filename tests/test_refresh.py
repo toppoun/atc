@@ -215,17 +215,25 @@ def test_refresh_can_run_inside_contest_folder_with_workspace_root_config(tmp_pa
 def test_refresh_rejects_workspace_root_before_confirmation_or_writes(tmp_path, monkeypatch):
     contest_dir = tmp_path
     config = _root_config(tmp_path, "py")
+    atc_dir = tmp_path / ".atc"
+    atc_dir.mkdir()
+    config_file = atc_dir / "config.toml"
+    config_before = "[paths]\nroot = \".\"\n"
+    config_file.write_text(config_before, encoding="utf-8")
     download_calls = _patch_download(monkeypatch)
     current_calls = _patch_current(monkeypatch)
     monkeypatch.setattr("builtins.input", lambda prompt: pytest.fail("confirmation should not be shown"))
     monkeypatch.setattr(refresh_module, "fetch_atcoder_tasks", lambda contest_id: pytest.fail("fetch should not run"))
     monkeypatch.setattr(refresh_module, "write_contest_metadata", lambda *args, **kwargs: pytest.fail("metadata should not be written"))
 
-    with pytest.raises(refresh_module.RefreshError, match="workspace root"):
+    with pytest.raises(refresh_module.RefreshError, match="workspace root") as excinfo:
         refresh_module.refresh_contest("atcoder", contest_dir, config, yes=False)
 
+    assert ".atc" in str(excinfo.value)
+    assert "config.toml" in str(excinfo.value)
     assert download_calls == []
     assert current_calls == []
+    assert config_file.read_text(encoding="utf-8") == config_before
     assert not (tmp_path / ".atc" / "contest.toml").exists()
     assert not (tmp_path / "tests").exists()
 
@@ -251,25 +259,90 @@ def test_refresh_command_rejects_workspace_root_without_prompt(tmp_path, monkeyp
     monkeypatch.setattr(refresh_module, "fetch_atcoder_tasks", lambda contest_id: pytest.fail("fetch should not run"))
 
     assert refresh_module.cmd_refresh(yes=False) == 1
+    assert (atc_dir / "config.toml").read_text(encoding="utf-8").startswith("[paths]")
     assert not (tmp_path / ".atc" / "contest.toml").exists()
     assert not (tmp_path / "tests").exists()
 
 
-def test_refresh_does_not_update_current_when_sample_download_fails(tmp_path, monkeypatch):
+def test_refresh_partial_sample_failure_keeps_metadata_and_continues(tmp_path, monkeypatch):
     contest_dir = tmp_path / "abc329"
     contest_dir.mkdir()
-    _patch_fetch(monkeypatch, [_problem("A")])
+    _patch_fetch(monkeypatch, [_problem("A"), _problem("B"), _problem("C")])
+    calls = []
 
     def fake_download_samples(contest, problem, dst_dir, url=None):
-        return False, "download failed"
+        calls.append(problem)
+        if problem == "A":
+            return False, "download failed"
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        (dst_dir / "sample-1.in").write_text("1\n", encoding="utf-8")
+        return True, ""
 
     monkeypatch.setattr(refresh_module, "download_samples", fake_download_samples)
     current_calls = _patch_current(monkeypatch)
 
-    with pytest.raises(refresh_module.RefreshError, match="Sample download failed for: A"):
-        refresh_module.refresh_contest("abc329", contest_dir, _config("py"), yes=True)
+    result = refresh_module.refresh_contest("abc329", contest_dir, _config("py"), yes=True)
 
+    assert calls == ["A", "B", "C"]
+    assert (contest_dir / ".atc" / "contest.toml").is_file()
+    assert result.samples_downloaded == ["B", "C"]
+    assert result.samples_failed == [("A", "download failed")]
     assert current_calls == []
+
+
+def test_refresh_cmd_reports_partial_failure_summary_and_nonzero_exit(tmp_path, monkeypatch, capsys):
+    contest_dir = tmp_path / "abc329"
+    contest_dir.mkdir()
+    monkeypatch.chdir(contest_dir)
+    _patch_fetch(monkeypatch, [_problem("A"), _problem("B")])
+
+    def fake_download_samples(contest, problem, dst_dir, url=None):
+        if problem == "A":
+            return False, "oj download failed"
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        (dst_dir / "sample-1.in").write_text("1\n", encoding="utf-8")
+        return True, ""
+
+    monkeypatch.setattr(refresh_module, "download_samples", fake_download_samples)
+
+    assert refresh_module.cmd_refresh(yes=True) == 1
+
+    output = capsys.readouterr().out
+    assert "Metadata" in output
+    assert "updated" in output
+    assert "Failed" in output
+    assert "A" in output
+    assert "partial failure" in output
+    assert "oj download failed" in output
+    assert (contest_dir / ".atc" / "contest.toml").is_file()
+
+
+def test_refresh_tests_path_file_conflict_is_failed_and_others_continue(tmp_path, monkeypatch):
+    contest_dir = tmp_path / "abc329"
+    contest_dir.mkdir()
+    tests_dir = contest_dir / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "A").write_text("not a directory\n", encoding="utf-8")
+    _patch_fetch(monkeypatch, [_problem("A"), _problem("B")])
+    download_calls = _patch_download(monkeypatch)
+
+    result = refresh_module.refresh_contest("abc329", contest_dir, _config("py"), yes=True)
+
+    assert download_calls == [("abc329", "B", contest_dir / "tests" / "B", "https://atcoder.jp/contests/abc329/tasks/abc329_b")]
+    assert result.samples_downloaded == ["B"]
+    assert result.samples_failed
+    assert result.samples_failed[0][0] == "A"
+    assert "not a directory" in result.samples_failed[0][1]
+
+
+def test_refresh_cmd_success_remains_zero_exit(tmp_path, monkeypatch):
+    contest_dir = tmp_path / "abc329"
+    contest_dir.mkdir()
+    monkeypatch.chdir(contest_dir)
+    _patch_fetch(monkeypatch, [_problem("A")])
+    _patch_download(monkeypatch)
+
+    assert refresh_module.cmd_refresh(yes=True) == 0
 
 
 def test_refresh_command_parses_yes_flags(monkeypatch):

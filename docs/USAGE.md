@@ -61,7 +61,10 @@ atc refresh abc335
 - `.atc/current-contest.json` は更新しない
 
 `atc refresh` は contest ディレクトリ内で実行してください。
+workspace root では、root の `.atc/config.toml` を contest-local metadata と混同しないように禁止しています。
 contest を active にしたり、VS Code の分割ターミナルを起動したりはしません。
+
+sample の取得が一部失敗した場合でも、metadata の更新結果と失敗した問題を表示します。この場合、exit code は非0になります。
 
 デフォルトでは確認が出ます。確認を省略する場合は `--yes` または `-y` を付けます。
 
