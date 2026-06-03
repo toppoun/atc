@@ -2,7 +2,7 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
-from .console import Live, RICH_AVAILABLE, console, print_text
+from .console import Live, console, print_text
 from .config import SOURCE_EXTS, load_config, watch_settings
 from .metadata import CONTEST_METADATA_PATH, contest_metadata_problems
 from .problems import resolve_available_problems
@@ -285,7 +285,7 @@ def cmd_watch(args):
 
     state = WatchState(cwd=cwd, problems=watch_problems, log_path=LOG_DIR / "last.log")
 
-    if RICH_AVAILABLE and Live:
+    if Live:
         last_render_at = 0.0
 
         with Live(build_watch_view(state), console=console, refresh_per_second=4) as live:

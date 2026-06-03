@@ -4,7 +4,7 @@ from typing import List, Optional, Tuple
 
 from .atcoder import AtCoderProblem, fetch_atcoder_tasks
 from .config import default_language, load_config
-from .console import RICH_AVAILABLE, Table, console, error, ok as print_ok
+from .console import Table, console, error, ok as print_ok
 from .paths import (
     ContestPathConfigError,
     is_workspace_root,
@@ -179,30 +179,18 @@ def print_refresh_summary(result: RefreshResult) -> None:
     rows.append(("Result", "partial failure" if result.samples_failed else "success"))
 
     print()
-    if RICH_AVAILABLE:
-        console.print(f"Refresh {result.contest_id}", style="bold")
-        table = Table.grid(padding=(0, 4))
-        table.add_column(style="bold")
-        table.add_column()
-        for key, value in rows:
-            table.add_row(key, value)
-        console.print(table)
-        if result.samples_failed:
-            console.print()
-            console.print("Failed samples:", style="bold")
-            for problem, reason in result.samples_failed:
-                console.print(f"  {problem}: {reason or 'unknown error'}")
-        return
-
-    print(f"Refresh {result.contest_id}")
+    console.print(f"Refresh {result.contest_id}", style="bold")
+    table = Table.grid(padding=(0, 4))
+    table.add_column(style="bold")
+    table.add_column()
     for key, value in rows:
-        print(f"{key:<10} {value}")
-
+        table.add_row(key, value)
+    console.print(table)
     if result.samples_failed:
-        print()
-        print("Failed samples:")
+        console.print()
+        console.print("Failed samples:", style="bold")
         for problem, reason in result.samples_failed:
-            print(f"  {problem}: {reason or 'unknown error'}")
+            console.print(f"  {problem}: {reason or 'unknown error'}")
 
 
 def cmd_refresh(contest: Optional[str] = None, *, yes: bool = False) -> int:

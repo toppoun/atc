@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-from .console import Panel, RICH_AVAILABLE, Table, Text, box
+from .console import Panel, Table, Text, box
 from .models import ProblemResult
 
 
@@ -120,11 +120,6 @@ def build_watch_header(state: WatchState, *, now: Optional[float] = None):
 
 def build_watch_view(state: WatchState, *, now: Optional[float] = None):
     now = time.monotonic() if now is None else now
-    if not RICH_AVAILABLE:
-        return build_plain_watch_view(state, now=now)
+    return build_plain_watch_view(state, now=now)
 
-    view = Table.grid(expand=True)
-    view.add_row(Panel(build_watch_header(state, now=now), title="Watch", border_style="cyan", box=box.ROUNDED))
-    view.add_row(build_watch_result_table(state.result))
-    return view
 

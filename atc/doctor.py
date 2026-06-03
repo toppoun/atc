@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import List, Optional, Set
 import tomllib
 
-from .console import RICH_AVAILABLE, Text, Table, Panel, box, console
+from .console import Text, Table, Panel, box, console
 from .config import (
     CONFIG_FILE_META_KEY,
     deep_merge_config,
@@ -109,10 +109,8 @@ class DoctorReport:
         self._print_plain_summary()
 
     def render(self):
-        if RICH_AVAILABLE:
-            self._render_rich()
-            return
-        self._render_plain()
+        self._render_rich()
+
 
     def _print_plain_item(self, item: DoctorItem):
         print(f"  [{item.status}] {item.display_message}")
@@ -242,16 +240,14 @@ class DoctorReport:
                     console.print(Text(f"       {detail}", style="dim"))
 
     def _render_summary(self):
-        if RICH_AVAILABLE:
-            console.print()
-            console.print("Summary", style="bold cyan")
-            for status in STATUS_ORDER:
-                line = Text("  ")
-                line.append(f"{status}: ", style=STATUS_STYLES.get(status, ""))
-                line.append(str(self.counts.get(status, 0)))
-                console.print(line)
-            return
-        self._print_plain_summary()
+        console.print()
+        console.print("Summary", style="bold cyan")
+        for status in STATUS_ORDER:
+            line = Text("  ")
+            line.append(f"{status}: ", style=STATUS_STYLES.get(status, ""))
+            line.append(str(self.counts.get(status, 0)))
+            console.print(line)
+
 
     def _append_message(self, line, message: str):
         label, sep, value = message.partition(":")

@@ -1,7 +1,7 @@
 import sys
 
 from .commands import USAGE_ERROR, resolve_command, usage_sections
-from .console import RICH_AVAILABLE, Table, Text, console
+from .console import Table, Text, console
 
 
 TITLE_STYLE = "bold white"
@@ -13,10 +13,8 @@ NOTE_STYLE = "dim"
 # ---------- usage ----------
 
 def usage():
-    if RICH_AVAILABLE:
-        _rich_usage()
-    else:
-        _plain_usage()
+    _rich_usage()
+
     sys.exit(1)
 
 

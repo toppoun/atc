@@ -10,25 +10,15 @@ YELLOW = "\033[33m"
 CYAN = "\033[36m"
 RESET = "\033[0m"
 
-try:
-    from rich import box
-    from rich.console import Console
-    from rich.live import Live
-    from rich.panel import Panel
-    from rich.table import Table
-    from rich.text import Text
 
-    console = Console()
-    RICH_AVAILABLE = True
-except ImportError:  # pragma: no cover - exercised when rich is not installed
-    box = None
-    Console = None
-    Live = None
-    Panel = None
-    Table = None
-    Text = None
-    console = None
-    RICH_AVAILABLE = False
+from rich import box
+from rich.console import Console
+from rich.live import Live
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
+
+console = Console()
 
 
 def color_text(message: str, color: str) -> str:
@@ -36,61 +26,40 @@ def color_text(message: str, color: str) -> str:
 
 
 def _styled_text(message: str, style: str):
-    if RICH_AVAILABLE:
-        return Text(str(message), style=style)
-    return str(message)
+    return Text(str(message), style=style)
 
 
 def print_text(message: str = "", *, style: Optional[str] = None, end: str = "\n", flush: bool = False) -> None:
-    if RICH_AVAILABLE:
-        console.print(str(message), style=style, end=end)
-        if flush:
-            console.file.flush()
-        return
-    print(str(message), end=end, flush=flush)
+    console.print(str(message), style=style, end=end)
+    if flush:
+        console.file.flush()
+
 
 
 def ok(message: str) -> None:
-    if RICH_AVAILABLE:
-        console.print(Text(f"[OK] {message}", style="green"))
-    else:
-        print(color_text(f"[OK] {message}", GREEN))
+    console.print(Text(f"[OK] {message}", style="green"))
+
 
 
 def warn(message: str) -> None:
-    if RICH_AVAILABLE:
-        console.print(Text(f"[WARN] {message}", style="yellow"))
-    else:
-        print(color_text(f"[WARN] {message}", YELLOW))
+    console.print(Text(f"[WARN] {message}", style="yellow"))
 
 
 def error(message: str) -> None:
-    if RICH_AVAILABLE:
-        console.print(Text(f"[ERROR] {message}", style="red"))
-    else:
-        print(color_text(f"[ERROR] {message}", RED))
+    console.print(Text(f"[ERROR] {message}", style="red"))
 
 
 def info(message: str) -> None:
-    if RICH_AVAILABLE:
-        console.print(Text(f"[INFO] {message}", style="cyan"))
-    else:
-        print(color_text(f"[INFO] {message}", CYAN))
+    console.print(Text(f"[INFO] {message}", style="cyan"))
 
 
 def rule(title: str) -> None:
-    if RICH_AVAILABLE:
-        console.rule(str(title))
-    else:
-        print(f"--- {title} ---")
+    console.rule(str(title))
+
 
 
 def panel(title: str, message: str, style: str = "cyan") -> None:
-    if RICH_AVAILABLE:
-        console.print(Panel(str(message), title=str(title), border_style=style))
-    else:
-        print(f"[{title}]")
-        print(message)
+    console.print(Panel(str(message), title=str(title), border_style=style))
 
 
 def _path_text(path) -> str:
@@ -113,18 +82,12 @@ def compact_problem_list(
 
 
 def print_key_value_panel(title: str, rows: Sequence[Tuple[str, object]], style: str = "cyan") -> None:
-    if RICH_AVAILABLE:
-        table = Table.grid(padding=(0, 1))
-        table.add_column(style="bold")
-        table.add_column()
-        for key, value in rows:
-            table.add_row(str(key), _path_text(value))
-        console.print(Panel(table, title=str(title), border_style=style))
-        return
-
-    print(f"{title}:")
+    table = Table.grid(padding=(0, 1))
+    table.add_column(style="bold")
+    table.add_column()
     for key, value in rows:
-        print(f"  {key}: {_path_text(value)}")
+        table.add_row(str(key), _path_text(value))
+    console.print(Panel(table, title=str(title), border_style=style))
 
 
 def _status_style(status: str) -> str:
@@ -175,21 +138,18 @@ def print_test_results(
         total_count = len(rows)
 
     print_text(title, style="bold")
-    if RICH_AVAILABLE:
-        table = Table(box=box.SIMPLE)
-        table.add_column("Case")
-        table.add_column("Result")
-        table.add_column("Time", justify="right")
-        for case_name, status, elapsed_ms in rows:
-            table.add_row(
-                case_name,
-                _styled_text(status, _status_style(status)),
-                f"{elapsed_ms:.2f} ms",
-            )
-        console.print(table)
-    else:
-        for case_name, status, elapsed_ms in rows:
-            print(f"{status:<3} {case_name} {elapsed_ms:.2f} ms")
+    table = Table(box=box.SIMPLE)
+    table.add_column("Case")
+    table.add_column("Result")
+    table.add_column("Time", justify="right")
+    for case_name, status, elapsed_ms in rows:
+        table.add_row(
+            case_name,
+            _styled_text(status, _status_style(status)),
+            f"{elapsed_ms:.2f} ms",
+        )
+    console.print(table)
+
 
     print_problem_summary(ok_count, total_count)
 
@@ -321,23 +281,12 @@ def print_stress_failure(
 
 def print_promote_result(problem: str, source_input: Path, source_expected: Path, target_input: Path, target_output: Path) -> None:
     print_text(f"promoted stress case for {problem}", style="green")
-    if RICH_AVAILABLE:
-        table = Table(box=box.SIMPLE_HEAVY)
-        table.add_column("Item")
-        table.add_column("Path")
-        table.add_row("input", str(source_input))
-        table.add_row("expected", str(source_expected))
-        table.add_row("saved input", str(target_input))
-        table.add_row("saved output", str(target_output))
-        console.print(table)
-        return
+    table = Table(box=box.SIMPLE_HEAVY)
+    table.add_column("Item")
+    table.add_column("Path")
+    table.add_row("input", str(source_input))
+    table.add_row("expected", str(source_expected))
+    table.add_row("saved input", str(target_input))
+    table.add_row("saved output", str(target_output))
+    console.print(table)
 
-    print()
-    print("input:")
-    print(f"  {source_input}")
-    print("expected:")
-    print(f"  {source_expected}")
-    print()
-    print("saved:")
-    print(f"  {target_input}")
-    print(f"  {target_output}")
