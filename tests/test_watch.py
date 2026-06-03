@@ -11,6 +11,20 @@ from atc.watch import (
 from atc.watch_render import WatchState, build_watch_view
 
 
+class DummyLive:
+    def __init__(self, *args, **kwargs):
+        self.updates = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+    def update(self, renderable):
+        self.updates.append(renderable)
+
+
 ADT_INDEXES = list("ABCDEFGHI")
 MANY_INDEXES = [f"A{i:02d}" for i in range(1, 51)]
 
@@ -89,9 +103,8 @@ def test_select_problem_after_config_change_without_last_problem_returns_none(tm
     assert problem is None
 
 
-def _disable_live(monkeypatch):
-    monkeypatch.setattr(watch_module, "Live", None)
-    monkeypatch.setattr(watch_module, "RICH_AVAILABLE", False)
+def _use_dummy_live(monkeypatch):
+    monkeypatch.setattr(watch_module, "Live", DummyLive)
 
 
 def _passed_result(problem):
@@ -121,7 +134,7 @@ def test_cmd_watch_without_args_does_not_initial_run_all(tmp_path, monkeypatch):
     def stop_watch(_seconds):
         raise KeyboardInterrupt
 
-    _disable_live(monkeypatch)
+    _use_dummy_live(monkeypatch)
     monkeypatch.setattr(watch_module, "run_problem_tests", lambda *args, **kwargs: calls.append(args))
     monkeypatch.setattr(watch_module, "_watch_snapshot", lambda cwd, problems=None: {})
     monkeypatch.setattr(watch_module.time, "sleep", stop_watch)
@@ -156,7 +169,7 @@ def test_cmd_watch_runs_changed_problem_only(tmp_path, monkeypatch):
         if sleep_calls >= 3:
             raise KeyboardInterrupt
 
-    _disable_live(monkeypatch)
+    _use_dummy_live(monkeypatch)
     monkeypatch.setattr(watch_module, "run_problem_tests", fake_run_problem_tests)
     monkeypatch.setattr(watch_module, "_watch_snapshot", fake_snapshot)
     monkeypatch.setattr(watch_module, "watch_settings", lambda config: (0.01, 0.0, []))
@@ -180,7 +193,7 @@ def test_cmd_watch_explicit_problem_runs_initial_once(tmp_path, monkeypatch):
     def stop_watch(_seconds):
         raise KeyboardInterrupt
 
-    _disable_live(monkeypatch)
+    _use_dummy_live(monkeypatch)
     monkeypatch.setattr(watch_module, "run_problem_tests", fake_run_problem_tests)
     monkeypatch.setattr(watch_module, "_watch_snapshot", lambda cwd, problems=None: {})
     monkeypatch.setattr(watch_module.time, "sleep", stop_watch)
@@ -245,7 +258,7 @@ def test_cmd_watch_explicit_problem_runs_after_changed_source(tmp_path, monkeypa
         if sleep_calls >= 3:
             raise KeyboardInterrupt
 
-    _disable_live(monkeypatch)
+    _use_dummy_live(monkeypatch)
     monkeypatch.setattr(watch_module, "run_problem_tests", fake_run_problem_tests)
     monkeypatch.setattr(watch_module, "_watch_snapshot", fake_snapshot)
     monkeypatch.setattr(watch_module, "watch_settings", lambda config: (0.01, 0.0, []))
@@ -283,7 +296,7 @@ def test_cmd_watch_many_without_args_runs_changed_problem_after_skipped_initial(
         if sleep_calls >= 3:
             raise KeyboardInterrupt
 
-    _disable_live(monkeypatch)
+    _use_dummy_live(monkeypatch)
     monkeypatch.setattr(watch_module, "run_problem_tests", fake_run_problem_tests)
     monkeypatch.setattr(watch_module, "_watch_snapshot", fake_snapshot)
     monkeypatch.setattr(watch_module, "watch_settings", lambda config: (0.01, 0.0, []))

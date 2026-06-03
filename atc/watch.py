@@ -285,89 +285,53 @@ def cmd_watch(args):
 
     state = WatchState(cwd=cwd, problems=watch_problems, log_path=LOG_DIR / "last.log")
 
-    if Live:
-        last_render_at = 0.0
 
-        with Live(build_watch_view(state), console=console, refresh_per_second=4) as live:
-            def run_one(problem: str):
-                nonlocal last_render_at
-                state.problem = problem
-                state.title = titles.get(problem, "")
-                state.message = f"Running {problem}..."
-                live.update(build_watch_view(state))
-                _run_watch_problem(problem, run_language, titles, state)
-                last_render_at = state.updated_at or time.monotonic()
-                live.update(build_watch_view(state, now=last_render_at))
+    last_render_at = 0.0
 
-            def reload_metadata(last_problem: str):
-                nonlocal config, titles, last_render_at
-                config = load_config(cwd)
-                available_problems, titles = _reload_watch_metadata(cwd, config)
-                refreshed = _update_watch_state_after_metadata_reload(
-                    state,
-                    selected,
-                    available_problems,
-                    titles,
-                    last_problem,
-                )
-                if not last_problem or last_problem not in set(refreshed):
-                    now = time.monotonic()
-                    live.update(build_watch_view(state, now=now))
-                    last_render_at = now
-                return refreshed
+    with Live(build_watch_view(state), console=console, refresh_per_second=4) as live:
+        def run_one(problem: str):
+            nonlocal last_render_at
+            state.problem = problem
+            state.title = titles.get(problem, "")
+            state.message = f"Running {problem}..."
+            live.update(build_watch_view(state))
+            _run_watch_problem(problem, run_language, titles, state)
+            last_render_at = state.updated_at or time.monotonic()
+            live.update(build_watch_view(state, now=last_render_at))
 
-            def tick(now: float):
-                nonlocal last_render_at
-                if state.updated_at is None or now - last_render_at < 1.0:
-                    return
+        def reload_metadata(last_problem: str):
+            nonlocal config, titles, last_render_at
+            config = load_config(cwd)
+            available_problems, titles = _reload_watch_metadata(cwd, config)
+            refreshed = _update_watch_state_after_metadata_reload(
+                state,
+                selected,
+                available_problems,
+                titles,
+                last_problem,
+            )
+            if not last_problem or last_problem not in set(refreshed):
+                now = time.monotonic()
                 live.update(build_watch_view(state, now=now))
                 last_render_at = now
+            return refreshed
 
-            if selected:
-                run_one(selected[0])
-            _run_watch_loop(
-                cwd,
-                watch_problems,
-                selected,
-                poll_seconds,
-                debounce_seconds,
-                run_one,
-                on_tick=tick,
-                on_metadata_change=reload_metadata,
-            )
-        return 0
+        def tick(now: float):
+            nonlocal last_render_at
+            if state.updated_at is None or now - last_render_at < 1.0:
+                return
+            live.update(build_watch_view(state, now=now))
+            last_render_at = now
 
-    print_text(f"Watching {cwd}")
-    print_text(WATCH_WAIT_MESSAGE)
-
-    def run_one_plain(problem: str):
-        _run_watch_problem(problem, run_language, titles, state)
-        _print_plain_watch_result(state)
-
-    def reload_metadata_plain(last_problem: str):
-        nonlocal config, titles
-        config = load_config(cwd)
-        available_problems, titles = _reload_watch_metadata(cwd, config)
-        refreshed = _update_watch_state_after_metadata_reload(
-            state,
+        if selected:
+            run_one(selected[0])
+        _run_watch_loop(
+            cwd,
+            watch_problems,
             selected,
-            available_problems,
-            titles,
-            last_problem,
+            poll_seconds,
+            debounce_seconds,
+            run_one,
+            on_tick=tick,
+            on_metadata_change=reload_metadata,
         )
-        if not last_problem or last_problem not in set(refreshed):
-            _print_plain_watch_result(state)
-        return refreshed
-
-    if selected:
-        run_one_plain(selected[0])
-    _run_watch_loop(
-        cwd,
-        watch_problems,
-        selected,
-        poll_seconds,
-        debounce_seconds,
-        run_one_plain,
-        on_metadata_change=reload_metadata_plain,
-    )
-    return 0
