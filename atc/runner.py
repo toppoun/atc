@@ -231,54 +231,6 @@ def run_problem_tests(
     return result
 
 
-def _print_result_summary(result: ProblemResult):
-    print_test_results(
-        result.cases,
-        ok_count=result.ok_count,
-        total_count=result.total_count,
-        failure_details=_result_failure_details(result),
-    )
-
-
-def _case_input_text(problem: str, case_name: str):
-    case_path = Path.cwd() / "tests" / problem / case_name
-    try:
-        return case_path.read_text(encoding="utf-8")
-    except OSError:
-        return None
-
-
-def _case_failure_sections(problem: str, case: CaseResult):
-    sections = []
-    input_text = _case_input_text(problem, case.name) if problem else None
-    if input_text:
-        sections.append(("input", input_text))
-    if case.expected is not None:
-        sections.append(("expected", case.expected))
-    if case.output:
-        sections.append(("actual", case.output))
-    if case.stderr:
-        sections.append(("stderr", case.stderr))
-    return sections
-
-
-def _result_failure_details(result: ProblemResult):
-    return [
-        (case.name, case.status, _case_failure_sections(result.problem, case))
-        for case in result.failed_cases
-    ]
-
-
-def _print_detailed_result(result: ProblemResult):
-    if result.error_status:
-        error(result.error_status)
-        if result.error_message:
-            print_text(result.error_message)
-        return
-
-    _print_result_summary(result)
-
-
 def _format_seconds(ms: float):
     return f"{ms / 1000:.2f}s"
 
@@ -352,13 +304,6 @@ def _print_auto_summary(results: List[ProblemResult], log_path: Path):
 
 def _results_passed(results: List[ProblemResult]):
     return bool(results) and all(result.passed for result in results)
-
-
-def cmd_run(problem: str, run_language: Optional[str] = None):
-    result = run_problem_tests(problem, run_language, show_compile=True)
-    _print_detailed_result(result)
-    if not result.passed:
-        sys.exit(1)
 
 
 def cmd_run_all(run_language: Optional[str] = None):

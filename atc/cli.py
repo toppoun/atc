@@ -33,16 +33,6 @@ def _rich_usage():
     console.print(Text("Tip: run `atc config doctor` to check your environment.", style=NOTE_STYLE))
 
 
-def _plain_usage():
-    print("AtC")
-    for title, rows in usage_sections():
-        print()
-        print(title)
-        for command, description in rows:
-            print(f"  {command:<46} {description}")
-    print()
-    print("Tip: run `atc config doctor` to check your environment.")
-
 # ---------- main ----------
 def main():
     if len(sys.argv) < 2:
