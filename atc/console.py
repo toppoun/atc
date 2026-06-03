@@ -21,6 +21,7 @@ from rich.text import Text
 console = Console()
 
 
+### 純粋テキスト出力 ###
 def color_text(message: str, color: str) -> str:
     return f"{color}{message}{RESET}"
 
@@ -40,7 +41,6 @@ def ok(message: str) -> None:
     console.print(Text(f"[OK] {message}", style="green"))
 
 
-
 def warn(message: str) -> None:
     console.print(Text(f"[WARN] {message}", style="yellow"))
 
@@ -57,7 +57,7 @@ def rule(title: str) -> None:
     console.rule(str(title))
 
 
-
+### Richのパネル(四角で囲ってるやつ)出力 ###
 def panel(title: str, message: str, style: str = "cyan") -> None:
     console.print(Panel(str(message), title=str(title), border_style=style))
 
@@ -104,25 +104,6 @@ def _case_values(case):
     return case.name, case.status, case.elapsed_ms
 
 
-def _failure_sections(
-    *,
-    input_text: Optional[str] = None,
-    expected: Optional[str] = None,
-    actual: str = "",
-    stderr: str = "",
-) -> Sequence[Tuple[str, str]]:
-    sections = []
-    if input_text:
-        sections.append(("input: ", input_text))
-    if expected is not None:
-        sections.append(("expected: ", expected))
-    if actual:
-        sections.append(("actual: ", actual))
-    if stderr:
-        sections.append(("stderr: ", stderr))
-    return sections
-
-
 def print_test_results(
     cases,
     *,
@@ -149,7 +130,6 @@ def print_test_results(
             f"{elapsed_ms:.2f} ms",
         )
     console.print(table)
-
 
     print_problem_summary(ok_count, total_count)
 

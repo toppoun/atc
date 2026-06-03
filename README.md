@@ -50,7 +50,7 @@ atc config doctor
 | `atc refresh` | 既存 contest の `.atc/contest.toml` と不足 samples を更新 |
 | `atc run A` | A 問題をテスト |
 | `atc run all` | 検出できる全問題をテスト |
-| `atc rerun` | 直前に失敗したケースだけ再実行 |
+| `atc rerun` | 非推奨 |
 | `atc watch` | ファイル変更を監視して自動テスト |
 | `atc stress A py` | ランダムケースで提出予定解と愚直解を比較 |
 | `atc stress init A` | stress 用 generator / brute を作成 |
