@@ -100,8 +100,8 @@ def _prepare_python_run_command(py_file: Path, run_language: str, config: dict):
         executable = sys.executable
     if not executable:
         if run_language == "pypy":
-            return "py", [], None, "ERROR", f"PyPy command not found: {command}. Install PyPy or update runner.pypy in config.toml."
-        return "py", [], None, "ERROR", f"Python command not found: {command}. Update runner.python in config.toml or check PATH."
+            return "py", [], None, "INVALID_LANGUAGE", f"PyPy command not found: {command}. Install PyPy or update runner.pypy in config.toml."
+        return "py", [], None, "INVALID_LANGUAGE", f"Python command not found: {command}. Update runner.python in config.toml or check PATH."
     return "py", [executable, str(py_file)], None, None, ""
 
 
@@ -109,7 +109,7 @@ def _prepare_run_command(cwd: Path, problem: str, run_language: Optional[str] = 
     config = config or load_config(cwd)
     run_language = normalize_run_language(run_language, config)
     if not run_language:
-        return None, [], None, "ERROR", "Invalid language. Use python, pypy, cpp, or set defaults.language to py/cpp."
+        return None, [], None, "INVALID_LANGUAGE", "Invalid language. Use python, pypy, cpp, or set defaults.language to py/cpp."
 
     py_file = cwd / f"{problem}.py"
     cpp_file = cwd / f"{problem}.cpp"
@@ -119,14 +119,14 @@ def _prepare_run_command(cwd: Path, problem: str, run_language: Optional[str] = 
             return _prepare_cpp_run_command(cwd, problem, cpp_file, config, show_compile)
         if py_file.exists():
             return _prepare_python_run_command(py_file, "python", config)
-        return None, [], None, "ERROR", "ファイルが見つかりません。"
+        return None, [], None, "NO_SOURCE", "ファイルが見つかりません。"
 
     if py_file.exists():
         return _prepare_python_run_command(py_file, run_language, config)
     if cpp_file.exists():
         return _prepare_cpp_run_command(cwd, problem, cpp_file, config, show_compile)
 
-    return None, [], None, "ERROR", "ファイルが見つかりません。"
+    return None, [], None, "NO_SOURCE", "ファイルが見つかりません。"
 
 
 def run_problem_tests(
