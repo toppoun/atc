@@ -7,48 +7,26 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, List, Optional, Set
 
-try:
-    from .config import (
-        SOURCE_EXTS,
-        _normalize_run_language,
-        _runner_command,
-        _runner_compile_timeout,
-        _runner_cpp_flags,
-        _runner_timeout,
-        load_config,
-        resolve_executable,
-    )
-    from .console import (
-        error,
-        ok,
-        print_auto_summary as console_print_auto_summary,
-        print_test_results,
-        print_text,
-        warn,
-    )
-    from .models import CaseResult, ProblemResult
-    from .problems import resolve_available_problems
-except ImportError:
-    from config import (
-        SOURCE_EXTS,
-        _normalize_run_language,
-        _runner_command,
-        _runner_compile_timeout,
-        _runner_cpp_flags,
-        _runner_timeout,
-        load_config,
-        resolve_executable,
-    )
-    from console import (
-        error,
-        ok,
-        print_auto_summary as console_print_auto_summary,
-        print_test_results,
-        print_text,
-        warn,
-    )
-    from models import CaseResult, ProblemResult
-    from problems import resolve_available_problems
+from .config import (
+    SOURCE_EXTS,
+    normalize_run_language,
+    runner_command,
+    runner_compile_timeout,
+    runner_cpp_flags,
+    runner_timeout,
+    load_config,
+    resolve_executable,
+)
+from .console import (
+    error,
+    ok,
+    print_auto_summary as console_print_auto_summary,
+    print_test_results,
+    print_text,
+    warn,
+)
+from .models import CaseResult, ProblemResult
+from .problems import resolve_available_problems
 
 
 LOG_DIR = Path(".atc") / "test-runs"
@@ -80,14 +58,14 @@ def _missing_cpp_compiler_message(compiler: str):
 
 
 def _prepare_cpp_run_command(cwd: Path, problem: str, cpp_file: Path, config: dict, show_compile=False):
-    compiler = _runner_command(config, "cpp_compiler", "g++")
+    compiler = runner_command(config, "cpp_compiler", "g++")
     compiler_path = resolve_executable(compiler)
     if not compiler_path:
         return "cpp", [], None, "ERROR", _missing_cpp_compiler_message(compiler)
 
     suffix = ".exe" if platform.system() == "Windows" else ".out"
     exe_path = cwd / f"_{problem}{suffix}"
-    flags = _runner_cpp_flags(config)
+    flags = runner_cpp_flags(config)
 
     if show_compile:
         warn(f"Compiling {cpp_file.name}...")
@@ -99,10 +77,10 @@ def _prepare_cpp_run_command(cwd: Path, problem: str, cpp_file: Path, config: di
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=_runner_compile_timeout(config),
+            timeout=runner_compile_timeout(config),
         )
     except subprocess.TimeoutExpired:
-        return "cpp", [], exe_path, "TLE", f"Compile timed out after {_runner_compile_timeout(config)} seconds."
+        return "cpp", [], exe_path, "TLE", f"Compile timed out after {runner_compile_timeout(config)} seconds."
     except OSError as e:
         return "cpp", [], exe_path, "ERROR", str(e)
 
@@ -114,7 +92,7 @@ def _prepare_cpp_run_command(cwd: Path, problem: str, cpp_file: Path, config: di
 def _prepare_python_run_command(py_file: Path, run_language: str, config: dict):
     key = "pypy" if run_language == "pypy" else "python"
     default = "pypy" if run_language == "pypy" else "python"
-    command = _runner_command(config, key, default)
+    command = runner_command(config, key, default)
     executable = resolve_executable(command)
     if run_language == "pypy" and not executable and command == "pypy":
         executable = shutil.which("pypy3")
@@ -129,7 +107,7 @@ def _prepare_python_run_command(py_file: Path, run_language: str, config: dict):
 
 def _prepare_run_command(cwd: Path, problem: str, run_language: Optional[str] = None, show_compile=False, config: Optional[dict] = None):
     config = config or load_config(cwd)
-    run_language = _normalize_run_language(run_language, config)
+    run_language = normalize_run_language(run_language, config)
     if not run_language:
         return None, [], None, "ERROR", "Invalid language. Use python, pypy, cpp, or set defaults.language to py/cpp."
 
@@ -201,7 +179,7 @@ def run_problem_tests(
                         text=True,
                         encoding="utf-8",
                         errors="replace",
-                        timeout=_runner_timeout(config),
+                        timeout=runner_timeout(config),
                     )
                     elapsed = (time.perf_counter() - case_started) * 1000
                 except subprocess.TimeoutExpired as e:
@@ -211,7 +189,7 @@ def run_problem_tests(
                         status="TLE",
                         elapsed_ms=elapsed,
                         output=(e.stdout or "").strip() if isinstance(e.stdout, str) else "",
-                        stderr=f"Timed out after {_runner_timeout(config)} seconds.",
+                        stderr=f"Timed out after {runner_timeout(config)} seconds.",
                     )
                     result.cases.append(case)
                     if on_case_result:

@@ -7,48 +7,25 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional, Set
+import tomllib
 
-try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib
-
-try:
-    from .console import RICH_AVAILABLE, Text, Table, Panel, box, console
-    from .config import (
-        CONFIG_FILE_META_KEY,
-        _deep_merge_config,
-        _default_config,
-        _find_config_file,
-        _find_project_root,
-        _runner_command,
-        _runner_compile_timeout,
-        _runner_cpp_flags,
-        _runner_timeout,
-        config_root,
-        resolve_executable,
-        watch_settings,
-    )
-    from .metadata import contest_metadata_error, contest_metadata_problems
-    from .templates import TemplateError, resolve_template_file as _resolve_template_file
-except ImportError:
-    from console import RICH_AVAILABLE, Text, Table, Panel, box, console
-    from config import (
-        CONFIG_FILE_META_KEY,
-        _deep_merge_config,
-        _default_config,
-        _find_config_file,
-        _find_project_root,
-        _runner_command,
-        _runner_compile_timeout,
-        _runner_cpp_flags,
-        _runner_timeout,
-        config_root,
-        resolve_executable,
-        watch_settings,
-    )
-    from metadata import contest_metadata_error, contest_metadata_problems
-    from templates import TemplateError, resolve_template_file as _resolve_template_file
+from .console import RICH_AVAILABLE, Text, Table, Panel, box, console
+from .config import (
+    CONFIG_FILE_META_KEY,
+    deep_merge_config,
+    default_config,
+    find_config_file,
+    find_project_root,
+    runner_command,
+    runner_compile_timeout,
+    runner_cpp_flags,
+    runner_timeout,
+    config_root,
+    resolve_executable,
+    watch_settings,
+)
+from .metadata import contest_metadata_error, contest_metadata_problems
+from .templates import TemplateError, resolve_template_file as _resolve_template_file
 
 try:
     from rich.columns import Columns
@@ -453,8 +430,8 @@ class DoctorReport:
 
 
 def _load_config_for_doctor(start: Path):
-    config = _default_config()
-    config_file = _find_config_file(start)
+    config = default_config()
+    config_file = find_config_file(start)
     if not config_file:
         return config, None, None
 
@@ -466,7 +443,7 @@ def _load_config_for_doctor(start: Path):
     except OSError as e:
         return config, config_file, f"failed to read config file: {e}"
 
-    merged = _deep_merge_config(config, loaded)
+    merged = deep_merge_config(config, loaded)
     merged[CONFIG_FILE_META_KEY] = str(config_file.resolve())
     return merged, config_file, None
 
@@ -612,7 +589,7 @@ def _doctor_check_templates(report: DoctorReport, config: dict, cwd: Path):
 
 def _doctor_check_runner(report: DoctorReport, config: dict):
     report.section("Runner")
-    python_cmd = _runner_command(config, "python", "python")
+    python_cmd = runner_command(config, "python", "python")
     python_runner = resolve_executable(python_cmd)
     if python_runner:
         report.item("OK", key="python_runner", label="Python runner", value=python_runner)
@@ -625,7 +602,7 @@ def _doctor_check_runner(report: DoctorReport, config: dict):
             value=sys.executable,
         )
 
-    pypy_cmd = _runner_command(config, "pypy", "pypy")
+    pypy_cmd = runner_command(config, "pypy", "pypy")
     pypy_runner = resolve_executable(pypy_cmd)
     if not pypy_runner and pypy_cmd == "pypy":
         pypy_runner = shutil.which("pypy3")
@@ -634,7 +611,7 @@ def _doctor_check_runner(report: DoctorReport, config: dict):
     else:
         report.item("WARN", key="pypy", label="PyPy", value="not found. Python mode still works.")
 
-    compiler_cmd = _runner_command(config, "cpp_compiler", "g++")
+    compiler_cmd = runner_command(config, "cpp_compiler", "g++")
     compiler = resolve_executable(compiler_cmd)
     if compiler:
         report.item("OK", key="cpp_compiler", label="C++ compiler", value=compiler)
@@ -656,9 +633,9 @@ def _doctor_check_runner(report: DoctorReport, config: dict):
                 label="C++ compiler not found.",
             )
 
-    report.item("OK", f"C++ flags: {' '.join(_runner_cpp_flags(config))}")
-    run_timeout = _runner_timeout(config)
-    compile_timeout = _runner_compile_timeout(config)
+    report.item("OK", f"C++ flags: {' '.join(runner_cpp_flags(config))}")
+    run_timeout = runner_timeout(config)
+    compile_timeout = runner_compile_timeout(config)
     report.item("OK", f"Run timeout: {run_timeout}s" if run_timeout else "Run timeout: disabled")
     report.item("OK", f"Compile timeout: {compile_timeout}s" if compile_timeout else "Compile timeout: disabled")
 
@@ -863,7 +840,7 @@ def _doctor_check_vscode(report: DoctorReport):
 
 def _doctor_current_contest_root(config: dict, cwd: Path):
     root = config_root(config)
-    return root if root else _find_project_root(cwd, config)
+    return root if root else find_project_root(cwd, config)
 
 
 def _doctor_check_current_contest(report: DoctorReport, config: dict, cwd: Path):

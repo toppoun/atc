@@ -3,12 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-try:
-    from .console import Panel, RICH_AVAILABLE, Table, Text, box
-    from .models import ProblemResult
-except ImportError:
-    from console import Panel, RICH_AVAILABLE, Table, Text, box
-    from models import ProblemResult
+from .console import Panel, RICH_AVAILABLE, Table, Text, box
+from .models import ProblemResult
 
 
 WATCH_WAIT_MESSAGE = "Save a source file to run its samples."

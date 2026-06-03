@@ -2,10 +2,7 @@ import re
 from pathlib import Path
 from typing import Optional
 
-try:
-    from .config import config_root, find_project_root
-except ImportError:
-    from config import config_root, find_project_root
+from .config import config_root, find_project_root
 
 
 class ContestPathConfigError(ValueError):

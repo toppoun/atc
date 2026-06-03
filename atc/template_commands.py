@@ -1,28 +1,16 @@
 from pathlib import Path
 from typing import List, Optional
 
-try:
-    from .config import load_config
-    from .console import error
-    from .templates import (
-        TemplateError,
-        TemplateInfo,
-        list_templates,
-        load_template_manifest,
-        resolve_template_manifest,
-        resolve_template_name,
-    )
-except ImportError:
-    from config import load_config
-    from console import error
-    from templates import (
-        TemplateError,
-        TemplateInfo,
-        list_templates,
-        load_template_manifest,
-        resolve_template_manifest,
-        resolve_template_name,
-    )
+from .config import load_config
+from .console import error
+from .templates import (
+    TemplateError,
+    TemplateInfo,
+    list_templates,
+    load_template_manifest,
+    resolve_template_manifest,
+    resolve_template_name,
+)
 
 
 def _normalize_template_language(language: Optional[str]) -> Optional[str]:

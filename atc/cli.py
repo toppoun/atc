@@ -1,11 +1,8 @@
 import sys
 
-try:
-    from .commands import USAGE_ERROR, resolve_command, usage_sections
-    from .console import RICH_AVAILABLE, Table, Text, console
-except ImportError:
-    from commands import USAGE_ERROR, resolve_command, usage_sections
-    from console import RICH_AVAILABLE, Table, Text, console
+from .commands import USAGE_ERROR, resolve_command, usage_sections
+from .console import RICH_AVAILABLE, Table, Text, console
+
 
 TITLE_STYLE = "bold white"
 SECTION_STYLE = "bold bright_blue"

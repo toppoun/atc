@@ -4,16 +4,9 @@ import shutil
 import sys
 from pathlib import Path
 from typing import Optional
+import tomllib
 
-try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib
-
-try:
-    from .console import RED, RESET
-except ImportError:
-    from console import RED, RESET
+from .console import RED, RESET
 
 
 PROBLEMS = ["A", "B", "C", "D", "E"]
@@ -360,3 +353,6 @@ runner_compile_timeout = _runner_compile_timeout
 watch_settings = _watch_settings
 config_to_toml = _config_to_toml
 toml_value = _toml_value
+find_config_file = _find_config_file
+deep_merge_config = _deep_merge_config
+default_config = _default_config

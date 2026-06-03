@@ -4,40 +4,22 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-try:
-    from .atcoder import (
-        AtCoderProblem,
-        build_fallback_task_url,
-        fetch_atcoder_tasks,
-    )
-    from .config import (
-        _find_project_root,
-        config_problems,
-        default_language,
-        load_config,
-    )
-    from .console import error, ok as print_ok, warn
-    from .metadata import write_contest_metadata
-    from .paths import ContestPathConfigError, resolve_contest_dir, resolve_contest_group
-    from .samples import download_samples, print_sample_download_summary
-    from .templates import load_template
-except ImportError:
-    from atcoder import (
-        AtCoderProblem,
-        build_fallback_task_url,
-        fetch_atcoder_tasks,
-    )
-    from config import (
-        _find_project_root,
-        config_problems,
-        default_language,
-        load_config,
-    )
-    from console import error, ok as print_ok, warn
-    from metadata import write_contest_metadata
-    from paths import ContestPathConfigError, resolve_contest_dir, resolve_contest_group
-    from samples import download_samples, print_sample_download_summary
-    from templates import load_template
+from .atcoder import (
+    AtCoderProblem,
+    build_fallback_task_url,
+    fetch_atcoder_tasks,
+)
+from .config import (
+    find_project_root,
+    config_problems,
+    default_language,
+    load_config,
+)
+from .console import error, ok as print_ok, warn
+from .metadata import write_contest_metadata
+from .paths import ContestPathConfigError, resolve_contest_dir, resolve_contest_group
+from .samples import download_samples, print_sample_download_summary
+from .templates import load_template
 
 
 def cmd_new(contest: str, lang: Optional[str] = None):
@@ -136,7 +118,7 @@ def load_contest_problems(contest_id: str, config: dict) -> List[AtCoderProblem]
 
 def write_current_contest(contest_dir: Path, config: Optional[dict] = None):
     config = config or load_config(Path.cwd())
-    project_root = _find_project_root(Path.cwd(), config)
+    project_root = find_project_root(Path.cwd(), config)
     atc_dir = project_root / ".atc"
     atc_dir.mkdir(parents=True, exist_ok=True)
 

@@ -2,44 +2,25 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple
 
-try:
-    from .argparse_utils import ArgumentParseError, AtcArgumentParser
-    from .config import (
-        CONFIG_FILE_NAME,
-        _config_to_toml,
-        _default_config_template,
-        _find_config_file,
-        load_config,
-    )
-    from .console import error, warn
-    from .contest import cmd_contest, cmd_new
-    from .doctor import cmd_config_doctor
-    from .manual import cmd_manual, cmd_manual_tests
-    from .refresh import cmd_refresh
-    from .runner import cmd_rerun, cmd_run, cmd_run_all
-    from .stress import cmd_stress, cmd_stress_init, cmd_stress_promote
-    from .template_commands import cmd_template_list, cmd_template_show
-    from .visual import cmd_visual, parse_visual_args
-    from .watch import cmd_watch
-except ImportError:
-    from argparse_utils import ArgumentParseError, AtcArgumentParser
-    from config import (
-        CONFIG_FILE_NAME,
-        _config_to_toml,
-        _default_config_template,
-        _find_config_file,
-        load_config,
-    )
-    from console import error, warn
-    from contest import cmd_contest, cmd_new
-    from doctor import cmd_config_doctor
-    from manual import cmd_manual, cmd_manual_tests
-    from refresh import cmd_refresh
-    from runner import cmd_rerun, cmd_run, cmd_run_all
-    from stress import cmd_stress, cmd_stress_init, cmd_stress_promote
-    from template_commands import cmd_template_list, cmd_template_show
-    from visual import cmd_visual, parse_visual_args
-    from watch import cmd_watch
+
+from .argparse_utils import ArgumentParseError, AtcArgumentParser
+from .config import (
+    CONFIG_FILE_NAME,
+    config_to_toml,
+    default_config_template,
+    find_config_file,
+    load_config,
+)
+from .console import error, warn
+from .contest import cmd_contest, cmd_new
+from .doctor import cmd_config_doctor
+from .manual import cmd_manual, cmd_manual_tests
+from .refresh import cmd_refresh
+from .runner import cmd_rerun, cmd_run, cmd_run_all
+from .stress import cmd_stress, cmd_stress_init, cmd_stress_promote
+from .template_commands import cmd_template_list, cmd_template_show
+from .visual import cmd_visual, parse_visual_args
+from .watch import cmd_watch
 
 
 class _UsageError:
@@ -105,11 +86,11 @@ def handle_config(args: List[str]):
 
     subcmd = args[0]
     if subcmd == "show":
-        config_file = _find_config_file(Path.cwd())
+        config_file = find_config_file(Path.cwd())
         config = load_config(Path.cwd())
         print(f"config file: {config_file.resolve() if config_file else '(default)'}")
         print()
-        print(_config_to_toml(config), end="")
+        print(config_to_toml(config), end="")
     elif subcmd == "init":
         atc_dir = Path(".atc")
         atc_dir.mkdir(parents=True, exist_ok=True)
@@ -117,7 +98,7 @@ def handle_config(args: List[str]):
         if config_file.exists():
             warn(f"already exists: {config_file.resolve()}")
             return 0
-        config_file.write_text(_config_to_toml(_default_config_template()), encoding="utf-8")
+        config_file.write_text(config_to_toml(default_config_template()), encoding="utf-8")
         print(f"created: {config_file.resolve()}")
     elif subcmd == "doctor":
         cmd_config_doctor()

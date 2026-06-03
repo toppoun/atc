@@ -2,20 +2,11 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
+import tomllib
 
-try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib
-
-try:
-    from .atcoder import AtCoderProblem
-    from .config import SOURCE_EXTS
-    from .console import warn
-except ImportError:
-    from atcoder import AtCoderProblem
-    from config import SOURCE_EXTS
-    from console import warn
+from .atcoder import AtCoderProblem
+from .config import SOURCE_EXTS
+from .console import warn
 
 
 CONTEST_METADATA_PATH = Path(".atc") / "contest.toml"

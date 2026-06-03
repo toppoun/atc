@@ -4,24 +4,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-try:
-    from .config import (
-        _config_project_root,
-        _find_config_file,
-        _find_project_root,
-        config_root,
-        load_config,
-    )
-    from .console import error, warn
-except ImportError:
-    from config import (
-        _config_project_root,
-        _find_config_file,
-        _find_project_root,
-        config_root,
-        load_config,
-    )
-    from console import error, warn
+from .config import (
+    config_project_root,
+    find_config_file,
+    find_project_root,
+    config_root,
+    load_config,
+)
+from .console import error, warn
 
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
@@ -222,7 +212,7 @@ def _resolve_template_path_value(value: str, ext: str, config: dict, start: Path
     if template_path.is_absolute():
         return template_path
 
-    config_file = _find_config_file(start)
+    config_file = find_config_file(start)
     if not config_file:
         if value == f"templates/template.{ext}":
             return TEMPLATE_DIR / f"template.{ext}"
@@ -230,14 +220,14 @@ def _resolve_template_path_value(value: str, ext: str, config: dict, start: Path
 
     candidates = [
         config_file.parent / template_path,
-        _config_project_root(config_file) / template_path,
+        config_project_root(config_file) / template_path,
     ]
 
     root_path = config_root(config)
     if root_path:
         candidates.append(root_path / template_path)
 
-    candidates.append(_find_project_root(start, config) / template_path)
+    candidates.append(find_project_root(start, config) / template_path)
 
     if value == f"templates/template.{ext}":
         candidates.append(TEMPLATE_DIR / f"template.{ext}")
@@ -250,32 +240,32 @@ def _resolve_manifest_path_value(value: str, config: dict, start: Path):
     if manifest_path.is_absolute():
         return manifest_path
 
-    config_file = _find_config_file(start)
+    config_file = find_config_file(start)
     if not config_file:
         return (start / manifest_path).resolve()
 
     candidates = [
         config_file.parent / manifest_path,
-        _config_project_root(config_file) / manifest_path,
+        config_project_root(config_file) / manifest_path,
     ]
 
     root_path = config_root(config)
     if root_path:
         candidates.append(root_path / manifest_path)
 
-    candidates.append(_find_project_root(start, config) / manifest_path)
+    candidates.append(find_project_root(start, config) / manifest_path)
     return _first_existing_or_last(candidates)
 
 
 def _implicit_manifest_candidates(config: dict, start: Path):
     manifest_path = Path("templates") / MANIFEST_FILE_NAME
-    config_file = _find_config_file(start)
+    config_file = find_config_file(start)
     candidates = []
     if config_file:
         candidates.extend(
             [
                 config_file.parent / manifest_path,
-                _config_project_root(config_file) / manifest_path,
+                config_project_root(config_file) / manifest_path,
             ]
         )
 
@@ -283,7 +273,7 @@ def _implicit_manifest_candidates(config: dict, start: Path):
         if root_path:
             candidates.append(root_path / manifest_path)
 
-        candidates.append(_find_project_root(start, config) / manifest_path)
+        candidates.append(find_project_root(start, config) / manifest_path)
 
     candidates.append(TEMPLATE_DIR / MANIFEST_FILE_NAME)
     return _unique_paths(candidates)

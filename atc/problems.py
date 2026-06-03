@@ -2,22 +2,13 @@ import re
 from pathlib import Path
 from typing import List, Optional
 
-try:
-    from .config import SOURCE_EXTS, config_problems, load_config
-    from .metadata import (
-        ContestProblem,
-        contest_metadata_error,
-        contest_metadata_problems,
-        read_contest_metadata,
-    )
-except ImportError:
-    from config import SOURCE_EXTS, config_problems, load_config
-    from metadata import (
-        ContestProblem,
-        contest_metadata_error,
-        contest_metadata_problems,
-        read_contest_metadata,
-    )
+from .config import SOURCE_EXTS, config_problems, load_config
+from .metadata import (
+    ContestProblem,
+    contest_metadata_error,
+    contest_metadata_problems,
+    read_contest_metadata,
+)
 
 
 def _normalize_problem_index(problem: object) -> str:

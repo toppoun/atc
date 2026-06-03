@@ -2,28 +2,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-try:
-    from .atcoder import AtCoderProblem, fetch_atcoder_tasks
-    from .config import default_language, load_config
-    from .console import RICH_AVAILABLE, Table, console, error, ok as print_ok
-    from .paths import (
-        ContestPathConfigError,
-        is_workspace_root,
-        resolve_contest_dir,
-    )
-    from .metadata import infer_source_name_for_metadata, write_contest_metadata
-    from .samples import download_samples
-except ImportError:
-    from atcoder import AtCoderProblem, fetch_atcoder_tasks
-    from config import default_language, load_config
-    from console import RICH_AVAILABLE, Table, console, error, ok as print_ok
-    from paths import (
-        ContestPathConfigError,
-        is_workspace_root,
-        resolve_contest_dir,
-    )
-    from metadata import infer_source_name_for_metadata, write_contest_metadata
-    from samples import download_samples
+from .atcoder import AtCoderProblem, fetch_atcoder_tasks
+from .config import default_language, load_config
+from .console import RICH_AVAILABLE, Table, console, error, ok as print_ok
+from .paths import (
+    ContestPathConfigError,
+    is_workspace_root,
+    resolve_contest_dir,
+)
+from .metadata import infer_source_name_for_metadata, write_contest_metadata
+from .samples import download_samples
 
 
 class RefreshError(RuntimeError):

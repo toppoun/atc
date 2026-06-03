@@ -7,56 +7,30 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-try:
-    from .config import (
-        load_config,
-        normalize_run_language,
-        resolve_executable,
-        runner_command,
-        runner_compile_timeout,
-        runner_cpp_flags,
-        runner_timeout,
-    )
-    from .console import (
-        error,
-        ok,
-        print_promote_result,
-        print_stress_failure,
-        print_stress_header,
-        print_text,
-        warn,
-    )
-    from .templates import (
-        TemplateError,
-        load_template_manifest,
-        resolve_template_manifest,
-        resolve_template_name,
-    )
-except ImportError:
-    from config import (
-        load_config,
-        normalize_run_language,
-        resolve_executable,
-        runner_command,
-        runner_compile_timeout,
-        runner_cpp_flags,
-        runner_timeout,
-    )
-    from console import (
-        error,
-        ok,
-        print_promote_result,
-        print_stress_failure,
-        print_stress_header,
-        print_text,
-        warn,
-    )
-    from templates import (
-        TemplateError,
-        load_template_manifest,
-        resolve_template_manifest,
-        resolve_template_name,
-    )
+from .config import (
+    load_config,
+    normalize_run_language,
+    resolve_executable,
+    runner_command,
+    runner_compile_timeout,
+    runner_cpp_flags,
+    runner_timeout,
+)
+from .console import (
+    error,
+    ok,
+    print_promote_result,
+    print_stress_failure,
+    print_stress_header,
+    print_text,
+    warn,
+)
+from .templates import (
+    TemplateError,
+    load_template_manifest,
+    resolve_template_manifest,
+    resolve_template_name,
+)
 
 
 COMPARE_MODES = {"exact", "strip", "tokens"}
