@@ -16,7 +16,7 @@ from .contest import cmd_contest, cmd_new
 from .doctor import cmd_config_doctor
 from .manual import cmd_manual, cmd_manual_tests
 from .refresh import cmd_refresh
-from .runner import cmd_rerun, cmd_run, cmd_run_all
+from .runner import cmd_run, cmd_run_all
 from .stress import cmd_stress, cmd_stress_init, cmd_stress_promote
 from .template_commands import cmd_template_list, cmd_template_show
 from .visual import cmd_visual, parse_visual_args
@@ -118,16 +118,6 @@ def handle_run(args: List[str]):
         cmd_run_all(parsed.lang)
     else:
         cmd_run(parsed.problem, parsed.lang)
-    return 0
-
-
-def handle_rerun(args: List[str]):
-    parser = AtcArgumentParser(prog="atc rerun")
-    parser.add_argument("lang", nargs="?")
-    parsed = _parse_handler_args(parser, args)
-    if parsed is None:
-        return USAGE_ERROR
-    cmd_rerun(parsed.lang)
     return 0
 
 
@@ -263,13 +253,6 @@ COMMANDS: Tuple[CommandSpec, ...] = (
         handler=handle_run,
     ),
     CommandSpec(
-        name="rerun",
-        aliases=("retry",),
-        usage=("atc rerun [python|pypy|cpp]",),
-        description="Run the failed cases from the previous test run.",
-        handler=handle_rerun,
-    ),
-    CommandSpec(
         name="watch",
         aliases=("w", "auto"),
         usage=("atc watch [A] [python|pypy|cpp]",),
@@ -343,7 +326,6 @@ USAGE_SECTIONS: Tuple[Tuple[str, Tuple[Tuple[str, str], ...]], ...] = (
         "Run",
         (
             ("atc run <A|all> [python|pypy|cpp]", "Run tests"),
-            ("atc rerun [python|pypy|cpp]", "Rerun last failed case"),
             ("atc watch [A] [python|pypy|cpp]", "Watch and run on save"),
         ),
     ),

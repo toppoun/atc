@@ -47,7 +47,7 @@ atc/
 ├── samples.py      # oj sample download
 ├── contest.py      # atc new / atc contest
 ├── manual.py       # atc manual
-├── runner.py       # atc run / test / rerun
+├── runner.py       # atc run / test
 ├── stress.py       # atc stress
 ├── watch.py        # atc watch
 ├── doctor.py       # atc config doctor
@@ -67,7 +67,6 @@ atc/
 - `atc test A [python|pypy|cpp]`
 - `atc t A [python|pypy|cpp]`
 - `atc run all [python|pypy|cpp]`
-- `atc rerun [python|pypy|cpp]`
 - `atc retry [python|pypy|cpp]`
 - `atc stress A [py|cpp] [--count N] [--seed S] [--gen PATH] [--brute PATH] [--timeout SEC] [--compare exact|strip|tokens]`
 - `atc stress init A`
@@ -185,7 +184,7 @@ manifest が明示されていて壊れている場合、`atc config doctor` で
 
 ## runner / watch
 
-`runner.py` は `run / test / rerun` を担当します。
+`runner.py` は `run / test` を担当します。
 
 - Python / PyPy 実行
 - C++ compile

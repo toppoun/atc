@@ -101,7 +101,7 @@ def test_run_problem_tests_returns_error_for_invalid_language(tmp_path, monkeypa
     result = run_problem_tests("A", "ruby")
 
     assert result.problem == "A"
-    assert result.error_status == "ERROR"
+    assert result.error_status == "INVALID_LANGUAGE"
     assert "Invalid language" in result.error_message
     assert result.passed is False
 

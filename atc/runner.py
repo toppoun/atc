@@ -369,37 +369,6 @@ def cmd_run_all(run_language: Optional[str] = None):
         sys.exit(1)
 
 
-def cmd_rerun(run_language: Optional[str] = None):
-    failed_path = LOG_DIR / "last_failed.txt"
-    if not failed_path.exists():
-        warn("直前の失敗記録がありません。")
-        return
-
-    groups = {}
-    for line in failed_path.read_text(encoding="utf-8").splitlines():
-        parts = line.split(maxsplit=1)
-        if len(parts) != 2:
-            continue
-        problem, case_name = parts
-        if case_name == "*":
-            groups[problem] = None
-        elif groups.get(problem) is not None:
-            groups.setdefault(problem, set()).add(case_name)
-
-    if not groups:
-        ok("直前に失敗したケースはありません。")
-        return
-
-    results = []
-    for problem, case_names in sorted(groups.items()):
-        results.append(run_problem_tests(problem, run_language, show_compile=False, case_names=case_names))
-
-    log_path = _write_test_log(results)
-    _print_auto_summary(results, log_path)
-    if not _results_passed(results):
-        sys.exit(1)
-
-
 def _run_batch_tests(problems: List[str], run_language: Optional[str] = None, reason=""):
     if not problems:
         warn("テスト対象が見つかりません。")

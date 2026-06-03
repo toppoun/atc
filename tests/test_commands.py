@@ -31,7 +31,6 @@ def test_usage_lines_include_main_commands():
     assert "atc config doctor" in usage
     assert "atc run A" in usage
     assert "atc run all" in usage
-    assert "atc rerun" in usage
     assert "atc watch" in usage
     assert "atc template list" in usage
     assert "atc template show" in usage

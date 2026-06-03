@@ -106,16 +106,6 @@ atc run all cpp
 .atc/test-runs/last_failed.txt
 ```
 
-## `atc rerun` / `atc retry`
-
-```bash
-atc rerun
-atc rerun cpp
-atc retry
-```
-
-直前に失敗したケースだけ再実行します。失敗情報は `.atc/test-runs/last_failed.txt` を使います。
-
 ## `atc watch` / `atc w` / `atc auto`
 
 ```bash

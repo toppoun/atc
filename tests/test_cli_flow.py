@@ -72,24 +72,6 @@ def _write_sample(cwd: Path, expected: str = "hello") -> None:
     (testdir / "sample-1.out").write_text(f"{expected}\n", encoding="utf-8")
 
 
-def test_cli_manual_run_rerun_success_flow(tmp_path):
-    _write_test_config(tmp_path)
-
-    manual = _run_cli(tmp_path, "manual", "A", "py")
-    _assert_success(manual)
-    assert (tmp_path / "A.py").is_file()
-    assert "Created" in manual.stdout
-
-    _write_echo_problem(tmp_path)
-
-    run = _run_cli(tmp_path, "run", "A", "py")
-    _assert_success(run)
-    assert "AC" in run.stdout
-
-    rerun = _run_cli(tmp_path, "rerun", "py")
-    _assert_success(rerun)
-
-
 def test_cli_single_run_prints_compact_result_table(tmp_path):
     _write_test_config(tmp_path)
     (tmp_path / "A.py").write_text("print(input())\n", encoding="utf-8")
@@ -141,30 +123,6 @@ def test_cli_single_run_prints_failure_detail_after_compact_table(tmp_path):
     assert "beta-expected" in combined
     assert "actual" in combined
     assert combined.count("sample-1.in") == 1
-
-
-def test_cli_run_all_writes_log_and_rerun_failed_problem(tmp_path):
-    _write_test_config(tmp_path)
-    _write_sample(tmp_path)
-
-    run_all = _run_cli(tmp_path, "run", "all", "py")
-    _assert_no_traceback(run_all)
-    assert run_all.returncode == 1, f"stdout:\n{run_all.stdout}\nstderr:\n{run_all.stderr}"
-    assert "FAIL" in run_all.stdout
-
-    log_path = tmp_path / ".atc" / "test-runs" / "last.log"
-    failed_path = tmp_path / ".atc" / "test-runs" / "last_failed.txt"
-    assert log_path.is_file()
-    assert "ERROR: ファイルが見つかりません。" in log_path.read_text(encoding="utf-8")
-    assert failed_path.read_text(encoding="utf-8") == "A *"
-
-    (tmp_path / "A.py").write_text("print(input())\n", encoding="utf-8")
-
-    rerun = _run_cli(tmp_path, "rerun", "py")
-    _assert_success(rerun)
-    assert "PASS" in rerun.stdout
-    assert log_path.is_file()
-    assert failed_path.read_text(encoding="utf-8") == ""
 
 
 def test_cli_config_init_writes_paths_contests_without_legacy_paths(tmp_path):
@@ -284,7 +242,6 @@ def test_cli_argparse_handlers_reject_extra_args(tmp_path):
         ("new", "abc001", "py", "extra"),
         ("contest", "abc001", "py", "extra"),
         ("run", "A", "py", "extra"),
-        ("rerun", "py", "extra"),
     ]
 
     for args in cases:

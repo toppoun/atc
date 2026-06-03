@@ -2,6 +2,21 @@
 
 開発者向けの構造メモです。ユーザー向けの使い方は `README.md` と `docs/USAGE.md` を見てください。
 
+## Commit message rule
+
+\<type>: <内容>
+
+```text
+feat:     新機能追加
+fix:      バグ修正
+refactor: 挙動を変えない整理・設計改善
+remove:   不要機能や不要コードの削除
+docs:     READMEやコメントだけ
+test:     テスト追加・修正
+chore:    設定・依存関係・雑務
+style:    フォーマットだけ
+```
+
 ## Module responsibilities
 
 ```text
@@ -15,7 +30,7 @@ template_commands.py template list/show CLI
 samples.py    oj sample download
 contest.py    atc new / atc contest
 manual.py     atc manual
-runner.py     atc run / test / rerun
+runner.py     atc run / test
 stress.py     atc stress / stress promote
 watch.py      atc watch
 doctor.py     atc config doctor
