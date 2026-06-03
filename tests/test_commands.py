@@ -1,4 +1,14 @@
+import atc.commands as commands_module
 from atc.commands import resolve_command, usage_lines, usage_sections
+from atc.models import CaseResult, ProblemResult
+
+
+def _passed_result(problem="A"):
+    return ProblemResult(
+        problem=problem,
+        mode="py",
+        cases=[CaseResult(name="sample-1.in", status="AC", elapsed_ms=1.0, expected="", output="")],
+    )
 
 
 def test_resolve_command_aliases():
@@ -20,6 +30,50 @@ def test_resolve_command_aliases():
     assert resolve_command("stress").name == "stress"
 
     assert resolve_command("unknown") is None
+
+
+def test_handle_run_all_prints_all_summary_and_returns_success(monkeypatch):
+    results = [_passed_result("A"), _passed_result("B")]
+    printed = []
+
+    monkeypatch.setattr(commands_module, "cmd_run_all", lambda lang=None: results)
+    monkeypatch.setattr(commands_module, "print_all_summary", lambda value: printed.append(value))
+
+    assert commands_module.handle_run(["all", "py"]) == 0
+    assert printed == [results]
+
+
+def test_handle_run_all_returns_failure_when_any_result_fails(monkeypatch):
+    failed = ProblemResult(
+        problem="A",
+        mode="py",
+        cases=[CaseResult(name="sample-1.in", status="WA", elapsed_ms=1.0, expected="ok", output="ng")],
+    )
+    results = [_passed_result("B"), failed]
+    printed = []
+
+    monkeypatch.setattr(commands_module, "cmd_run_all", lambda lang=None: results)
+    monkeypatch.setattr(commands_module, "print_all_summary", lambda value: printed.append(value))
+
+    assert commands_module.handle_run(["all"]) == 1
+    assert printed == [results]
+
+
+def test_handle_run_single_prints_detailed_result(monkeypatch):
+    result = _passed_result("A")
+    printed = []
+    calls = []
+
+    def fake_run_problem_tests(problem, lang=None, show_compile=False, write_log=False):
+        calls.append((problem, lang, show_compile, write_log))
+        return result
+
+    monkeypatch.setattr(commands_module, "run_problem_tests", fake_run_problem_tests)
+    monkeypatch.setattr(commands_module, "print_detailed_result", lambda value: printed.append(value))
+
+    assert commands_module.handle_run(["A", "py"]) == 0
+    assert calls == [("A", "py", True, True)]
+    assert printed == [result]
 
 
 def test_usage_lines_include_main_commands():

@@ -1,9 +1,10 @@
 import json
+import inspect
 import sys
 
 import atc.runner as runner_module
 from atc.models import CaseResult, ProblemResult
-from atc.runner import LOG_DIR, print_auto_summary, results_passed, run_problem_tests, write_test_log
+from atc.runner import LOG_DIR, results_passed, run_problem_tests, write_test_log
 
 
 ADT_INDEXES = list("ABCDEFGHI")
@@ -94,6 +95,21 @@ def test_run_problem_tests_returns_no_tests_without_samples(tmp_path, monkeypatc
     assert result.passed is False
 
 
+def test_run_problem_tests_returns_no_source_without_source_file(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    testdir = tmp_path / "tests" / "A"
+    testdir.mkdir(parents=True)
+    (testdir / "sample-1.in").write_text("hello\n", encoding="utf-8")
+    (testdir / "sample-1.out").write_text("hello\n", encoding="utf-8")
+
+    result = run_problem_tests("A", "python")
+
+    assert result.problem == "A"
+    assert result.error_status == "NO_SOURCE"
+    assert "ファイル" in result.error_message
+    assert result.passed is False
+
+
 def test_run_problem_tests_returns_error_for_invalid_language(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "A.py").write_text("print(input())\n", encoding="utf-8")
@@ -111,15 +127,29 @@ def test_cmd_run_all_uses_metadata_problem_list(tmp_path, monkeypatch):
     _write_contest_metadata(tmp_path)
     calls = []
 
-    def fake_run_batch_tests(problems, run_language, reason=""):
-        calls.append((problems, run_language, reason))
-        return True
+    def fake_run_problem_tests(problem, run_language, show_compile=False):
+        calls.append((problem, run_language, show_compile))
+        return _passed_result(problem)
 
-    monkeypatch.setattr(runner_module, "_run_batch_tests", fake_run_batch_tests)
+    monkeypatch.setattr(runner_module, "run_problem_tests", fake_run_problem_tests)
 
-    runner_module.cmd_run_all("py")
+    results = runner_module.cmd_run_all("py")
 
-    assert calls == [(ADT_INDEXES, "py", "manual")]
+    assert [result.problem for result in results] == ADT_INDEXES
+    assert calls == [(problem, "py", False) for problem in ADT_INDEXES]
+    assert (tmp_path / ".atc" / "test-runs" / "last.log").is_file()
+
+
+def test_cmd_run_all_returns_empty_list_without_available_problems(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(runner_module, "resolve_available_problems", lambda cwd, config: [])
+
+    results = runner_module.cmd_run_all("py")
+
+    captured = capsys.readouterr()
+    assert results == []
+    assert captured.out == ""
+    assert captured.err == ""
 
 
 def test_write_test_log_records_failed_cases(tmp_path, monkeypatch):
@@ -151,85 +181,17 @@ def test_write_test_log_records_failed_cases(tmp_path, monkeypatch):
     assert (tmp_path / ".atc" / "test-runs" / "last_failed.txt").read_text(encoding="utf-8") == "A sample-1.in\nB *"
 
 
-def test_auto_summary_prints_batch_success_summary(capsys):
-    result = _passed_result("A")
-
-    print_auto_summary([result], LOG_DIR / "last.log")
-
-    output = capsys.readouterr().out
-    assert "Test Results: A" in output
-    assert "PASS A: 1 tests" in output
-    assert "Full log" in output
+def test_runner_does_not_expose_removed_batch_display_helpers():
+    assert not hasattr(runner_module, "print_auto_summary")
+    assert not hasattr(runner_module, "run_batch_tests")
+    assert not hasattr(runner_module, "rerun")
 
 
-def test_auto_summary_prints_batch_failure_summary(capsys):
-    failed = ProblemResult(
-        problem="A",
-        mode="py",
-        cases=[
-            CaseResult(
-                name="sample-1.in",
-                status="WA",
-                elapsed_ms=1.0,
-                expected="hello",
-                output="bye",
-            )
-        ],
-    )
+def test_runner_does_not_import_console_display_functions():
+    source = inspect.getsource(runner_module)
 
-    print_auto_summary([failed], LOG_DIR / "last.log")
-
-    output = capsys.readouterr().out
-    assert "FAIL A: 0/1 AC" in output
-    assert "sample-1.in" in output
-    assert "Test Results: A" in output
-    assert "Full log" in output
-
-
-def test_batch_tests_prints_full_summary(tmp_path, monkeypatch, capsys):
-    monkeypatch.chdir(tmp_path)
-
-    def fake_run_problem_tests(problem, run_language, show_compile=False):
-        return ProblemResult(
-            problem=problem,
-            mode="py",
-            cases=[
-                CaseResult(name=f"sample-{i}.in", status="WA", elapsed_ms=1.0, expected="ok", output="ng")
-                for i in range(1, 5)
-            ],
-        )
-
-    monkeypatch.setattr(runner_module, "run_problem_tests", fake_run_problem_tests)
-
-    passed = runner_module.run_batch_tests(["A"], "python", reason="manual")
-
-    output = capsys.readouterr().out
-    assert passed is False
-    assert "manual: running A" in output
-    assert "FAIL A: 0/4 AC" in output
-    assert "sample-1.in" in output
-
-
-def test_batch_tests_prints_all_problem_names(tmp_path, monkeypatch, capsys):
-    monkeypatch.chdir(tmp_path)
-    problems = [f"A{i:02d}" for i in range(1, 51)]
-
-    def fake_run_problem_tests(problem, run_language, show_compile=False):
-        return ProblemResult(
-            problem=problem,
-            mode="py",
-            cases=[CaseResult(name="sample-1.in", status="AC", elapsed_ms=1.0, expected="", output="")],
-        )
-
-    monkeypatch.setattr(runner_module, "run_problem_tests", fake_run_problem_tests)
-
-    passed = runner_module.run_batch_tests(problems, "python", reason="manual")
-    output = capsys.readouterr().out
-    compact_output = "".join(output.split())
-
-    assert passed is True
-    assert "manual:runningA01,A02,A03" in compact_output
-    assert "PASSA01,A02,A03" in compact_output
+    assert "from .console import" not in source
+    assert "from console import" not in source
 
 
 def test_run_problem_tests_python_minimal_ac_case(tmp_path, monkeypatch):

@@ -17,7 +17,6 @@ from .config import (
     load_config,
     resolve_executable,
 )
-from .console import warn
 
 from .models import CaseResult, ProblemResult
 from .problems import resolve_available_problems
@@ -61,8 +60,6 @@ def _prepare_cpp_run_command(cwd: Path, problem: str, cpp_file: Path, config: di
     exe_path = cwd / f"_{problem}{suffix}"
     flags = runner_cpp_flags(config)
 
-    if show_compile:
-        warn(f"Compiling {cpp_file.name}...")
     try:
         c_proc = subprocess.run(
             [compiler_path, *flags, str(cpp_file), "-o", str(exe_path)],
@@ -282,8 +279,7 @@ def cmd_run_all(run_language: Optional[str] = None):
     problems = resolve_available_problems(cwd, config)
     
     if not problems:
-        warn("テスト対象が見つかりません。")
-        return False
+        return []
     
     results = [run_problem_tests(problem, run_language, show_compile=False)
                for problem in problems]
