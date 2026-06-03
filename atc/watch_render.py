@@ -53,29 +53,6 @@ def _problem_heading(state: WatchState, now: float):
     return f"{heading}{_format_problem_elapsed(state, now)}"
 
 
-def build_plain_watch_view(state: WatchState, *, now: Optional[float] = None) -> str:
-    now = time.monotonic() if now is None else now
-    lines = [
-        f"Watching {state.cwd}",
-        state.message or _problem_heading(state, now),
-        f"log {state.log_path}",
-        "",
-        "Case          Result   Time",
-    ]
-    result = state.result
-    if not result:
-        lines.append("waiting       -        -")
-        return "\n".join(lines)
-    if result.error_status:
-        lines.append(f"problem       {result.error_status:<8} -")
-        if result.error_message:
-            lines.append(result.error_message)
-        return "\n".join(lines)
-    for case in result.cases:
-        lines.append(f"{case.name:<13} {case.status:<8} {_format_case_time(case.elapsed_ms)}")
-    return "\n".join(lines)
-
-
 def build_watch_result_table(result: Optional[ProblemResult]):
     table = Table(box=box.SIMPLE)
     table.add_column("Case")
@@ -120,6 +97,8 @@ def build_watch_header(state: WatchState, *, now: Optional[float] = None):
 
 def build_watch_view(state: WatchState, *, now: Optional[float] = None):
     now = time.monotonic() if now is None else now
-    return build_plain_watch_view(state, now=now)
-
+    view = Table.grid(expand=True)
+    view.add_row(Panel(build_watch_header(state, now=now), title="Watch", border_style="cyan", box=box.ROUNDED))
+    view.add_row(build_watch_result_table(state.result))
+    return view
 

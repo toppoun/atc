@@ -7,7 +7,7 @@ from .config import SOURCE_EXTS, load_config, watch_settings
 from .metadata import CONTEST_METADATA_PATH, contest_metadata_problems
 from .problems import resolve_available_problems
 from .runner import LOG_DIR, normalize_problem, run_problem_tests, write_test_log
-from .watch_render import WATCH_WAIT_MESSAGE, WatchState, build_plain_watch_view, build_watch_view
+from .watch_render import WATCH_WAIT_MESSAGE, WatchState, build_watch_view
 
 
 CONFIG_FILES = {
@@ -203,10 +203,6 @@ def _run_watch_problem(problem: str, run_language: Optional[str], titles: Dict[s
     state.message = ""
     write_test_log([result])
     return result
-
-
-def _print_plain_watch_result(state: WatchState):
-    print_text(build_plain_watch_view(state))
 
 
 def _run_watch_loop(
