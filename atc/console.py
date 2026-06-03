@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterable, Optional, Sequence, Tuple
+from typing import Iterable, Optional, Sequence, Tuple, List, Any
 
 from rich import box
 from rich.console import Console
@@ -32,8 +32,8 @@ def _styled_text(message: str, style: str):
     return Text(str(message), style=style)
 
 
-def print_text(message: str = "", *, style: Optional[str] = None, end: str = "\n", flush: bool = False) -> None:
-    console.print(str(message), style=style, end=end)
+def print_text(message: Any = "", *, style: Optional[str] = None, end: str = "\n", flush: bool = False) -> None:
+    console.print(message, style=style, end=end)
     if flush:
         console.file.flush()
 
@@ -154,23 +154,34 @@ def print_failure_detail(title: str, sections: Iterable[Tuple[str, str]], style:
     panel(title, message, style=style)
 
 
-def print_auto_summary(
-    problems: str,
-    passed_cases: int,
-    total_cases: int,
-    duration: str,
-    failed_items: Sequence[Tuple[str, str, str]],
-    log_path: Path,
-) -> None:
-    if failed_items:
-        print_text(f"FAIL {problems}: {passed_cases}/{total_cases} AC in {duration}", style="red")
-        for problem, status, detail in failed_items[:8]:
-            print_text(f"  {problem} - {status}: {detail}")
-        if len(failed_items) > 8:
-            print_text(f"  ... and {len(failed_items) - 8} more")
-    else:
-        print_text(f"PASS {problems}: {total_cases} tests in {duration}", style="green")
-    print_text(f"Full log: {log_path}")
+def print_all_summary(results: List[ProblemResult]) -> None:
+
+    for result in results:
+        if result.error_status:
+            status = result.error_status
+            status_text = _styled_text(status, _status_style(status))
+
+            print_text(
+                Text.assemble(
+                    f"{result.problem} - ",
+                    status_text,
+                    f" {result.ok_count}/{result.total_count}  {result.error_message}",
+                )
+            )
+            continue
+
+        status = "AC" if result.passed else "WA"
+        status_text = _styled_text(status, _status_style(status))
+
+
+        print_text(
+            Text.assemble(
+                f"{result.problem} - ",
+                status_text,
+                f" {result.ok_count}/{result.total_count}  "
+                f"{result.duration_ms / 1000:.2f}s",
+            )
+        )
 
 
 def print_watch_header(

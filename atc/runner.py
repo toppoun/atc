@@ -17,14 +17,8 @@ from .config import (
     load_config,
     resolve_executable,
 )
-from .console import (
-    error,
-    ok,
-    print_auto_summary as console_print_auto_summary,
-    print_test_results,
-    print_text,
-    warn,
-)
+from .console import warn
+
 from .models import CaseResult, ProblemResult
 from .problems import resolve_available_problems
 
@@ -135,6 +129,7 @@ def run_problem_tests(
     show_compile=False,
     case_names: Optional[Set[str]] = None,
     on_case_result: Optional[Callable[[CaseResult], None]] = None,
+    write_log=False
 ):
     cwd = Path.cwd()
     config = load_config(cwd)
@@ -228,6 +223,9 @@ def run_problem_tests(
             cleanup_path.unlink()
 
     result.duration_ms = (time.perf_counter() - started) * 1000
+
+    if write_log:
+        write_test_log([result])
     return result
 
 
@@ -274,34 +272,6 @@ def _write_test_log(results: List[ProblemResult]):
     return log_path
 
 
-def _print_auto_summary(results: List[ProblemResult], log_path: Path):
-    total_cases = sum(result.total_count for result in results)
-    passed_cases = sum(result.ok_count for result in results)
-    failed_items = []
-    total_ms = sum(result.duration_ms for result in results)
-
-    for result in results:
-        if result.error_status:
-            failed_items.append((result.problem, result.error_status, result.error_message))
-        for case in result.failed_cases:
-            failed_items.append((result.problem, case.status, case.name))
-
-    problem_names = [result.problem for result in results]
-    problems = ",".join(problem_names)
-
-    for result in results:
-        if not result.error_status and result.cases:
-            print_test_results(
-                result.cases,
-                title=f"Test Results: {result.problem}",
-                ok_count=result.ok_count,
-                total_count=result.total_count,
-                failure_details=_result_failure_details(result),
-            )
-
-    console_print_auto_summary(problems, passed_cases, total_cases, _format_seconds(total_ms), failed_items, log_path)
-
-
 def _results_passed(results: List[ProblemResult]):
     return bool(results) and all(result.passed for result in results)
 
@@ -310,32 +280,24 @@ def cmd_run_all(run_language: Optional[str] = None):
     cwd = Path.cwd()
     config = load_config(cwd)
     problems = resolve_available_problems(cwd, config)
-    if not _run_batch_tests(problems, run_language, reason="manual"):
-        sys.exit(1)
-
-
-def _run_batch_tests(problems: List[str], run_language: Optional[str] = None, reason=""):
+    
     if not problems:
         warn("テスト対象が見つかりません。")
         return False
+    
+    results = [run_problem_tests(problem, run_language, show_compile=False)
+               for problem in problems]
+    
+    write_test_log(results)
 
-    label = ",".join(problems)
-    prefix = f"{reason}: " if reason else ""
-    print_text(f"{prefix}running {label} ...")
-    results = [run_problem_tests(problem, run_language, show_compile=False) for problem in problems]
-    log_path = _write_test_log(results)
-    _print_auto_summary(results, log_path)
-    return _results_passed(results)
+    return results
 
 
-def run_auto_tests(problems: List[str], run_language: Optional[str] = None, reason=""):
-    return _run_batch_tests(problems, run_language, reason=reason)
+
 
 
 # Public aliases used by command modules and lightweight tests.
 normalize_problem = _normalize_problem
 available_problems = _available_problems
 write_test_log = _write_test_log
-print_auto_summary = _print_auto_summary
 results_passed = _results_passed
-run_batch_tests = _run_batch_tests

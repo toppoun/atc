@@ -11,12 +11,12 @@ from .config import (
     find_config_file,
     load_config,
 )
-from .console import error, warn, print_detailed_result
+from .console import error, warn, print_detailed_result, print_all_summary
 from .contest import cmd_contest, cmd_new
 from .doctor import cmd_config_doctor
 from .manual import cmd_manual, cmd_manual_tests
 from .refresh import cmd_refresh
-from .runner import cmd_run_all, run_problem_tests
+from .runner import cmd_run_all, run_problem_tests, write_test_log
 from .stress import cmd_stress, cmd_stress_init, cmd_stress_promote
 from .template_commands import cmd_template_list, cmd_template_show
 from .visual import cmd_visual, parse_visual_args
@@ -115,9 +115,11 @@ def handle_run(args: List[str]):
     if parsed is None:
         return USAGE_ERROR
     if parsed.problem.lower() == "all":
-        cmd_run_all(parsed.lang)
+        results = cmd_run_all(parsed.lang)
+        print_all_summary(results)
+        return 0 if bool(results) and all(result.passed for result in results) else 1
     else:
-        result = run_problem_tests(parsed.problem, parsed.lang, show_compile=True)
+        result = run_problem_tests(parsed.problem, parsed.lang, show_compile=True, write_log=True)
         print_detailed_result(result)
         return 0 if result.passed else 1
 
