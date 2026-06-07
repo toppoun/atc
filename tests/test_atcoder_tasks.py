@@ -1,4 +1,4 @@
-from atc.atcoder import build_fallback_task_url, parse_atcoder_tasks_html
+from atc.core.atcoder import build_fallback_task_url, parse_atcoder_tasks_html
 
 
 ADT_TASKS_HTML = """

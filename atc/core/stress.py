@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-from .config import (
+from atc.core.config import (
     load_config,
     normalize_run_language,
     resolve_executable,

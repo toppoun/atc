@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from atc.ui.console import Panel, Table, Text, box
-from .models import ProblemResult
+from ..models import ProblemResult
 
 
 # --- Constants ---

@@ -1,7 +1,7 @@
 import subprocess
 
-import atc.samples as samples_module
-from atc.samples import download_samples
+import atc.core.samples as samples_module
+from atc.core.samples import download_samples
 
 
 def test_download_samples_prefers_explicit_url(tmp_path, monkeypatch):

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from atc.stress import (
+from atc.core.stress import (
     StressError,
     compare_outputs,
     resolve_stress_timeout,

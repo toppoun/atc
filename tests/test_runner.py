@@ -2,9 +2,9 @@ import json
 import inspect
 import sys
 
-import atc.runner as runner_module
+import atc.core.runner as runner_module
 from atc.models import CaseResult, ProblemResult
-from atc.runner import LOG_DIR, results_passed, run_problem_tests, write_test_log
+from atc.core.runner import LOG_DIR, results_passed, run_problem_tests, write_test_log
 
 
 ADT_INDEXES = list("ABCDEFGHI")

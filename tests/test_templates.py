@@ -8,8 +8,8 @@ except ModuleNotFoundError:
 
 import pytest
 
-import atc.config as config_module
-from atc.templates import (
+import atc.core.config as config_module
+from atc.core.templates import (
     TEMPLATE_DIR,
     TemplateError,
     TemplateManifestError,

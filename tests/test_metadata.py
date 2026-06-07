@@ -1,7 +1,7 @@
 import tomllib
 
 from atc.models import AtCoderProblem
-from atc.metadata import (
+from atc.core.metadata import (
     contest_metadata_error,
     contest_metadata_problems,
     infer_source_name_for_metadata,

@@ -2,7 +2,7 @@ import tomllib
 import pytest
 
 import atc.commands as commands_module
-import atc.refresh as refresh_module
+import atc.core.refresh as refresh_module
 from atc.models import AtCoderProblem
 
 

@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from .config import config_root, find_project_root
+from atc.core.config import config_root, find_project_root
 
 
 class ContestPathConfigError(ValueError):

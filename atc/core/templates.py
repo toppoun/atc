@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-from .config import (
+from atc.core.config import (
     config_project_root,
     find_config_file,
     find_project_root,
@@ -15,7 +15,7 @@ from atc.ui.console import error, warn
 
 
 # --- Constants ---
-TEMPLATE_DIR = Path(__file__).parent / "templates"
+TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "templates"
 MANIFEST_FILE_NAME = "manifest.json"
 
 

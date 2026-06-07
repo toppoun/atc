@@ -8,7 +8,7 @@ from atc.watch import (
     _select_problem_after_change,
     _update_watch_state_after_metadata_reload,
 )
-from atc.watch_render import WatchState, build_watch_view
+from atc.ui.watch_view import WatchState, build_watch_view
 
 
 class DummyLive:

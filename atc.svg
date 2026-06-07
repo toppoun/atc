@@ -218,7 +218,7 @@
 <g id="node16" class="node">
 <title>atc_samples</title><style>.edge>path:hover{stroke-width:8}</style>
 <ellipse fill="#c24747" stroke="black" cx="582.27" cy="-247.88" rx="41.64" ry="18"/>
-<text xml:space="preserve" text-anchor="middle" x="582.27" y="-244.38" font-family="Helvetica,sans-Serif" font-size="10.00" fill="#ffffff">atc.samples</text>
+<text xml:space="preserve" text-anchor="middle" x="582.27" y="-244.38" font-family="Helvetica,sans-Serif" font-size="10.00" fill="#ffffff">atc.core.samples</text>
 </g>
 <!-- atc_samples&#45;&gt;atc_contest -->
 <g id="edge19" class="edge">

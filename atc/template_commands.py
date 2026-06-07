@@ -1,9 +1,9 @@
 from pathlib import Path
 from typing import List, Optional
 
-from .config import load_config
+from atc.core.config import load_config
 from atc.ui.console import error
-from .templates import (
+from atc.core.templates import (
     TemplateError,
     TemplateInfo,
     list_templates,

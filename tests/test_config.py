@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import atc.config as config_module
+import atc.core.config as config_module
 
 
 def _write_config(root: Path, content: str) -> Path:

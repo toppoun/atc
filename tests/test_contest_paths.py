@@ -1,9 +1,9 @@
 import pytest
 
-import atc.config as config_module
-import atc.contest as contest_module
-import atc.paths as paths_module
-from atc.paths import ContestPathConfigError, is_workspace_root, resolve_contest_dir
+import atc.core.config as config_module
+import atc.core.contest as contest_module
+import atc.core.paths as paths_module
+from atc.core.paths import ContestPathConfigError, is_workspace_root, resolve_contest_dir
 
 
 def _config(root, paths):

@@ -4,13 +4,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-from .models import AtCoderProblem
+from ..models import AtCoderProblem
 
-from .atcoder import (
+from atc.core.atcoder import (
     build_fallback_task_url,
     fetch_atcoder_tasks,
 )
-from .config import (
+from atc.core.config import (
     find_project_root,
     config_problems,
     default_language,
@@ -19,7 +19,7 @@ from .config import (
 from atc.ui.console import error, ok as print_ok, warn
 from .metadata import write_contest_metadata
 from .paths import ContestPathConfigError, resolve_contest_dir, resolve_contest_group
-from .samples import download_samples, print_sample_download_summary
+from atc.core.samples import download_samples, print_sample_download_summary
 from .templates import load_template
 
 

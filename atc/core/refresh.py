@@ -2,17 +2,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from .models import AtCoderProblem
-from .atcoder import fetch_atcoder_tasks
-from .config import default_language, load_config
+from ..models import AtCoderProblem
+from atc.core.atcoder import fetch_atcoder_tasks
+from atc.core.config import default_language, load_config
 from atc.ui.console import Table, console, error, ok as print_ok
-from .paths import (
+from atc.core.paths import (
     ContestPathConfigError,
     is_workspace_root,
     resolve_contest_dir,
 )
-from .metadata import infer_source_name_for_metadata, write_contest_metadata
-from .samples import download_samples
+from atc.core.metadata import infer_source_name_for_metadata, write_contest_metadata
+from atc.core.samples import download_samples
 
 
 class RefreshError(RuntimeError):

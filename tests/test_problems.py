@@ -1,4 +1,4 @@
-from atc.problems import (
+from atc.core.problems import (
     contest_metadata_error,
     contest_metadata_problems,
     resolve_available_problems,

@@ -2,8 +2,8 @@ import re
 from pathlib import Path
 from typing import List, Optional
 
-from .config import SOURCE_EXTS, config_problems, load_config
-from .metadata import (
+from atc.core.config import SOURCE_EXTS, config_problems, load_config
+from atc.core.metadata import (
     ContestProblem,
     contest_metadata_error,
     contest_metadata_problems,

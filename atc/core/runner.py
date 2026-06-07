@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, List, Optional, Set
 
-from .config import (
+from atc.core.config import (
     SOURCE_EXTS,
     normalize_run_language,
     runner_command,
@@ -18,8 +18,8 @@ from .config import (
     resolve_executable,
 )
 
-from .models import CaseResult, ProblemResult
-from .problems import resolve_available_problems
+from ..models import CaseResult, ProblemResult
+from atc.core.problems import resolve_available_problems
 
 
 # --- Constants ---

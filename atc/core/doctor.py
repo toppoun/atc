@@ -10,7 +10,7 @@ from typing import List, Optional, Set
 import tomllib
 
 from atc.ui.console import Text, Table, Panel, box, console
-from .config import (
+from atc.core.config import (
     CONFIG_FILE_META_KEY,
     deep_merge_config,
     default_config,

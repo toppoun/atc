@@ -1,6 +1,6 @@
 import subprocess
 
-from atc import doctor
+from atc.core import doctor
 
 
 def _run_tools_check(monkeypatch, capsys, which_result="C:/bin/oj", run_impl=None):
