@@ -43,7 +43,7 @@ def download_samples(contest: str, problem_char: str, dst_dir: Path, url: Option
         return False, str(e)
 
 
-def print_sample_download_summary(problems: List[str], failed_downloads: List[tuple]):
+def print_sample_download_summary(problems: List[str], failed_downloads: List[Tuple]):
     if not failed_downloads:
         return
 

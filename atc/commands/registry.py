@@ -33,7 +33,7 @@ USAGE_ERROR = _UsageError()
 class CommandSpec:
     name: str
     aliases: Tuple[str, ...]
-    usage: tuple[tuple[str, str], ...]
+    usage: Tuple[Tuple[str, str], ...]
     category: str
     handler: Callable[[List[str]], Any]
 
@@ -330,8 +330,8 @@ def resolve_command(name: str):
 
 
 # --- Usage data ---
-def usage_sections() -> list[tuple[str, list[tuple[str, str]]]]:
-    sections: dict[str, list[tuple[str, str]]] = {}
+def usage_sections() -> list[Tuple[str, list[Tuple[str, str]]]]:
+    sections: Dict[str, list[Tuple[str, str]]] = {}
 
     for spec in COMMANDS:
         rows = sections.setdefault(spec.category, [])

@@ -125,7 +125,7 @@ def _watch_paths(cwd: Path, problems: Optional[List[str]] = None):
             yield metadata
 
 
-def _changed_paths(before: Dict[Path, tuple], after: Dict[Path, tuple]):
+def _changed_paths(before: Dict[Path, Tuple], after: Dict[Path, Tuple]):
     changed = set()
     for path in before.keys() | after.keys():
         if before.get(path) != after.get(path):

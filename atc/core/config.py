@@ -90,7 +90,9 @@ def _deep_merge_config(defaults: dict, overrides: dict) -> dict:
     return merged
 
 
-def load_config(start: Path = Path.cwd()) -> dict:
+def load_config(start: Optional[Path] = None) -> dict:
+    if start is None:
+        start = Path.cwd()
     config = _default_config()
     config_file = _find_config_file(start)
     if not config_file:

@@ -93,7 +93,7 @@ def _status_style(status: str) -> str:
 
 
 def _case_values(case):
-    if isinstance(case, tuple):
+    if isinstance(case, Tuple):
         return case
     return case.name, case.status, case.elapsed_ms
 

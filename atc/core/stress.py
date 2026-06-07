@@ -284,7 +284,7 @@ def _compile_cpp_solution(cwd: Path, problem: str, cpp_file: Path, config: dict)
     return StressProgram(command=[str(exe_path)], path=cpp_file, cleanup_path=exe_path)
 
 
-def _prepare_solution(cwd: Path, problem: str, language: Optional[str], config: dict) -> tuple[str, StressProgram]:
+def _prepare_solution(cwd: Path, problem: str, language: Optional[str], config: dict) -> Tuple[str, StressProgram]:
     run_language = normalize_run_language(language, config)
     if not run_language:
         raise StressError("Invalid language. Use py, python, pypy, or cpp.")
