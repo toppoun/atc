@@ -10,7 +10,7 @@ from atc.core.config import (
     find_config_file,
     load_config,
 )
-from atc.ui.console import error, warn, print_detailed_result, print_all_summary
+from atc.ui.console import error, warn, print_detailed_result, print_all_summary, print_usage
 from atc.core.contest import cmd_contest, cmd_new
 from atc.core.doctor import cmd_config_doctor
 from atc.core.manual import cmd_manual, cmd_manual_tests
@@ -35,6 +35,7 @@ class CommandSpec:
     aliases: Tuple[str, ...]
     usage: Tuple[str, ...]
     description: str
+    category: str
     handler: Callable[[List[str]], Any]
 
 
@@ -46,6 +47,13 @@ def _parse_handler_args(parser: AtcArgumentParser, args: List[str]):
         if str(e):
             error(f"Error: {e}")
         return None
+
+# --- help handler ---
+def handle_help(args: List[str]):
+    if args:
+        return USAGE_ERROR
+    print_usage(usage_sections())
+    return 0
 
 
 # --- Contest hadlers ---
@@ -218,6 +226,7 @@ COMMANDS: Tuple[CommandSpec, ...] = (
         aliases=(),
         usage=("atc new abc413 [py|cpp]  (デフォルトは config の defaults.language、未設定なら cpp)",),
         description="Create files for a contest in the current directory.",
+        category="Contest",
         handler=handle_new,
     ),
     CommandSpec(
@@ -225,6 +234,7 @@ COMMANDS: Tuple[CommandSpec, ...] = (
         aliases=("contests", "c"),
         usage=("atc contest abc413 [py|cpp]",),
         description="Create or select a contest directory.",
+        category="Contest",
         handler=handle_contest,
     ),
     CommandSpec(
@@ -232,6 +242,7 @@ COMMANDS: Tuple[CommandSpec, ...] = (
         aliases=(),
         usage=("atc refresh [contest] [--yes]",),
         description="Refresh contest metadata and missing samples without touching sources.",
+        category="Contest",
         handler=handle_refresh,
     ),
     CommandSpec(
@@ -239,6 +250,7 @@ COMMANDS: Tuple[CommandSpec, ...] = (
         aliases=(),
         usage=("atc config show", "atc config init", "atc config doctor"),
         description="Show, initialize, or diagnose configuration.",
+        category="Config",
         handler=handle_config,
     ),
     CommandSpec(
@@ -246,6 +258,7 @@ COMMANDS: Tuple[CommandSpec, ...] = (
         aliases=("r", "test", "t"),
         usage=("atc run A [python|pypy|cpp]", "atc run all [python|pypy|cpp]"),
         description="Run tests for one problem or all available problems.",
+        category="Run",
         handler=handle_run,
     ),
     CommandSpec(
@@ -253,6 +266,7 @@ COMMANDS: Tuple[CommandSpec, ...] = (
         aliases=("w", "auto"),
         usage=("atc watch [A] [python|pypy|cpp]",),
         description="Watch files and rerun tests automatically.",
+        category="Run",
         handler=handle_watch,
     ),
     CommandSpec(
@@ -260,6 +274,7 @@ COMMANDS: Tuple[CommandSpec, ...] = (
         aliases=(),
         usage=("atc template list [py|cpp|stress]", "atc template show <py|cpp|stress> <name>"),
         description="List templates or print a template body.",
+        category="Template",
         handler=handle_template,
     ),
     CommandSpec(
@@ -267,6 +282,7 @@ COMMANDS: Tuple[CommandSpec, ...] = (
         aliases=(),
         usage=("atc stress A [py|cpp] [--count N] [--seed S]", "atc stress init A", "atc stress promote A [--name NAME] [--force]"),
         description="Run randomized stress tests against a brute force solution.",
+        category="Stress",
         handler=handle_stress,
     ),
     CommandSpec(
@@ -274,7 +290,16 @@ COMMANDS: Tuple[CommandSpec, ...] = (
         aliases=(),
         usage=("atc manual A B C", "atc manual tests  (現在のフォルダ名を contest_id としてサンプル取得)"),
         description="Create problem files or download samples for the current folder.",
+        category="Manual",
         handler=handle_manual,
+    ),
+    CommandSpec(
+        name="help",
+        aliases=("usage", "-h", "--help"),
+        usage=("atc help", "atc usage"),
+        description="Show usage.",
+        category="Help",
+        handler=handle_help,
     ),
 )
 
@@ -304,54 +329,61 @@ def usage_lines() -> List[str]:
     return lines
 
 
-USAGE_SECTIONS: Tuple[Tuple[str, Tuple[Tuple[str, str], ...]], ...] = (
-    (
-        "Contest",
-        (
-            ("atc contest <contest> [py|cpp]", "Create/open contest"),
-            ("atc new <contest> [py|cpp]", "Create contest files"),
-            ("atc refresh [contest] [--yes]", "Refresh metadata/samples"),
-        ),
-    ),
-    (
-        "Run",
-        (
-            ("atc run <A|all> [python|pypy|cpp]", "Run tests"),
-            ("atc watch [A] [python|pypy|cpp]", "Watch and run on save"),
-        ),
-    ),
-    (
-        "Config",
-        (
-            ("atc config show", "Show resolved config"),
-            ("atc config init", "Create config file"),
-            ("atc config doctor", "Diagnose environment"),
-        ),
-    ),
-    (
-        "Template",
-        (
-            ("atc template list [py|cpp|stress]", "List templates"),
-            ("atc template show <kind> <name>", "Show template content"),
-        ),
-    ),
-    (
-        "Stress",
-        (
-            ("atc stress A [py|cpp] [--count N] [--seed S]", "Run stress test"),
-            ("atc stress init A", "Create stress files"),
-            ("atc stress promote A [--name NAME] [--force]", "Promote failed case"),
-        ),
-    ),
-    (
-        "Manual",
-        (
-            ("atc manual A B C", "Create manual problems"),
-            ("atc manual tests", "Download samples for current folder contest"),
-        ),
-    ),
-)
+# USAGE_SECTIONS: Tuple[Tuple[str, Tuple[Tuple[str, str], ...]], ...] = (
+#     (
+#         "Contest",
+#         (
+#             ("atc contest <contest> [py|cpp]", "Create/open contest"),
+#             ("atc new <contest> [py|cpp]", "Create contest files"),
+#             ("atc refresh [contest] [--yes]", "Refresh metadata/samples"),
+#         ),
+#     ),
+#     (
+#         "Run",
+#         (
+#             ("atc run <A|all> [python|pypy|cpp]", "Run tests"),
+#             ("atc watch [A] [python|pypy|cpp]", "Watch and run on save"),
+#         ),
+#     ),
+#     (
+#         "Config",
+#         (
+#             ("atc config show", "Show resolved config"),
+#             ("atc config init", "Create config file"),
+#             ("atc config doctor", "Diagnose environment"),
+#         ),
+#     ),
+#     (
+#         "Template",
+#         (
+#             ("atc template list [py|cpp|stress]", "List templates"),
+#             ("atc template show <kind> <name>", "Show template content"),
+#         ),
+#     ),
+#     (
+#         "Stress",
+#         (
+#             ("atc stress A [py|cpp] [--count N] [--seed S]", "Run stress test"),
+#             ("atc stress init A", "Create stress files"),
+#             ("atc stress promote A [--name NAME] [--force]", "Promote failed case"),
+#         ),
+#     ),
+#     (
+#         "Manual",
+#         (
+#             ("atc manual A B C", "Create manual problems"),
+#             ("atc manual tests", "Download samples for current folder contest"),
+#         ),
+#     ),
+# )
 
 
-def usage_sections() -> List[Tuple[str, List[Tuple[str, str]]]]:
-    return [(title, list(rows)) for title, rows in USAGE_SECTIONS]
+def usage_sections() -> list[tuple[str, list[tuple[str, str]]]]:
+    sections: dict[str, list[tuple[str, str]]] = {}
+
+    for spec in COMMANDS:
+        rows = sections.setdefault(spec.category, [])
+        for usage in spec.usage:
+            rows.append((usage, spec.description))
+    print([(category, rows) for category, rows in sections.items()])
+    return [(category, rows) for category, rows in sections.items()]

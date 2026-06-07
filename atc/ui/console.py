@@ -19,6 +19,12 @@ YELLOW = "\033[33m"
 CYAN = "\033[36m"
 RESET = "\033[0m"
 
+TITLE_STYLE = "bold white"
+SECTION_STYLE = "bold bright_blue"
+COMMAND_STYLE = "cyan"
+DESC_STYLE = "default"
+NOTE_STYLE = "dim"
+
 
 # --- Console instance ---
 console = Console()
@@ -275,3 +281,19 @@ def print_promote_result(problem: str, source_input: Path, source_expected: Path
     table.add_row("saved input", str(target_input))
     table.add_row("saved output", str(target_output))
     console.print(table)
+
+
+# --- usage ---
+def print_usage(usage_sections):
+    console.print(Text("AtC", style=TITLE_STYLE))
+    for title, rows in usage_sections:
+        console.print()
+        console.print(Text(title, style=SECTION_STYLE))
+        table = Table.grid(padding=(0, 4))
+        table.add_column(no_wrap=True)
+        table.add_column()
+        for command, description in rows:
+            table.add_row(Text(command, style=COMMAND_STYLE), Text(description, style=DESC_STYLE))
+        console.print(table)
+    console.print()
+    console.print(Text("Tip: run `atc config doctor` to check your environment.", style=NOTE_STYLE))
