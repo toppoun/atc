@@ -112,4 +112,4 @@ def test_pyproject_includes_stress_templates_as_package_data():
     pyproject = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     package_data = pyproject["tool"]["setuptools"]["package-data"]["atc"]
 
-    assert "templates/stress/*.py" in package_data
+    assert "resources/templates/stress/*.py" in package_data

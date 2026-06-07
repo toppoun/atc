@@ -1,4 +1,4 @@
-from atc.template_commands import cmd_template_list, cmd_template_show
+from atc.commands.template_commands import cmd_template_list, cmd_template_show
 
 
 def test_cmd_template_list_filters_python_templates(tmp_path, monkeypatch, capsys):

@@ -15,7 +15,7 @@ from atc.ui.console import error, warn
 
 
 # --- Constants ---
-TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "templates"
+TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "resources" / "templates"
 MANIFEST_FILE_NAME = "manifest.json"
 
 
