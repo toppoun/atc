@@ -2,12 +2,13 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
-from .console import Live, console, print_text
+from .console import console, print_text
 from .config import SOURCE_EXTS, load_config, watch_settings
 from .metadata import CONTEST_METADATA_PATH, contest_metadata_problems
 from .problems import resolve_available_problems
 from .runner import LOG_DIR, normalize_problem, run_problem_tests, write_test_log
 from .watch_render import WATCH_WAIT_MESSAGE, WatchState, build_watch_view
+from rich.live import Live
 
 
 CONFIG_FILES = {

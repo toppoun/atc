@@ -121,7 +121,7 @@ def test_cli_single_run_prints_failure_detail_after_compact_table(tmp_path):
     assert "beta-input" in combined
     assert "expected" in combined
     assert "beta-expected" in combined
-    assert "actual" in combined
+    assert "output" in combined
     assert combined.count("sample-1.in") == 1
 
 

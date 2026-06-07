@@ -64,15 +64,15 @@ def test_handle_run_single_prints_detailed_result(monkeypatch):
     printed = []
     calls = []
 
-    def fake_run_problem_tests(problem, lang=None, show_compile=False, write_log=False):
-        calls.append((problem, lang, show_compile, write_log))
+    def fake_run_problem_tests(problem, lang=None, show_compile=False):
+        calls.append((problem, lang, show_compile))
         return result
 
     monkeypatch.setattr(commands_module, "run_problem_tests", fake_run_problem_tests)
     monkeypatch.setattr(commands_module, "print_detailed_result", lambda value: printed.append(value))
 
     assert commands_module.handle_run(["A", "py"]) == 0
-    assert calls == [("A", "py", True, True)]
+    assert calls == [("A", "py", True)]
     assert printed == [result]
 
 

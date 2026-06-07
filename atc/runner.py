@@ -126,7 +126,6 @@ def run_problem_tests(
     show_compile=False,
     case_names: Optional[Set[str]] = None,
     on_case_result: Optional[Callable[[CaseResult], None]] = None,
-    write_log=False
 ):
     cwd = Path.cwd()
     config = load_config(cwd)
@@ -221,8 +220,6 @@ def run_problem_tests(
 
     result.duration_ms = (time.perf_counter() - started) * 1000
 
-    if write_log:
-        write_test_log([result])
     return result
 
 

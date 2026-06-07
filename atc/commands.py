@@ -117,10 +117,12 @@ def handle_run(args: List[str]):
     if parsed.problem.lower() == "all":
         results = cmd_run_all(parsed.lang)
         print_all_summary(results)
+        write_test_log(results)
         return 0 if bool(results) and all(result.passed for result in results) else 1
     else:
-        result = run_problem_tests(parsed.problem, parsed.lang, show_compile=True, write_log=True)
+        result = run_problem_tests(parsed.problem, parsed.lang, show_compile=True)
         print_detailed_result(result)
+        write_test_log([result])
         return 0 if result.passed else 1
 
 

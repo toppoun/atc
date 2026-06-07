@@ -1,9 +1,8 @@
 from pathlib import Path
-from typing import Iterable, Optional, Sequence, Tuple, List, Any
+from typing import Iterable, Optional, Sequence, Tuple, List
 
 from rich import box
 from rich.console import Console
-from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
@@ -18,70 +17,55 @@ GREEN = "\033[32m"
 YELLOW = "\033[33m"
 CYAN = "\033[36m"
 RESET = "\033[0m"
-
-
+# --- Console instance ---
 console = Console()
 
 
-### 純粋テキスト出力 ###
+# --- Basic text output ---
 def color_text(message: str, color: str) -> str:
     return f"{color}{message}{RESET}"
-
-
-def _styled_text(message: str, style: str):
-    return Text(str(message), style=style)
-
-
-def print_text(message: Any = "", *, style: Optional[str] = None, end: str = "\n", flush: bool = False) -> None:
-    console.print(message, style=style, end=end)
-    if flush:
-        console.file.flush()
-
-
 
 def ok(message: str) -> None:
     console.print(Text(f"[OK] {message}", style="green"))
 
-
 def warn(message: str) -> None:
     console.print(Text(f"[WARN] {message}", style="yellow"))
-
 
 def error(message: str) -> None:
     console.print(Text(f"[ERROR] {message}", style="red"))
 
 
-def info(message: str) -> None:
-    console.print(Text(f"[INFO] {message}", style="cyan"))
+def print_text(
+    message="",
+    *,
+    style: Optional[str] = None,
+    end: str = "\n",
+    flush: bool = False,
+) -> None:
+    if isinstance(message, Text):
+        console.print(message, end=end, highlight=False)
+    else:
+        console.print(
+            message,
+            style=style,
+            end=end,
+            highlight=False,
+            markup=False,
+        )
+
+    if flush:
+        console.file.flush()
 
 
-def rule(title: str) -> None:
-    console.rule(str(title))
+# --- Rich helpers ---
+def _make_styled_text(message: str, style: str):
+    return Text(str(message), style=style)
 
-
-### Richのパネル(四角で囲ってるやつ)出力 ###
 def panel(title: str, message: str, style: str = "cyan") -> None:
     console.print(Panel(str(message), title=str(title), border_style=style))
 
-
 def _path_text(path) -> str:
     return str(path)
-
-
-def compact_problem_list(
-    problems: Sequence[str],
-    *,
-    limit: int = PROBLEM_LIST_DISPLAY_LIMIT,
-    overflow_label: str = "count",
-) -> str:
-    if not problems:
-        return "(none)"
-    if len(problems) <= limit:
-        return ",".join(problems)
-    if overflow_label == "all":
-        return "all"
-    return f"{len(problems)} problems"
-
 
 def print_key_value_panel(title: str, rows: Sequence[Tuple[str, object]], style: str = "cyan") -> None:
     table = Table.grid(padding=(0, 1))
@@ -91,11 +75,10 @@ def print_key_value_panel(title: str, rows: Sequence[Tuple[str, object]], style:
         table.add_row(str(key), _path_text(value))
     console.print(Panel(table, title=str(title), border_style=style))
 
-
 def _status_style(status: str) -> str:
     if status == "AC":
         return "green"
-    if status in {"WA", "RE", "TLE", "CE", "ERROR"}:
+    if status in {"WA", "RE", "TLE", "CE", "ERROR", "NO_SOURCE", "NO_TESTS", "INVALID_LANGUAGE"}:
         return "red"
     return "yellow"
 
@@ -106,6 +89,49 @@ def _case_values(case):
     return case.name, case.status, case.elapsed_ms
 
 
+# --- run output ---
+def _case_input_text(problem: str, case_name: str):
+    case_path = Path.cwd() / "tests" / problem / case_name
+    try:
+        return case_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    
+
+def _case_failure_sections(problem: str, case: CaseResult):
+    sections = []
+    input_text = _case_input_text(problem, case.name) if problem else None
+
+    if input_text:
+        sections.append(("input", input_text))
+    if case.expected is not None:
+        sections.append(("expected", case.expected))
+    if case.output:
+        sections.append(("output", case.output))
+    if case.stderr:
+        sections.append(("stderr", case.stderr))
+    return sections
+
+
+
+def print_detailed_result(result: ProblemResult):
+    if result.error_status:
+        error(result.error_status)
+        if result.error_message:
+            print_text(result.error_message)
+        return
+    
+    failure_details = [
+        (case.name, case.status, _case_failure_sections(result.problem, case))
+        for case in result.failed_cases
+    ]
+
+    print_test_results(
+        result.cases,
+        ok_count=result.ok_count,
+        total_count=result.total_count,
+        failure_details=failure_details,
+    )
 def print_test_results(
     cases,
     *,
@@ -128,30 +154,26 @@ def print_test_results(
     for case_name, status, elapsed_ms in rows:
         table.add_row(
             case_name,
-            _styled_text(status, _status_style(status)),
+            _make_styled_text(status, _status_style(status)),
             f"{elapsed_ms:.2f} ms",
         )
     console.print(table)
 
-    print_problem_summary(ok_count, total_count)
+    print_text(f"結果: {ok_count}/{total_count} AC", style="green" if ok_count == total_count and total_count else "red")
 
     for case_name, status, sections in failure_details:
         if status != "AC" and sections:
             print_failure_detail(f"{case_name} {status}", sections, style="red")
 
 
-def print_problem_summary(ok_count: int, total_count: int) -> None:
-    print_text(f"結果: {ok_count}/{total_count} AC", style="green" if ok_count == total_count and total_count else "red")
-
-
 def print_failure_detail(title: str, sections: Iterable[Tuple[str, str]], style: str = "red") -> None:
-    lines = []
+    print_text()
+    print_text(f"=== {title} ===", style=style)
+
     for label, text in sections:
-        lines.append(str(label))
-        lines.append(str(text))
-        lines.append("")
-    message = "\n".join(lines).rstrip()
-    panel(title, message, style=style)
+        print_text()
+        print_text(f"{label}: ", style="bold")
+        print_text(str(text))
 
 
 def print_all_summary(results: List[ProblemResult]) -> None:
@@ -159,7 +181,7 @@ def print_all_summary(results: List[ProblemResult]) -> None:
     for result in results:
         if result.error_status:
             status = result.error_status
-            status_text = _styled_text(status, _status_style(status))
+            status_text = _make_styled_text(status, _status_style(status))
 
             print_text(
                 Text.assemble(
@@ -171,7 +193,7 @@ def print_all_summary(results: List[ProblemResult]) -> None:
             continue
 
         status = "AC" if result.passed else "WA"
-        status_text = _styled_text(status, _status_style(status))
+        status_text = _make_styled_text(status, _status_style(status))
 
 
         print_text(
@@ -184,39 +206,8 @@ def print_all_summary(results: List[ProblemResult]) -> None:
         )
 
 
-def print_watch_header(
-    cwd: Path,
-    poll_seconds: float,
-    debounce_seconds: float,
-    log_path: Path,
-    problems: Sequence[str],
-    *,
-    mode: Optional[str] = None,
-    initial: Optional[str] = None,
-) -> None:
-    rows = [
-        ("cwd", cwd),
-        ("problems", compact_problem_list(problems)),
-    ]
-    if mode:
-        rows.append(("mode", mode))
-    if initial:
-        rows.append(("initial", initial))
-    rows.extend(
-        [
-            ("poll", f"{poll_seconds:.2f}s"),
-            ("debounce", f"{debounce_seconds:.2f}s"),
-            ("log", log_path),
-        ]
-    )
-    print_key_value_panel(
-        "Watch",
-        rows,
-        style="cyan",
-    )
-    print_text("Ctrl+C で終了します。")
 
-
+# --- stress output ---
 def print_stress_header(
     problem: str,
     language: str,
@@ -282,48 +273,3 @@ def print_promote_result(problem: str, source_input: Path, source_expected: Path
     table.add_row("saved input", str(target_input))
     table.add_row("saved output", str(target_output))
     console.print(table)
-
-
-
-def _case_input_text(problem: str, case_name: str):
-    case_path = Path.cwd() / "tests" / problem / case_name
-    try:
-        return case_path.read_text(encoding="utf-8")
-    except OSError:
-        return None
-    
-
-def _case_failure_sections(problem: str, case: CaseResult):
-    sections = []
-    input_text = _case_input_text(problem, case.name) if problem else None
-    if input_text:
-        sections.append(("input", input_text))
-    if case.expected is not None:
-        sections.append(("expected", case.expected))
-    if case.output:
-        sections.append(("actual", case.output))
-    if case.stderr:
-        sections.append(("stderr", case.stderr))
-    return sections
-
-
-def _result_failure_details(result: ProblemResult):
-    return [
-        (case.name, case.status, _case_failure_sections(result.problem, case))
-        for case in result.failed_cases
-    ]
-
-
-def print_detailed_result(result: ProblemResult):
-    if result.error_status:
-        error(result.error_status)
-        if result.error_message:
-            print_text(result.error_message)
-        return
-
-    print_test_results(
-        result.cases,
-        ok_count=result.ok_count,
-        total_count=result.total_count,
-        failure_details=_result_failure_details(result),
-    )
