@@ -14,6 +14,7 @@ from .config import (
 from .console import error, warn
 
 
+# --- Constants ---
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 MANIFEST_FILE_NAME = "manifest.json"
 

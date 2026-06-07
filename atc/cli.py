@@ -4,21 +4,15 @@ from .commands import USAGE_ERROR, resolve_command, usage_sections
 from .console import Table, Text, console
 
 
+# --- Constants ---
 TITLE_STYLE = "bold white"
 SECTION_STYLE = "bold bright_blue"
 COMMAND_STYLE = "cyan"
 DESC_STYLE = "default"
 NOTE_STYLE = "dim"
 
-# ---------- usage ----------
-
+# --- usage ---
 def usage():
-    _rich_usage()
-
-    sys.exit(1)
-
-
-def _rich_usage():
     console.print(Text("AtC", style=TITLE_STYLE))
     for title, rows in usage_sections():
         console.print()
@@ -31,9 +25,10 @@ def _rich_usage():
         console.print(table)
     console.print()
     console.print(Text("Tip: run `atc config doctor` to check your environment.", style=NOTE_STYLE))
+    sys.exit(1)
 
 
-# ---------- main ----------
+# --- main ---
 def main():
     if len(sys.argv) < 2:
         usage()

@@ -10,6 +10,7 @@ from rich.text import Text
 from .models import ProblemResult, CaseResult
 
 
+# --- Constants ---
 PROBLEM_LIST_DISPLAY_LIMIT = 12
 
 RED = "\033[31m"
@@ -17,6 +18,8 @@ GREEN = "\033[32m"
 YELLOW = "\033[33m"
 CYAN = "\033[36m"
 RESET = "\033[0m"
+
+
 # --- Console instance ---
 console = Console()
 
@@ -177,7 +180,6 @@ def print_failure_detail(title: str, sections: Iterable[Tuple[str, str]], style:
 
 
 def print_all_summary(results: List[ProblemResult]) -> None:
-
     for result in results:
         if result.error_status:
             status = result.error_status

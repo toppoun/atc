@@ -7,6 +7,7 @@ from .console import Panel, Table, Text, box
 from .models import ProblemResult
 
 
+# --- Constants ---
 WATCH_WAIT_MESSAGE = "Save a source file to run its samples."
 WATCH_LOG_PATH = Path(".atc") / "test-runs" / "last.log"
 

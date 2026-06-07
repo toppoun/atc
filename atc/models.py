@@ -36,3 +36,13 @@ class ProblemResult:
     @property
     def passed(self):
         return not self.error_status and self.total_count > 0 and not self.failed_cases
+
+
+@dataclass
+class AtCoderProblem:
+    index: str
+    title: str
+    url: str
+    task_id: str
+    time_limit: Optional[str] = None
+    memory_limit: Optional[str] = None

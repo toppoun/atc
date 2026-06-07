@@ -36,7 +36,7 @@ def test_handle_run_all_prints_all_summary_and_returns_success(monkeypatch):
     results = [_passed_result("A"), _passed_result("B")]
     printed = []
 
-    monkeypatch.setattr(commands_module, "cmd_run_all", lambda lang=None: results)
+    monkeypatch.setattr(commands_module, "run_all_problem_tests", lambda lang=None: results)
     monkeypatch.setattr(commands_module, "print_all_summary", lambda value: printed.append(value))
 
     assert commands_module.handle_run(["all", "py"]) == 0
@@ -52,7 +52,7 @@ def test_handle_run_all_returns_failure_when_any_result_fails(monkeypatch):
     results = [_passed_result("B"), failed]
     printed = []
 
-    monkeypatch.setattr(commands_module, "cmd_run_all", lambda lang=None: results)
+    monkeypatch.setattr(commands_module, "run_all_problem_tests", lambda lang=None: results)
     monkeypatch.setattr(commands_module, "print_all_summary", lambda value: printed.append(value))
 
     assert commands_module.handle_run(["all"]) == 1

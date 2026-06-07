@@ -2,7 +2,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple
 
-
 from .argparse_utils import ArgumentParseError, AtcArgumentParser
 from .config import (
     CONFIG_FILE_NAME,
@@ -16,20 +15,21 @@ from .contest import cmd_contest, cmd_new
 from .doctor import cmd_config_doctor
 from .manual import cmd_manual, cmd_manual_tests
 from .refresh import cmd_refresh
-from .runner import cmd_run_all, run_problem_tests, write_test_log
+from .runner import run_all_problem_tests, run_problem_tests, write_test_log
 from .stress import cmd_stress, cmd_stress_init, cmd_stress_promote
 from .template_commands import cmd_template_list, cmd_template_show
 from .visual import cmd_visual, parse_visual_args
 from .watch import cmd_watch
 
 
+# --- Constants ---
 class _UsageError:
     pass
-
 
 USAGE_ERROR = _UsageError()
 
 
+# --- Command model ---
 @dataclass(frozen=True)
 class CommandSpec:
     name: str
@@ -39,6 +39,7 @@ class CommandSpec:
     handler: Callable[[List[str]], Any]
 
 
+# --- Argument parsing helpes ---
 def _parse_handler_args(parser: AtcArgumentParser, args: List[str]):
     try:
         return parser.parse_args(args)
@@ -48,6 +49,7 @@ def _parse_handler_args(parser: AtcArgumentParser, args: List[str]):
         return None
 
 
+# --- Contest hadlers ---
 def handle_new(args: List[str]):
     parser = AtcArgumentParser(prog="atc new")
     parser.add_argument("contest")
@@ -80,6 +82,7 @@ def handle_refresh(args: List[str]):
     return cmd_refresh(parsed.contest, yes=parsed.yes)
 
 
+# --- Config handlers ---
 def handle_config(args: List[str]):
     if not args:
         return USAGE_ERROR
@@ -107,6 +110,7 @@ def handle_config(args: List[str]):
     return 0
 
 
+# --- Run hundlers ---
 def handle_run(args: List[str]):
     parser = AtcArgumentParser(prog="atc run")
     parser.add_argument("problem")
@@ -115,7 +119,7 @@ def handle_run(args: List[str]):
     if parsed is None:
         return USAGE_ERROR
     if parsed.problem.lower() == "all":
-        results = cmd_run_all(parsed.lang)
+        results = run_all_problem_tests(parsed.lang)
         print_all_summary(results)
         write_test_log(results)
         return 0 if bool(results) and all(result.passed for result in results) else 1
@@ -126,6 +130,12 @@ def handle_run(args: List[str]):
         return 0 if result.passed else 1
 
 
+def handle_watch(args: List[str]):
+    result = cmd_watch(args)
+    return result if result is not None else 0
+
+
+# --- Template handlers ---
 def handle_template(args: List[str]):
     parser = AtcArgumentParser(prog="atc template")
     subparsers = parser.add_subparsers(dest="subcommand", required=True, parser_class=AtcArgumentParser)
@@ -148,6 +158,7 @@ def handle_template(args: List[str]):
     return USAGE_ERROR
 
 
+# --- Stress handlers ---
 def handle_stress(args: List[str]):
     if args and args[0] == "init":
         parser = AtcArgumentParser(prog="atc stress init")
@@ -192,11 +203,16 @@ def handle_stress(args: List[str]):
     )
 
 
-def handle_watch(args: List[str]):
-    result = cmd_watch(args)
-    return result if result is not None else 0
+# --- Manual handlers ---
+def handle_manual(args: List[str]):
+    if len(args) >= 1 and args[0] == "tests":
+        cmd_manual_tests()
+    else:
+        cmd_manual(args)
+    return 0
 
 
+# --- Visual handlers ---
 def handle_visual(args: List[str]):
     try:
         visual_args = parse_visual_args(args)
@@ -213,14 +229,7 @@ def handle_visual(args: List[str]):
     )
 
 
-def handle_manual(args: List[str]):
-    if len(args) >= 1 and args[0] == "tests":
-        cmd_manual_tests()
-    else:
-        cmd_manual(args)
-    return 0
-
-
+# --- Command registry ---
 COMMANDS: Tuple[CommandSpec, ...] = (
     CommandSpec(
         name="new",
@@ -295,6 +304,7 @@ COMMANDS: Tuple[CommandSpec, ...] = (
 )
 
 
+# --- Command lookup ---
 def _command_map() -> Dict[str, CommandSpec]:
     mapping: Dict[str, CommandSpec] = {}
     for spec in COMMANDS:
@@ -311,6 +321,7 @@ def resolve_command(name: str):
     return COMMAND_BY_NAME.get(name)
 
 
+# --- Usage data ---
 def usage_lines() -> List[str]:
     lines: List[str] = []
     for spec in COMMANDS:

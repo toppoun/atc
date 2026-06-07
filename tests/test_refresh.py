@@ -1,13 +1,9 @@
-try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib
-
+import tomllib
 import pytest
 
 import atc.commands as commands_module
 import atc.refresh as refresh_module
-from atc.atcoder import AtCoderProblem
+from atc.models import AtCoderProblem
 
 
 def _problem(index, url=None, task_id=None):

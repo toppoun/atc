@@ -2,7 +2,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from .atcoder import AtCoderProblem, fetch_atcoder_tasks
+from .models import AtCoderProblem
+from .atcoder import fetch_atcoder_tasks
 from .config import default_language, load_config
 from .console import Table, console, error, ok as print_ok
 from .paths import (

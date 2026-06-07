@@ -133,18 +133,17 @@ def test_cmd_run_all_uses_metadata_problem_list(tmp_path, monkeypatch):
 
     monkeypatch.setattr(runner_module, "run_problem_tests", fake_run_problem_tests)
 
-    results = runner_module.cmd_run_all("py")
+    results = runner_module.run_all_problem_tests("py")
 
     assert [result.problem for result in results] == ADT_INDEXES
     assert calls == [(problem, "py", False) for problem in ADT_INDEXES]
-    assert (tmp_path / ".atc" / "test-runs" / "last.log").is_file()
 
 
 def test_cmd_run_all_returns_empty_list_without_available_problems(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(runner_module, "resolve_available_problems", lambda cwd, config: [])
 
-    results = runner_module.cmd_run_all("py")
+    results = runner_module.run_all_problem_tests("py")
 
     captured = capsys.readouterr()
     assert results == []

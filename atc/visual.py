@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
 
 
+# --- Constants ---
 DEFAULT_PORT = 8765
 HOST = "127.0.0.1"
 VISUALIZER_NAME = "visualizer.html"

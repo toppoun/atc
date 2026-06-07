@@ -1,9 +1,6 @@
-try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib
+import tomllib
 
-from atc.atcoder import AtCoderProblem
+from atc.models import AtCoderProblem
 from atc.metadata import (
     contest_metadata_error,
     contest_metadata_problems,

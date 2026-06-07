@@ -22,9 +22,11 @@ from .models import CaseResult, ProblemResult
 from .problems import resolve_available_problems
 
 
+# --- Constants ---
 LOG_DIR = Path(".atc") / "test-runs"
 
 
+# --- Problem henlers
 def _normalize_problem(problem: str):
     return problem.upper()
 
@@ -42,6 +44,7 @@ def _available_problems(cwd: Path, problems: Optional[List[str]] = None):
     return found
 
 
+# --- Run command preparation ---
 def _missing_cpp_compiler_message(compiler: str):
     return (
         f"C++ compiler not found: {compiler}\n"
@@ -120,6 +123,7 @@ def _prepare_run_command(cwd: Path, problem: str, run_language: Optional[str] = 
     return None, [], None, "NO_SOURCE", "ファイルが見つかりません。"
 
 
+# --- Single problem run ---
 def run_problem_tests(
     problem: str,
     run_language: Optional[str] = None,
@@ -223,10 +227,7 @@ def run_problem_tests(
     return result
 
 
-def _format_seconds(ms: float):
-    return f"{ms / 1000:.2f}s"
-
-
+# --- Write log ---
 def _write_test_log(results: List[ProblemResult]):
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     log_path = LOG_DIR / "last.log"
@@ -266,11 +267,13 @@ def _write_test_log(results: List[ProblemResult]):
     return log_path
 
 
+# --- Result helper ---
 def _results_passed(results: List[ProblemResult]):
     return bool(results) and all(result.passed for result in results)
 
 
-def cmd_run_all(run_language: Optional[str] = None):
+# --- Run all ---
+def run_all_problem_tests(run_language: Optional[str] = None):
     cwd = Path.cwd()
     config = load_config(cwd)
     problems = resolve_available_problems(cwd, config)
@@ -281,15 +284,10 @@ def cmd_run_all(run_language: Optional[str] = None):
     results = [run_problem_tests(problem, run_language, show_compile=False)
                for problem in problems]
     
-    write_test_log(results)
-
     return results
 
 
-
-
-
-# Public aliases used by command modules and lightweight tests.
+# --- Public aliases ---
 normalize_problem = _normalize_problem
 available_problems = _available_problems
 write_test_log = _write_test_log

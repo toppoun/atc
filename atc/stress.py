@@ -33,6 +33,7 @@ from .templates import (
 )
 
 
+# --- Constants ---
 COMPARE_MODES = {"exact", "strip", "tokens"}
 DEFAULT_STRESS_COUNT = 100
 DEFAULT_STRESS_TIMEOUT = 2.0

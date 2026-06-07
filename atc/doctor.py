@@ -33,6 +33,7 @@ except ImportError:  # pragma: no cover - exercised when rich is not installed
     Columns = None
 
 
+# --- Constants ---
 STATUS_ORDER = ["OK", "WARN", "ERROR", "INFO"]
 STATUS_STYLES = {
     "OK": "green",

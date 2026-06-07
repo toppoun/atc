@@ -4,8 +4,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
+from .models import AtCoderProblem
+
 from .atcoder import (
-    AtCoderProblem,
     build_fallback_task_url,
     fetch_atcoder_tasks,
 )

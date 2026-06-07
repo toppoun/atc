@@ -9,6 +9,7 @@ import tomllib
 from .console import RED, RESET
 
 
+# --- Constants ---
 PROBLEMS = ["A", "B", "C", "D", "E"]
 SOURCE_EXTS = ["py", "cpp"]
 

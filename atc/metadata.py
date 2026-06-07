@@ -4,11 +4,12 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import tomllib
 
-from .atcoder import AtCoderProblem
+from .models import AtCoderProblem
 from .config import SOURCE_EXTS
 from .console import warn
 
 
+# --- Constants ---
 CONTEST_METADATA_PATH = Path(".atc") / "contest.toml"
 
 

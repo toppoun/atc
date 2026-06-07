@@ -4,24 +4,19 @@ from typing import List, Optional
 from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
+from .models import AtCoderProblem
 
+
+# --- Constants ---
 ATCODER_BASE_URL = "https://atcoder.jp"
 
 
+# --- URL helpers ---
 def build_fallback_task_url(contest_id: str, problem_index: str) -> str:
     return f"{ATCODER_BASE_URL}/contests/{contest_id}/tasks/{contest_id}_{problem_index.lower()}"
 
 
-@dataclass
-class AtCoderProblem:
-    index: str
-    title: str
-    url: str
-    task_id: str
-    time_limit: Optional[str] = None
-    memory_limit: Optional[str] = None
-
-
+# --- Internal HTML parse models ---
 @dataclass
 class _ParsedLink:
     href: str
@@ -51,6 +46,7 @@ class _ParsedTable:
     current_cell: Optional[_ParsedCell] = None
 
 
+# --- Text helpers ---
 def _clean_text(text: str) -> str:
     return " ".join(text.replace("\xa0", " ").split())
 
@@ -63,6 +59,7 @@ def _link_text(link: _ParsedLink) -> str:
     return _clean_text("".join(link.text_parts))
 
 
+# --- HTML parser ---
 class _AtCoderTasksHTMLParser(HTMLParser):
     def __init__(self):
         super().__init__(convert_charrefs=True)
@@ -156,6 +153,7 @@ class _AtCoderTasksHTMLParser(HTMLParser):
             self._link_stack[-1].text_parts.append(data)
 
 
+# --- Parser helpers ---
 def _has_problem_name_header(table: _ParsedTable) -> bool:
     for row in table.thead_rows:
         for cell in row.cells:
@@ -177,6 +175,7 @@ def _task_id_from_url(url: str) -> str:
     return path.split("/")[-1] if path else ""
 
 
+# --- Public parse API ---
 def parse_atcoder_tasks_html(html: str, base_url: str = ATCODER_BASE_URL) -> List[AtCoderProblem]:
     parser = _AtCoderTasksHTMLParser()
     parser.feed(html)
@@ -218,6 +217,7 @@ def parse_atcoder_tasks_html(html: str, base_url: str = ATCODER_BASE_URL) -> Lis
     return problems
 
 
+# --- Fetch API ---
 def fetch_atcoder_tasks_html(
     contest_id: str,
     base_url: str = ATCODER_BASE_URL,

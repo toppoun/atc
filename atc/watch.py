@@ -11,6 +11,7 @@ from .watch_render import WATCH_WAIT_MESSAGE, WatchState, build_watch_view
 from rich.live import Live
 
 
+# --- Constants ---
 CONFIG_FILES = {
     "pyproject.toml",
     "requirements.txt",
