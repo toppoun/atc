@@ -6,7 +6,7 @@ import tomllib
 
 from .models import AtCoderProblem
 from .config import SOURCE_EXTS
-from .console import warn
+from atc.ui.console import warn
 
 
 # --- Constants ---

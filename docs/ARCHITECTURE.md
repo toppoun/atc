@@ -15,7 +15,6 @@ atc/
 │  ├─ stress.py
 │  ├─ manual.py
 │  ├─ doctor.py
-│  └─ visual.py
 │
 ├─ core/
 │  ├─ __init__.py

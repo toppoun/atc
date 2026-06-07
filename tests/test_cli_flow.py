@@ -153,11 +153,9 @@ def test_cli_without_args_prints_categorized_usage(tmp_path):
     assert "Config" in combined
     assert "Stress" in combined
     assert "Manual" in combined
-    assert "Visual" in combined
     assert "atc contest" in combined
     assert "atc run" in combined
     assert "atc config doctor" in combined
-    assert "atc visual [options]" in combined
     assert "--live-preview-url" not in combined
 
 

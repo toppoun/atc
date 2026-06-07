@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
 
-from .console import Panel, Table, Text, box
+from atc.ui.console import Panel, Table, Text, box
 from .models import ProblemResult
 
 

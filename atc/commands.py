@@ -10,7 +10,7 @@ from .config import (
     find_config_file,
     load_config,
 )
-from .console import error, warn, print_detailed_result, print_all_summary
+from atc.ui.console import error, warn, print_detailed_result, print_all_summary
 from .contest import cmd_contest, cmd_new
 from .doctor import cmd_config_doctor
 from .manual import cmd_manual, cmd_manual_tests
@@ -18,7 +18,6 @@ from .refresh import cmd_refresh
 from .runner import run_all_problem_tests, run_problem_tests, write_test_log
 from .stress import cmd_stress, cmd_stress_init, cmd_stress_promote
 from .template_commands import cmd_template_list, cmd_template_show
-from .visual import cmd_visual, parse_visual_args
 from .watch import cmd_watch
 
 
@@ -212,23 +211,6 @@ def handle_manual(args: List[str]):
     return 0
 
 
-# --- Visual handlers ---
-def handle_visual(args: List[str]):
-    try:
-        visual_args = parse_visual_args(args)
-    except ValueError as e:
-        error(f"Error: {e}")
-        print("Usage: atc visual [--live-preview|--no-live-preview] [--live-preview-url URL] [--no-fallback] [--port 8765] [--no-open]")
-        return 1
-    return cmd_visual(
-        port=visual_args.port,
-        open_browser=visual_args.open_browser,
-        live_preview=visual_args.live_preview,
-        live_preview_url=visual_args.live_preview_url,
-        fallback=visual_args.fallback,
-    )
-
-
 # --- Command registry ---
 COMMANDS: Tuple[CommandSpec, ...] = (
     CommandSpec(
@@ -286,13 +268,6 @@ COMMANDS: Tuple[CommandSpec, ...] = (
         usage=("atc stress A [py|cpp] [--count N] [--seed S]", "atc stress init A", "atc stress promote A [--name NAME] [--force]"),
         description="Run randomized stress tests against a brute force solution.",
         handler=handle_stress,
-    ),
-    CommandSpec(
-        name="visual",
-        aliases=("vis", "vizui"),
-        usage=("atc visual [--live-preview|--no-live-preview] [--live-preview-url URL] [--no-fallback] [--port 8765] [--no-open]",),
-        description="Start the local visualizer server.",
-        handler=handle_visual,
     ),
     CommandSpec(
         name="manual",
@@ -373,12 +348,6 @@ USAGE_SECTIONS: Tuple[Tuple[str, Tuple[Tuple[str, str], ...]], ...] = (
         (
             ("atc manual A B C", "Create manual problems"),
             ("atc manual tests", "Download samples for current folder contest"),
-        ),
-    ),
-    (
-        "Visual",
-        (
-            ("atc visual [options]", "Start visualizer"),
         ),
     ),
 )

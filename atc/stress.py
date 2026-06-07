@@ -16,7 +16,7 @@ from .config import (
     runner_cpp_flags,
     runner_timeout,
 )
-from .console import (
+from atc.ui.console import (
     error,
     ok,
     print_promote_result,

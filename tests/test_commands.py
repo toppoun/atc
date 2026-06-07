@@ -22,10 +22,6 @@ def test_resolve_command_aliases():
     assert resolve_command("c").name == "contest"
     assert resolve_command("refresh").name == "refresh"
 
-    assert resolve_command("visual").name == "visual"
-    assert resolve_command("vis").name == "visual"
-    assert resolve_command("vizui").name == "visual"
-
     assert resolve_command("template").name == "template"
     assert resolve_command("stress").name == "stress"
 
@@ -91,7 +87,6 @@ def test_usage_lines_include_main_commands():
     assert "atc stress A" in usage
     assert "atc stress init A" in usage
     assert "atc stress promote A" in usage
-    assert "atc visual" in usage
     assert "atc manual" in usage
 
 
@@ -108,7 +103,6 @@ def test_usage_sections_group_main_commands():
     assert "Config" in usage
     assert "Stress" in usage
     assert "Manual" in usage
-    assert "Visual" in usage
     assert "atc contest" in usage
     assert "atc refresh" in usage
     assert "atc run" in usage

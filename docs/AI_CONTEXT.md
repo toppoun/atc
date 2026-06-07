@@ -24,12 +24,10 @@
 
 ## 概要
 
-このリポジトリは AtCoder 用の Python CLI、VS Code 補助、visualizer を提供します。
 
 - CLI: `atc/cli.py`
 - Command registry: `atc/commands.py`
 - VS Code 拡張: `vscode/atc-helper/src/extension.ts`
-- Visualizer: `tools/visualizer.html`
 - 連携ファイル: `.atc/current-contest.json`
 - 設定ファイル: `.atc/config.toml`
 
@@ -51,7 +49,6 @@ atc/
 ├── stress.py       # atc stress
 ├── watch.py        # atc watch
 ├── doctor.py       # atc config doctor
-└── visual.py       # atc visual / vis
 ```
 
 `cli.py` は dispatcher です。コマンド名、alias、usage、handler wrapper は `commands.py` に集約します。処理本体は feature module に置きます。
@@ -74,9 +71,6 @@ atc/
 - `atc watch [A|all] [python|pypy|cpp]`
 - `atc w [A|all] [python|pypy|cpp]`
 - `atc auto [A|all] [python|pypy|cpp]`
-- `atc visual [--live-preview|--no-live-preview] [--live-preview-url URL] [--no-fallback] [--port PORT] [--no-open]`
-- `atc vis [--live-preview|--no-live-preview] [--live-preview-url URL] [--no-fallback] [--port PORT] [--no-open]`
-- `atc vizui [--live-preview|--no-live-preview] [--live-preview-url URL] [--no-fallback] [--port PORT] [--no-open]`
 - `atc manual A B C [py|cpp]`
 - `atc manual A~E [py|cpp]`
 - `atc manual A-E [py|cpp]`
@@ -107,7 +101,6 @@ test実行 -> runner.py
 stress test / stress promote -> stress.py
 watch -> watch.py
 doctor診断項目 -> doctor.py
-visualizer起動 -> visual.py
 表示色・console出力 -> console.py
 共通データ構造 -> models.py
 ```
@@ -116,7 +109,6 @@ visualizer起動 -> visual.py
 
 必要がない限り触らない:
 
-- `tools/visualizer.html`
 - `vscode/atc-helper/`
 - 既存コマンドの引数仕様
 - config 探索順
@@ -208,18 +200,6 @@ manifest が明示されていて壊れている場合、`atc config doctor` で
 - `atc stress promote A --name corner` は `tests/A/corner.in/out` に保存し、`--force` が無い限り既存ファイルを上書きしない
 - `A.py` / `A.cpp` は `manual` / `contest` 側の責務なので作らない
 
-## visual
-
-`atc visual` / `atc vis` / `atc vizui` は `visual.py` が担当します。
-
-デフォルトでは VS Code Live Preview URL を優先します。
-
-```text
-http://127.0.0.1:3000/tools/visualizer.html?vscode-livepreview=true
-```
-
-Live Preview が使えない場合はローカルHTTPサーバーに fallback します。Live Preview を使わない場合は `--no-live-preview` を指定します。
-
 ## current-contest.json
 
 `atc contest` は contest 作成または既存確認後に `.atc/current-contest.json` を書きます。
@@ -287,8 +267,6 @@ terminal が開く条件:
 python -m compileall atc
 atc config show
 atc config doctor
-atc visual --no-open
-atc vis --no-live-preview --no-open
 ```
 
 一時ディレクトリで:

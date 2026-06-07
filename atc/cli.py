@@ -1,7 +1,7 @@
 import sys
 
 from .commands import USAGE_ERROR, resolve_command, usage_sections
-from .console import Table, Text, console
+from atc.ui.console import Table, Text, console
 
 
 # --- Constants ---

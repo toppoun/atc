@@ -2,7 +2,7 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
-from .console import console, print_text
+from atc.ui.console import console, print_text
 from .config import SOURCE_EXTS, load_config, watch_settings
 from .metadata import CONTEST_METADATA_PATH, contest_metadata_problems
 from .problems import resolve_available_problems

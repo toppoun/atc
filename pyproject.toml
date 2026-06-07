@@ -33,7 +33,6 @@ atc = [
   "templates/python/*.py",
   "templates/cpp/*.cpp",
   "templates/stress/*.py",
-  "assets/visualizer.html"
 ]
 
 [tool.pytest.ini_options]

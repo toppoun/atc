@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from .config import load_config
-from .console import error
+from atc.ui.console import error
 from .templates import (
     TemplateError,
     TemplateInfo,

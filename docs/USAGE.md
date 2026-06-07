@@ -263,34 +263,6 @@ oj login --check https://atcoder.jp/
 
 config の詳細は [CONFIG.md](CONFIG.md) を見てください。
 
-## `atc visual` / `atc vis` / `atc vizui`
-
-```bash
-atc visual
-atc vis
-atc vizui
-atc vis --live-preview
-atc vis --live-preview --no-fallback
-atc vis --no-live-preview
-atc vis --live-preview-url "http://127.0.0.1:3000/tools/visualizer.html?vscode-livepreview=true"
-atc visual --port 8000
-atc visual --no-open
-atc vis --no-open
-```
-
-`tools/visualizer.html` をブラウザで開きます。デフォルトでは VS Code Live Preview を優先し、使えない場合だけローカルHTTPサーバーに fallback します。
-
-- デフォルトの Live Preview URL は `http://127.0.0.1:3000/tools/visualizer.html?vscode-livepreview=true`
-- `--live-preview` で Live Preview URL を明示的に使う
-- `--no-fallback` を併用すると、Live Preview が使えない場合にローカルHTTPサーバーへ fallback せず終了
-- `--no-live-preview` で Live Preview を使わず、必ずローカルHTTPサーバーを使う
-- `--live-preview-url` で Live Preview URL を変更
-- ローカルHTTPサーバーのデフォルトは `http://127.0.0.1:8765/visualizer.html`
-- `--port` でローカルHTTPサーバーの開始ポートを指定
-- 指定ポートが使用中なら、近い空きポートに fallback
-- `--no-open` を付けるとブラウザを自動で開かず、URLだけ表示
-- 停止は `Ctrl+C`
-
 ## 未対応
 
 以下は現時点では未対応です。

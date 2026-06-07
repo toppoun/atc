@@ -34,7 +34,6 @@ runner.py     atc run / test
 stress.py     atc stress / stress promote
 watch.py      atc watch
 doctor.py     atc config doctor
-visual.py     atc visual / vis
 ```
 
 ## 新機能を追加するときの置き場所
@@ -50,7 +49,6 @@ test実行 -> runner.py
 stress test / stress init / stress promote -> stress.py
 watch -> watch.py
 doctor診断項目 -> doctor.py
-visualizer起動 -> visual.py
 表示色・console出力 -> console.py
 共通データ構造 -> models.py
 ```
@@ -85,7 +83,7 @@ templates.py -> doctor.py
 - 挙動を変えない
 - 先に `python -m compileall atc`
 - 一時ディレクトリでコマンド確認
-- visualizer.html と VS Code拡張は必要がない限り触らない
+- VS Code拡張は必要がない限り触らない
 - 新コマンド追加と大規模リファクタを同時にやらない
 - config 探索順、テンプレート探索順、出力文言、exit code を変える場合は明示的に扱う
 
@@ -95,8 +93,6 @@ templates.py -> doctor.py
 python -m compileall atc
 atc config show
 atc config doctor
-atc visual --no-open
-atc vis --no-live-preview --no-open
 ```
 
 一時ディレクトリで:
@@ -116,8 +112,6 @@ npm run compile
 
 ## package-data / templates
 
-`pyproject.toml` の package-data には、標準テンプレート、manifest 用テンプレート階層、配布用 visualizer asset を含めます。
-
 ```text
 atc/templates/template.py
 atc/templates/template.cpp
@@ -125,13 +119,6 @@ atc/templates/manifest.json
 atc/templates/python/*.py
 atc/templates/cpp/*.cpp
 atc/templates/stress/*.py
-atc/assets/visualizer.html
 ```
 
 stress 用 generator / brute テンプレートは `atc/templates/stress/` に置き、manifest の `stress` section に登録します。`atc stress init A` はこのテンプレートから `A_gen.py` / `A_brute.py` だけを作ります。`atc stress promote A` は保存済みの `.atc/stress/A/failed.in` と `brute.out` を通常テスト `tests/A/*.in` / `*.out` へコピーします。
-
-## visualizer assets
-
-`visualizer.html` は `tools/visualizer.html` を本体として編集します。package 配布用には、同じ内容を `atc/assets/visualizer.html` にコピーします。
-
-`atc visual` は開発環境では `tools/visualizer.html` を優先し、配布環境では `atc/assets/visualizer.html` を fallback として使います。2つの内容がズレると `tests/test_visual_assets.py` が失敗します。

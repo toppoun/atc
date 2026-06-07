@@ -16,7 +16,7 @@ from .config import (
     default_language,
     load_config,
 )
-from .console import error, ok as print_ok, warn
+from atc.ui.console import error, ok as print_ok, warn
 from .metadata import write_contest_metadata
 from .paths import ContestPathConfigError, resolve_contest_dir, resolve_contest_group
 from .samples import download_samples, print_sample_download_summary

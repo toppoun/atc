@@ -11,7 +11,6 @@ AtCoder 用の CLI + VS Code 補助 + グラフ可視化ツールです。
 - local test
 - watch mode
 - config doctor
-- visualizer 起動
 - VS Code 分割 terminal 連携
 
 README は短い入口です。詳しい仕様や開発者向け情報は `docs/` を見てください。
@@ -55,7 +54,6 @@ atc config doctor
 | `atc stress init A` | stress 用 generator / brute を作成 |
 | `atc manual A B C py` | 問題ファイルを手動作成 |
 | `atc template list` | 利用可能なテンプレートを表示 |
-| `atc visual` | visualizer を開く |
 
 詳しい使い方は [docs/USAGE.md](docs/USAGE.md) を見てください。
 
@@ -106,15 +104,6 @@ cpp = "acl"
 ```
 
 詳細は [docs/CONFIG.md](docs/CONFIG.md) を見てください。
-
-## atc visual
-
-```bash
-atc visual
-atc vis
-```
-
-VS Code Live Preview が使える場合はそれを優先し、使えない場合はローカルサーバーに fallback して `visualizer.html` を開きます。
 
 ## ドキュメント
 

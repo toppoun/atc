@@ -11,7 +11,7 @@ from .config import (
     config_root,
     load_config,
 )
-from .console import error, warn
+from atc.ui.console import error, warn
 
 
 # --- Constants ---

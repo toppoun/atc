@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 import tomllib
 
-from .console import RED, RESET
+from atc.ui.console import RED, RESET
 
 
 # --- Constants ---

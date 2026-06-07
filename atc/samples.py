@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from .atcoder import build_fallback_task_url
-from .console import warn
+from atc.ui.console import warn
 
 
 def download_samples(contest: str, problem_char: str, dst_dir: Path, url: Optional[str] = None):

@@ -5,7 +5,7 @@ from typing import List, Optional, Tuple
 from .models import AtCoderProblem
 from .atcoder import fetch_atcoder_tasks
 from .config import default_language, load_config
-from .console import Table, console, error, ok as print_ok
+from atc.ui.console import Table, console, error, ok as print_ok
 from .paths import (
     ContestPathConfigError,
     is_workspace_root,
