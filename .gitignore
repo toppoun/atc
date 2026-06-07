@@ -8,3 +8,7 @@ dist/
 build/
 *.egg-info/
 .DS_Store
+.atc/test-runs/
+.atc/stress/
+.atc/current-contest.json
+.atc/contest.toml
