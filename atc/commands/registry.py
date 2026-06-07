@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple
 
-from .argparse_utils import ArgumentParseError, AtcArgumentParser
+from ..argparse_utils import ArgumentParseError, AtcArgumentParser
 from atc.core.config import (
     CONFIG_FILE_NAME,
     config_to_toml,
@@ -17,8 +17,8 @@ from atc.core.manual import cmd_manual, cmd_manual_tests
 from atc.core.refresh import cmd_refresh
 from atc.core.runner import run_all_problem_tests, run_problem_tests, write_test_log
 from atc.core.stress import cmd_stress, cmd_stress_init, cmd_stress_promote
-from .template_commands import cmd_template_list, cmd_template_show
-from .watch import cmd_watch
+from ..template_commands import cmd_template_list, cmd_template_show
+from atc.core.watch import cmd_watch
 
 
 # --- Constants ---

@@ -1,6 +1,6 @@
-import atc.watch as watch_module
+import atc.core.watch as watch_module
 from atc.models import CaseResult, ProblemResult
-from atc.watch import (
+from atc.core.watch import (
     METADATA_CHANGE,
     _problem_from_changed_path,
     _reload_watch_metadata,

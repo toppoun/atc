@@ -1,5 +1,5 @@
-import atc.commands as commands_module
-from atc.commands import resolve_command, usage_lines, usage_sections
+import atc.commands.registry as commands_module
+from atc.commands.registry import resolve_command, usage_lines, usage_sections
 from atc.models import CaseResult, ProblemResult
 
 
