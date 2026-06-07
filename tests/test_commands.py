@@ -1,5 +1,5 @@
 import atc.commands.registry as commands_module
-from atc.commands.registry import resolve_command, usage_lines, usage_sections
+from atc.commands.registry import resolve_command, usage_sections, usage_sections
 from atc.models import CaseResult, ProblemResult
 
 
@@ -73,7 +73,11 @@ def test_handle_run_single_prints_detailed_result(monkeypatch):
 
 
 def test_usage_lines_include_main_commands():
-    usage = "\n".join(usage_lines())
+    parts = []
+    for _title, rows in usage_sections():
+        parts.extend(command for command, _description in rows)
+
+    usage = "\n".join(parts)
 
     assert "atc new" in usage
     assert "atc contest" in usage

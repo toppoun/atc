@@ -1,11 +1,11 @@
 import sys
 
-from atc.commands.registry import USAGE_ERROR, resolve_command
+from atc.commands.registry import USAGE_ERROR, resolve_command, print_usage, usage_sections
 
 
 # --- usage ---
 def usage():
-
+    print_usage(usage_sections())
     sys.exit(1)
 
 

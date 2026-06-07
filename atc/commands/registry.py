@@ -33,8 +33,7 @@ USAGE_ERROR = _UsageError()
 class CommandSpec:
     name: str
     aliases: Tuple[str, ...]
-    usage: Tuple[str, ...]
-    description: str
+    usage: tuple[tuple[str, str], ...]
     category: str
     handler: Callable[[List[str]], Any]
 
@@ -224,80 +223,89 @@ COMMANDS: Tuple[CommandSpec, ...] = (
     CommandSpec(
         name="new",
         aliases=(),
-        usage=("atc new abc413 [py|cpp]  (デフォルトは config の defaults.language、未設定なら cpp)",),
-        description="Create files for a contest in the current directory.",
+        usage=(("atc new abc413 [py|cpp]", "Create files for a contest in the current directory."),),
         category="Contest",
         handler=handle_new,
     ),
     CommandSpec(
         name="contest",
         aliases=("contests", "c"),
-        usage=("atc contest abc413 [py|cpp]",),
-        description="Create or select a contest directory.",
+        usage=(("atc contest abc413 [py|cpp]", "Create or select a contest directory."),),
         category="Contest",
         handler=handle_contest,
     ),
     CommandSpec(
         name="refresh",
         aliases=(),
-        usage=("atc refresh [contest] [--yes]",),
-        description="Refresh contest metadata and missing samples without touching sources.",
+        usage=(("atc refresh [contest] [--yes]", "Refresh contest metadata and missing samples without touching sources."),),
         category="Contest",
         handler=handle_refresh,
     ),
     CommandSpec(
         name="config",
         aliases=(),
-        usage=("atc config show", "atc config init", "atc config doctor"),
-        description="Show, initialize, or diagnose configuration.",
+        usage=(
+            ("atc config show", "Show configurations."), 
+            ("atc config init", "Initialize configuration in the root directry."), 
+            ("atc config doctor", "Diagnose configurations."),
+            ),
         category="Config",
         handler=handle_config,
     ),
     CommandSpec(
         name="run",
         aliases=("r", "test", "t"),
-        usage=("atc run A [python|pypy|cpp]", "atc run all [python|pypy|cpp]"),
-        description="Run tests for one problem or all available problems.",
+        usage=(
+            ("atc run A [python|pypy|cpp]", "Run tests for one problem."), 
+            ("atc run all [python|pypy|cpp]", "Run tests for all available problems."), 
+            ),
         category="Run",
         handler=handle_run,
     ),
     CommandSpec(
         name="watch",
         aliases=("w", "auto"),
-        usage=("atc watch [A] [python|pypy|cpp]",),
-        description="Watch files and rerun tests automatically.",
+        usage=(("atc watch [A] [python|pypy|cpp]", "Watch files and rerun tests automatically."),),
         category="Run",
         handler=handle_watch,
     ),
     CommandSpec(
         name="template",
         aliases=(),
-        usage=("atc template list [py|cpp|stress]", "atc template show <py|cpp|stress> <name>"),
-        description="List templates or print a template body.",
+        usage=(
+            ("atc template list [py|cpp|stress]", "List templates."), 
+            ("atc template show <py|cpp|stress> <name>", "Print a template body."),
+            ),
         category="Template",
         handler=handle_template,
     ),
     CommandSpec(
         name="stress",
         aliases=(),
-        usage=("atc stress A [py|cpp] [--count N] [--seed S]", "atc stress init A", "atc stress promote A [--name NAME] [--force]"),
-        description="Run randomized stress tests against a brute force solution.",
+        usage=(
+            ("atc stress A [py|cpp] [--count N] [--seed S]", "Run randomized stress tests against a brute force solution."), 
+            ("atc stress init A", "Create a blute and generate file."), 
+            ("atc stress promote A [--name NAME] [--force]", "Promote to test/"),
+            ),
         category="Stress",
         handler=handle_stress,
     ),
     CommandSpec(
         name="manual",
         aliases=(),
-        usage=("atc manual A B C", "atc manual tests  (現在のフォルダ名を contest_id としてサンプル取得)"),
-        description="Create problem files or download samples for the current folder.",
+        usage=(
+            ("atc manual A B C", "Create problem files"),
+            ("atc manual tests", "Download samples for the current folder."),
+            ),
         category="Manual",
         handler=handle_manual,
     ),
     CommandSpec(
         name="help",
         aliases=("usage", "-h", "--help"),
-        usage=("atc help", "atc usage"),
-        description="Show usage.",
+        usage=(
+            ("atc help", "Show usage."), 
+            ),
         category="Help",
         handler=handle_help,
     ),
@@ -322,68 +330,10 @@ def resolve_command(name: str):
 
 
 # --- Usage data ---
-def usage_lines() -> List[str]:
-    lines: List[str] = []
-    for spec in COMMANDS:
-        lines.extend(spec.usage)
-    return lines
-
-
-# USAGE_SECTIONS: Tuple[Tuple[str, Tuple[Tuple[str, str], ...]], ...] = (
-#     (
-#         "Contest",
-#         (
-#             ("atc contest <contest> [py|cpp]", "Create/open contest"),
-#             ("atc new <contest> [py|cpp]", "Create contest files"),
-#             ("atc refresh [contest] [--yes]", "Refresh metadata/samples"),
-#         ),
-#     ),
-#     (
-#         "Run",
-#         (
-#             ("atc run <A|all> [python|pypy|cpp]", "Run tests"),
-#             ("atc watch [A] [python|pypy|cpp]", "Watch and run on save"),
-#         ),
-#     ),
-#     (
-#         "Config",
-#         (
-#             ("atc config show", "Show resolved config"),
-#             ("atc config init", "Create config file"),
-#             ("atc config doctor", "Diagnose environment"),
-#         ),
-#     ),
-#     (
-#         "Template",
-#         (
-#             ("atc template list [py|cpp|stress]", "List templates"),
-#             ("atc template show <kind> <name>", "Show template content"),
-#         ),
-#     ),
-#     (
-#         "Stress",
-#         (
-#             ("atc stress A [py|cpp] [--count N] [--seed S]", "Run stress test"),
-#             ("atc stress init A", "Create stress files"),
-#             ("atc stress promote A [--name NAME] [--force]", "Promote failed case"),
-#         ),
-#     ),
-#     (
-#         "Manual",
-#         (
-#             ("atc manual A B C", "Create manual problems"),
-#             ("atc manual tests", "Download samples for current folder contest"),
-#         ),
-#     ),
-# )
-
-
 def usage_sections() -> list[tuple[str, list[tuple[str, str]]]]:
     sections: dict[str, list[tuple[str, str]]] = {}
 
     for spec in COMMANDS:
         rows = sections.setdefault(spec.category, [])
-        for usage in spec.usage:
-            rows.append((usage, spec.description))
-    print([(category, rows) for category, rows in sections.items()])
+        rows.extend(spec.usage)
     return [(category, rows) for category, rows in sections.items()]
