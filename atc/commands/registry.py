@@ -10,9 +10,8 @@ from atc.core.config import (
     find_config_file,
     load_config,
 )
-from atc.ui.console import warn, print_usage
+from atc.ui.console import print_usage
 from atc.core.contest import cmd_contest, cmd_new
-from atc.core.doctor import cmd_config_doctor
 from atc.core.manual import cmd_manual, cmd_manual_tests
 from atc.core.refresh import cmd_refresh
 from atc.core.stress import cmd_stress, cmd_stress_init, cmd_stress_promote
@@ -22,6 +21,7 @@ from atc.core.watch import cmd_watch
 # リファクタ後
 from atc.commands.parsing import parse_handler_args
 from atc.commands.run import handle_run
+from atc.commands.config import handle_config
 from atc.commands.usage_error import USAGE_ERROR
 
 # --- Constants ---
@@ -79,34 +79,6 @@ def handle_refresh(args: List[str]):
     if parsed is None:
         return USAGE_ERROR
     return cmd_refresh(parsed.contest, yes=parsed.yes)
-
-
-# --- Config handlers ---
-def handle_config(args: List[str]):
-    if not args:
-        return USAGE_ERROR
-
-    subcmd = args[0]
-    if subcmd == "show":
-        config_file = find_config_file(Path.cwd())
-        config = load_config(Path.cwd())
-        print(f"config file: {config_file.resolve() if config_file else '(default)'}")
-        print()
-        print(config_to_toml(config), end="")
-    elif subcmd == "init":
-        atc_dir = Path(".atc")
-        atc_dir.mkdir(parents=True, exist_ok=True)
-        config_file = atc_dir / CONFIG_FILE_NAME
-        if config_file.exists():
-            warn(f"already exists: {config_file.resolve()}")
-            return 0
-        config_file.write_text(config_to_toml(default_config_template()), encoding="utf-8")
-        print(f"created: {config_file.resolve()}")
-    elif subcmd == "doctor":
-        cmd_config_doctor()
-    else:
-        return USAGE_ERROR
-    return 0
 
 
 # --- Watch hundler ---
