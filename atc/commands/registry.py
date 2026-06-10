@@ -10,22 +10,22 @@ from atc.core.config import (
     find_config_file,
     load_config,
 )
-from atc.ui.console import error, warn, print_detailed_result, print_all_summary, print_usage
+from atc.ui.console import warn, print_usage
 from atc.core.contest import cmd_contest, cmd_new
 from atc.core.doctor import cmd_config_doctor
 from atc.core.manual import cmd_manual, cmd_manual_tests
 from atc.core.refresh import cmd_refresh
-from atc.core.runner import run_all_problem_tests, run_problem_tests, write_test_log
 from atc.core.stress import cmd_stress, cmd_stress_init, cmd_stress_promote
 from atc.commands.template_commands import cmd_template_list, cmd_template_show
 from atc.core.watch import cmd_watch
 
+# リファクタ後
+from atc.commands.parsing import parse_handler_args
+from atc.commands.run import handle_run
+from atc.commands.usage_error import USAGE_ERROR
 
 # --- Constants ---
-class _UsageError:
-    pass
 
-USAGE_ERROR = _UsageError()
 
 
 # --- Command model ---
@@ -38,14 +38,7 @@ class CommandSpec:
     handler: Callable[[List[str]], Any]
 
 
-# --- Argument parsing helpes ---
-def _parse_handler_args(parser: AtcArgumentParser, args: List[str]):
-    try:
-        return parser.parse_args(args)
-    except ArgumentParseError as e:
-        if str(e):
-            error(f"Error: {e}")
-        return None
+
 
 # --- help handler ---
 def handle_help(args: List[str]):
@@ -60,7 +53,7 @@ def handle_new(args: List[str]):
     parser = AtcArgumentParser(prog="atc new")
     parser.add_argument("contest")
     parser.add_argument("lang", nargs="?")
-    parsed = _parse_handler_args(parser, args)
+    parsed = parse_handler_args(parser, args)
     if parsed is None:
         return USAGE_ERROR
     cmd_new(parsed.contest, parsed.lang)
@@ -71,7 +64,7 @@ def handle_contest(args: List[str]):
     parser = AtcArgumentParser(prog="atc contest")
     parser.add_argument("contest")
     parser.add_argument("lang", nargs="?")
-    parsed = _parse_handler_args(parser, args)
+    parsed = parse_handler_args(parser, args)
     if parsed is None:
         return USAGE_ERROR
     cmd_contest(parsed.contest, parsed.lang)
@@ -82,7 +75,7 @@ def handle_refresh(args: List[str]):
     parser = AtcArgumentParser(prog="atc refresh")
     parser.add_argument("-y", "--yes", action="store_true")
     parser.add_argument("contest", nargs="?")
-    parsed = _parse_handler_args(parser, args)
+    parsed = parse_handler_args(parser, args)
     if parsed is None:
         return USAGE_ERROR
     return cmd_refresh(parsed.contest, yes=parsed.yes)
@@ -116,26 +109,7 @@ def handle_config(args: List[str]):
     return 0
 
 
-# --- Run hundlers ---
-def handle_run(args: List[str]):
-    parser = AtcArgumentParser(prog="atc run")
-    parser.add_argument("problem")
-    parser.add_argument("lang", nargs="?")
-    parsed = _parse_handler_args(parser, args)
-    if parsed is None:
-        return USAGE_ERROR
-    if parsed.problem.lower() == "all":
-        results = run_all_problem_tests(parsed.lang)
-        print_all_summary(results)
-        write_test_log(results)
-        return 0 if bool(results) and all(result.passed for result in results) else 1
-    else:
-        result = run_problem_tests(parsed.problem, parsed.lang, show_compile=True)
-        print_detailed_result(result)
-        write_test_log([result])
-        return 0 if result.passed else 1
-
-
+# --- Watch hundler ---
 def handle_watch(args: List[str]):
     result = cmd_watch(args)
     return result if result is not None else 0
@@ -153,7 +127,7 @@ def handle_template(args: List[str]):
     show_parser.add_argument("lang")
     show_parser.add_argument("name")
 
-    parsed = _parse_handler_args(parser, args)
+    parsed = parse_handler_args(parser, args)
     if parsed is None:
         return USAGE_ERROR
 
@@ -170,7 +144,7 @@ def handle_stress(args: List[str]):
         parser = AtcArgumentParser(prog="atc stress init")
         parser.add_argument("subcommand")
         parser.add_argument("problem")
-        parsed = _parse_handler_args(parser, args)
+        parsed = parse_handler_args(parser, args)
         if parsed is None:
             return USAGE_ERROR
         return cmd_stress_init(parsed.problem)
@@ -180,7 +154,7 @@ def handle_stress(args: List[str]):
         parser.add_argument("problem")
         parser.add_argument("--name")
         parser.add_argument("--force", action="store_true")
-        parsed = _parse_handler_args(parser, args)
+        parsed = parse_handler_args(parser, args)
         if parsed is None:
             return USAGE_ERROR
         return cmd_stress_promote(parsed.problem, name=parsed.name, force=parsed.force)
@@ -194,7 +168,7 @@ def handle_stress(args: List[str]):
     parser.add_argument("--brute")
     parser.add_argument("--timeout", type=float)
     parser.add_argument("--compare", default="strip")
-    parsed = _parse_handler_args(parser, args)
+    parsed = parse_handler_args(parser, args)
     if parsed is None:
         return USAGE_ERROR
     return cmd_stress(

@@ -1,6 +1,7 @@
 import sys
 
-from atc.commands.registry import USAGE_ERROR, resolve_command, usage_sections
+from atc.commands.usage_error import USAGE_ERROR
+from atc.commands.registry import resolve_command, usage_sections
 from atc.ui.console import print_usage
 
 
