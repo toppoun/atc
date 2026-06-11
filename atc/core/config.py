@@ -1,12 +1,12 @@
 import copy
 import json
 import shutil
-import sys
 from pathlib import Path
 from typing import Optional
-import tomllib
-
-from atc.ui.console import RED, RESET
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
 
 # --- Constants ---
@@ -30,7 +30,11 @@ DEFAULT_CONTEST_PATH_RULES = {
     "adt_.*": "ATD",
 }
 
+class ConfigError(RuntimeError):
+    pass
 
+
+# --- default config ---
 def _default_config() -> dict:
     return {
         "paths": {
@@ -60,6 +64,7 @@ def _default_config() -> dict:
     }
 
 
+# --- default config template ---
 def _default_config_template() -> dict:
     config = _default_config()
     config["paths"]["root"] = "."
@@ -102,13 +107,9 @@ def load_config(start: Optional[Path] = None) -> dict:
         with config_file.open("rb") as f:
             loaded = tomllib.load(f)
     except tomllib.TOMLDecodeError as e:
-        print(f"{RED}Error: failed to parse config file: {config_file.resolve()}{RESET}")
-        print(f"  {e}")
-        sys.exit(1)
+        raise ConfigError(f"Error: failed to parse config file: {config_file.resolve()}: {e}") from e
     except OSError as e:
-        print(f"{RED}Error: failed to read config file: {config_file.resolve()}{RESET}")
-        print(f"  {e}")
-        sys.exit(1)
+        raise ConfigError(f"Error: failed to read config file: {config_file.resolve()}: {e}") from e
 
     if isinstance(loaded.get("paths"), dict) and "contests" in loaded["paths"]:
         config["paths"]["contests"] = {}

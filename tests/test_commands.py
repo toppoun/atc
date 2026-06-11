@@ -1,4 +1,4 @@
-import atc.commands.registry as commands_module
+import atc.commands.run as commands_module
 from atc.commands.registry import resolve_command, usage_sections, usage_sections
 from atc.models import CaseResult, ProblemResult
 

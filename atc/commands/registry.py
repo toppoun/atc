@@ -1,15 +1,7 @@
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Callable, Dict, List, Tuple
 
-from ..argparse_utils import ArgumentParseError, AtcArgumentParser
-from atc.core.config import (
-    CONFIG_FILE_NAME,
-    config_to_toml,
-    default_config_template,
-    find_config_file,
-    load_config,
-)
+from ..argparse_utils import AtcArgumentParser
 from atc.ui.console import print_usage
 from atc.core.contest import cmd_contest, cmd_new
 from atc.core.manual import cmd_manual, cmd_manual_tests
@@ -23,10 +15,6 @@ from atc.commands.parsing import parse_handler_args
 from atc.commands.run import handle_run
 from atc.commands.config import handle_config
 from atc.commands.usage_error import USAGE_ERROR
-
-# --- Constants ---
-
-
 
 # --- Command model ---
 @dataclass(frozen=True)
@@ -276,8 +264,8 @@ def resolve_command(name: str):
 
 
 # --- Usage data ---
-def usage_sections() -> list[Tuple[str, list[Tuple[str, str]]]]:
-    sections: Dict[str, list[Tuple[str, str]]] = {}
+def usage_sections() -> List[Tuple[str, List[Tuple[str, str]]]]:
+    sections: Dict[str, List[Tuple[str, str]]] = {}
 
     for spec in COMMANDS:
         rows = sections.setdefault(spec.category, [])

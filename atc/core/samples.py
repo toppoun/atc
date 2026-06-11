@@ -1,7 +1,7 @@
 import shutil
 import subprocess
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from atc.core.atcoder import build_fallback_task_url
 from atc.ui.console import warn
