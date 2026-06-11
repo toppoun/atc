@@ -1,12 +1,12 @@
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Tuple
 
 from atc.ui.console import console, print_text
 from atc.core.config import SOURCE_EXTS, load_config, watch_settings
 from atc.core.metadata import CONTEST_METADATA_PATH, contest_metadata_problems
-from atc.core.problems import resolve_available_problems
-from atc.core.runner import LOG_DIR, normalize_problem, run_problem_tests, write_test_log
+from atc.core.problems import resolve_available_problems, normalize_problem_index
+from atc.core.runner import LOG_DIR, run_problem_tests, write_test_log
 from atc.ui.watch_view import WATCH_WAIT_MESSAGE, WatchState, build_watch_view
 from rich.live import Live
 
@@ -274,7 +274,7 @@ def cmd_watch(args):
             print_text("Use `atc test all` for one-shot all tests.")
             return 0
         else:
-            selected.append(normalize_problem(arg))
+            selected.append(normalize_problem_index(arg))
 
     if selected:
         watch_problems = selected

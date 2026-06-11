@@ -19,18 +19,15 @@ from atc.core.config import (
 )
 
 from ..models import CaseResult, ProblemResult
-from atc.core.problems import resolve_available_problems
+from atc.core.problems import resolve_available_problems, normalize_problem_index
+
 
 
 # --- Constants ---
 LOG_DIR = Path(".atc") / "test-runs"
 
 
-# --- Problem henlers
-def _normalize_problem(problem: str):
-    return problem.upper()
-
-
+# --- Problem henlers ---
 def _available_problems(cwd: Path, problems: Optional[List[str]] = None):
     if problems is None:
         return resolve_available_problems(cwd, load_config(cwd))
@@ -133,7 +130,7 @@ def run_problem_tests(
 ):
     cwd = Path.cwd()
     config = load_config(cwd)
-    problem = _normalize_problem(problem)
+    problem = normalize_problem_index(problem)
     testdir = cwd / "tests" / problem
     started = time.perf_counter()
     result = ProblemResult(problem=problem)
@@ -288,7 +285,6 @@ def run_all_problem_tests(run_language: Optional[str] = None):
 
 
 # --- Public aliases ---
-normalize_problem = _normalize_problem
 available_problems = _available_problems
 write_test_log = _write_test_log
 results_passed = _results_passed

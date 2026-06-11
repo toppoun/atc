@@ -11,7 +11,7 @@ from atc.core.metadata import (
 )
 
 
-def _normalize_problem_index(problem: object) -> str:
+def normalize_problem_index(problem: object) -> str:
     return str(problem or "").strip().upper()
 
 
@@ -19,7 +19,7 @@ def _dedupe_problem_indexes(indexes: List[str]) -> List[str]:
     seen = set()
     deduped = []
     for index in indexes:
-        normalized = _normalize_problem_index(index)
+        normalized = normalize_problem_index(index)
         if normalized and normalized not in seen:
             seen.add(normalized)
             deduped.append(normalized)
@@ -27,7 +27,7 @@ def _dedupe_problem_indexes(indexes: List[str]) -> List[str]:
 
 
 def _problem_sort_key(index: str):
-    normalized = _normalize_problem_index(index)
+    normalized = normalize_problem_index(index)
     if len(normalized) == 1 and "A" <= normalized <= "Z":
         return (0, ord(normalized))
 
@@ -43,7 +43,7 @@ def _problem_sort_key(index: str):
 
 
 def _is_problem_source_index(index: str) -> bool:
-    normalized = _normalize_problem_index(index)
+    normalized = normalize_problem_index(index)
     return bool(re.fullmatch(r"(?:[A-Z]|EX|[0-9]+|[A-Z][0-9]+)", normalized))
 
 

@@ -17,13 +17,13 @@ def test_find_config_file_from_parent(tmp_path, monkeypatch):
     nested = tmp_path / "abc335" / "src"
     nested.mkdir(parents=True)
 
-    assert config_module._find_config_file(nested) == config_file
+    assert config_module.find_config_file(nested) == config_file
 
 
 def test_find_config_file_without_config_returns_none(tmp_path, monkeypatch):
     monkeypatch.setattr(config_module.Path, "home", lambda: tmp_path / "home")
 
-    assert config_module._find_config_file(tmp_path) is None
+    assert config_module.find_config_file(tmp_path) is None
 
 
 def test_config_root_dot_is_project_root(tmp_path, monkeypatch):
@@ -47,7 +47,7 @@ def test_config_root_relative_path_is_under_project_root(tmp_path, monkeypatch):
 
 
 def test_default_config_uses_contest_path_rules_without_legacy_paths():
-    paths = config_module._default_config()["paths"]
+    paths = config_module.default_config()["paths"]
 
     assert paths["contests"]["abc\\d+"] == "ABC"
     assert paths["contests"]["adt_.*"] == "ATD"
@@ -78,7 +78,7 @@ def test_find_project_root_does_not_use_legacy_category_names(tmp_path, monkeypa
 
 
 def test_watch_settings_default_values():
-    poll_seconds, debounce_seconds, warnings = config_module.watch_settings(config_module._default_config())
+    poll_seconds, debounce_seconds, warnings = config_module.watch_settings(config_module.default_config())
 
     assert poll_seconds == config_module.WATCH_POLL_SECONDS
     assert debounce_seconds == config_module.WATCH_DEBOUNCE_SECONDS
@@ -86,7 +86,7 @@ def test_watch_settings_default_values():
 
 
 def test_watch_settings_invalid_values_fall_back_to_defaults():
-    cfg = config_module._default_config()
+    cfg = config_module.default_config()
     cfg["watch"] = {
         "poll_seconds": 999,
         "debounce_seconds": -1,

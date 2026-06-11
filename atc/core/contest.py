@@ -138,9 +138,3 @@ def write_current_contest(contest_dir: Path, config: Optional[dict] = None):
         encoding="utf-8",
     )
     return current_contest_file.resolve()
-
-
-_create_contest_files = create_contest_files
-_resolve_contest_group = resolve_contest_group
-_resolve_contest_dir = resolve_contest_dir
-_write_current_contest = write_current_contest

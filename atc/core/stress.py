@@ -5,7 +5,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from atc.core.config import (
     load_config,
@@ -32,6 +32,8 @@ from .templates import (
     resolve_template_name,
 )
 
+from atc.core.problems import normalize_problem_index
+
 
 # --- Constants ---
 COMPARE_MODES = {"exact", "strip", "tokens"}
@@ -56,10 +58,6 @@ class StressRunOutput:
     stdout: str
     stderr: str
     returncode: int
-
-
-def normalize_problem(problem: str) -> str:
-    return str(problem).strip().upper()
 
 
 def normalize_compare_mode(mode: str) -> str:
@@ -151,7 +149,7 @@ def _write_stress_template(target: Path, template_path: Path) -> bool:
 def cmd_stress_init(problem: str) -> int:
     cwd = Path.cwd()
     config = load_config(cwd)
-    problem = normalize_problem(problem)
+    problem = normalize_problem_index(problem)
 
     try:
         gen_template = _stress_template_path(cwd, config, "gen")
@@ -195,7 +193,7 @@ def _first_existing(paths: List[Path]) -> Optional[Path]:
 
 def promote_failed_case(problem: str, *, name: Optional[str] = None, force: bool = False) -> int:
     cwd = Path.cwd()
-    problem = normalize_problem(problem)
+    problem = normalize_problem_index(problem)
     stress_dir = cwd / STRESS_DIR / problem
     failed_input = stress_dir / "failed.in"
     brute_output = stress_dir / "brute.out"
@@ -378,7 +376,7 @@ def cmd_stress(
 ) -> int:
     cwd = Path.cwd()
     config = load_config(cwd)
-    problem = normalize_problem(problem)
+    problem = normalize_problem_index(problem)
 
     try:
         count = validate_count(count)

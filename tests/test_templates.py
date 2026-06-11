@@ -89,7 +89,7 @@ def test_load_template_manifest_broken_json_raises_manifest_error(tmp_path):
 def test_resolve_default_template_file_exists(tmp_path, monkeypatch):
     monkeypatch.setattr(config_module.Path, "home", lambda: tmp_path / "home")
 
-    template = resolve_template_file("py", config_module._default_config(), tmp_path)
+    template = resolve_template_file("py", config_module.default_config(), tmp_path)
 
     assert template.name == "template.py"
     assert template.exists()

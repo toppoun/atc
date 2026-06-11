@@ -215,10 +215,3 @@ def cmd_refresh(contest: Optional[str] = None, *, yes: bool = False) -> int:
 
     print_refresh_summary(result)
     return 1 if result.samples_failed else 0
-
-
-_fetch_contest_problems_strict = fetch_contest_problems_strict
-_infer_source_name_for_metadata = infer_source_name_for_metadata
-_download_missing_samples = download_missing_samples
-_refresh_contest = refresh_contest
-_is_workspace_root = is_workspace_root
