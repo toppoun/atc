@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import tomllib
 
-from ..models import AtCoderProblem
+from atc.models import AtCoderProblem
 from atc.core.config import SOURCE_EXTS
 from atc.ui.console import warn
 

@@ -24,8 +24,8 @@ from atc.core.config import (
     resolve_executable,
     watch_settings,
 )
-from .metadata import contest_metadata_error, contest_metadata_problems
-from .templates import TemplateError, resolve_template_file as _resolve_template_file
+from atc.core.metadata import contest_metadata_error, contest_metadata_problems
+from atc.core.templates import TemplateError, resolve_template_file as _resolve_template_file
 
 try:
     from rich.columns import Columns

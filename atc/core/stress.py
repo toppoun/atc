@@ -25,7 +25,7 @@ from atc.ui.console import (
     print_text,
     warn,
 )
-from .templates import (
+from atc.core.templates import (
     TemplateError,
     load_template_manifest,
     resolve_template_manifest,

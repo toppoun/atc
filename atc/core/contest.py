@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-from ..models import AtCoderProblem
+from atc.models import AtCoderProblem
 
 from atc.core.atcoder import (
     build_fallback_task_url,
@@ -17,10 +17,10 @@ from atc.core.config import (
     load_config,
 )
 from atc.ui.console import error, ok as print_ok, warn
-from .metadata import write_contest_metadata
-from .paths import ContestPathConfigError, resolve_contest_dir, resolve_contest_group
+from atc.core.metadata import write_contest_metadata
+from atc.core.paths import ContestPathConfigError, resolve_contest_dir, resolve_contest_group
 from atc.core.samples import download_samples, print_sample_download_summary
-from .templates import load_template
+from atc.core.templates import load_template
 
 
 def cmd_new(contest: str, lang: Optional[str] = None):

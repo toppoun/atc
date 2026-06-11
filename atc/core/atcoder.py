@@ -4,7 +4,7 @@ from typing import List, Optional
 from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 
-from ..models import AtCoderProblem
+from atc.models import AtCoderProblem
 
 
 # --- Constants ---

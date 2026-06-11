@@ -18,9 +18,8 @@ from atc.core.config import (
     resolve_executable,
 )
 
-from ..models import CaseResult, ProblemResult
+from atc.models import CaseResult, ProblemResult
 from atc.core.problems import resolve_available_problems, normalize_problem_index
-
 
 
 # --- Constants ---

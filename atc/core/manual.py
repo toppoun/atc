@@ -3,9 +3,9 @@ from pathlib import Path
 
 from atc.core.config import default_language, load_config
 from atc.ui.console import GREEN, color_text, error, ok as print_ok, warn
-from .problems import resolve_sample_download_problems
+from atc.core.problems import resolve_sample_download_problems
 from atc.core.samples import download_samples
-from .templates import load_template
+from atc.core.templates import load_template
 
 
 def cmd_manual(args):

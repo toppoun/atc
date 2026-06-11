@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from ..models import AtCoderProblem
+from atc.models import AtCoderProblem
 from atc.core.atcoder import fetch_atcoder_tasks
 from atc.core.config import default_language, load_config
 from atc.ui.console import Table, console, error, ok as print_ok
