@@ -3,12 +3,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from atc.core.config import SOURCE_EXTS, config_problems, load_config
-from atc.core.metadata import (
-    ContestProblem,
-    contest_metadata_error,
-    contest_metadata_problems,
-    read_contest_metadata,
-)
+from atc.core.metadata import ContestProblem, contest_metadata_problems
 
 
 def normalize_problem_index(problem: object) -> str:

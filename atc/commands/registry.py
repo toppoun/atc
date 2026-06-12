@@ -4,13 +4,13 @@ from typing import Any, Callable, Dict, List, Tuple
 from ..argparse_utils import AtcArgumentParser
 from atc.ui.console import print_usage
 from atc.core.contest import cmd_contest, cmd_new
-from atc.core.manual import cmd_manual, cmd_manual_tests
 from atc.core.refresh import cmd_refresh
 from atc.core.stress import cmd_stress, cmd_stress_init, cmd_stress_promote
-from atc.commands.template_commands import cmd_template_list, cmd_template_show
+from atc.commands.template import cmd_template_list, cmd_template_show
 from atc.core.watch import cmd_watch
 
 # リファクタ後
+from atc.commands.manual import handle_manual
 from atc.commands.parsing import parse_handler_args
 from atc.commands.run import handle_run
 from atc.commands.config import handle_config
@@ -141,15 +141,6 @@ def handle_stress(args: List[str]):
         timeout=parsed.timeout,
         compare=parsed.compare,
     )
-
-
-# --- Manual handlers ---
-def handle_manual(args: List[str]):
-    if len(args) >= 1 and args[0] == "tests":
-        cmd_manual_tests()
-    else:
-        cmd_manual(args)
-    return 0
 
 
 # --- Command registry ---

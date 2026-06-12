@@ -1,9 +1,10 @@
 from atc.core.problems import (
-    contest_metadata_error,
     contest_metadata_problems,
     resolve_available_problems,
     resolve_sample_download_problems,
 )
+
+from atc.core.metadata import contest_metadata_error
 
 
 ADT_INDEXES = list("ABCDEFGHI")

@@ -107,9 +107,9 @@ def load_config(start: Optional[Path] = None) -> dict:
         with config_file.open("rb") as f:
             loaded = tomllib.load(f)
     except tomllib.TOMLDecodeError as e:
-        raise ConfigError(f"Error: failed to parse config file: {config_file.resolve()}: {e}") from e
+        raise ConfigError(f"failed to parse config file: {config_file.resolve()}: {e}") from e
     except OSError as e:
-        raise ConfigError(f"Error: failed to read config file: {config_file.resolve()}: {e}") from e
+        raise ConfigError(f"failed to read config file: {config_file.resolve()}: {e}") from e
 
     if isinstance(loaded.get("paths"), dict) and "contests" in loaded["paths"]:
         config["paths"]["contests"] = {}

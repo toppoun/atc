@@ -1,4 +1,4 @@
-import atc.core.manual as manual_module
+import atc.commands.manual as manual_module
 
 
 def _write_contest_metadata(contest_dir):
