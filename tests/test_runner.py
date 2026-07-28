@@ -1,8 +1,11 @@
 import json
 import inspect
 import sys
+from pathlib import Path
+from types import SimpleNamespace
 
 import atc.core.runner as runner_module
+from atc.core.config import default_config
 from atc.models import CaseResult, ProblemResult
 from atc.core.runner import LOG_DIR, results_passed, run_problem_tests, write_test_log
 
@@ -127,8 +130,8 @@ def test_cmd_run_all_uses_metadata_problem_list(tmp_path, monkeypatch):
     _write_contest_metadata(tmp_path)
     calls = []
 
-    def fake_run_problem_tests(problem, run_language, show_compile=False):
-        calls.append((problem, run_language, show_compile))
+    def fake_run_problem_tests(problem, run_language, show_compile=False, cpp_extra_flags=()):
+        calls.append((problem, run_language, show_compile, tuple(cpp_extra_flags)))
         return _passed_result(problem)
 
     monkeypatch.setattr(runner_module, "run_problem_tests", fake_run_problem_tests)
@@ -136,7 +139,28 @@ def test_cmd_run_all_uses_metadata_problem_list(tmp_path, monkeypatch):
     results = runner_module.run_all_problem_tests("py")
 
     assert [result.problem for result in results] == ADT_INDEXES
-    assert calls == [(problem, "py", False) for problem in ADT_INDEXES]
+    assert calls == [(problem, "py", False, ()) for problem in ADT_INDEXES]
+
+
+def test_run_all_problem_tests_passes_cpp_extra_flags_to_each_problem(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    _write_contest_metadata(tmp_path, ["A", "B"])
+    calls = []
+    extra_flags = ("-DLOCAL", "-D_GLIBCXX_DEBUG")
+
+    def fake_run_problem_tests(problem, run_language, show_compile=False, cpp_extra_flags=()):
+        calls.append((problem, run_language, show_compile, tuple(cpp_extra_flags)))
+        return _passed_result(problem)
+
+    monkeypatch.setattr(runner_module, "run_problem_tests", fake_run_problem_tests)
+
+    results = runner_module.run_all_problem_tests("cpp", cpp_extra_flags=extra_flags)
+
+    assert [result.problem for result in results] == ["A", "B"]
+    assert calls == [
+        ("A", "cpp", False, extra_flags),
+        ("B", "cpp", False, extra_flags),
+    ]
 
 
 def test_cmd_run_all_returns_empty_list_without_available_problems(tmp_path, monkeypatch, capsys):
@@ -209,6 +233,118 @@ def test_run_problem_tests_python_minimal_ac_case(tmp_path, monkeypatch):
     assert result.total_count == 1
     assert result.cases[0].status == "AC"
     assert result.cases[0].output == "hello"
+
+
+def test_cpp_debug_flags_are_appended_without_mutating_config_or_leaking(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    cpp_file = tmp_path / "A.cpp"
+    cpp_file.write_text("int main() { return 0; }\n", encoding="utf-8")
+    testdir = tmp_path / "tests" / "A"
+    testdir.mkdir(parents=True)
+    (testdir / "sample-1.in").write_text("hello\n", encoding="utf-8")
+    (testdir / "sample-1.out").write_text("hello\n", encoding="utf-8")
+
+    config = default_config()
+    base_flags = ["-std=gnu++23", "-O2", "-Wall", "-Wextra"]
+    config["runner"]["cpp_flags"] = base_flags[:]
+    compile_commands = []
+
+    monkeypatch.setattr(runner_module, "load_config", lambda cwd: config)
+    monkeypatch.setattr(runner_module, "resolve_executable", lambda command: command)
+
+    def fake_subprocess_run(command, **kwargs):
+        if command[0] == "g++":
+            compile_commands.append(command[:])
+            output_path = Path(command[command.index("-o") + 1])
+            output_path.write_text("", encoding="utf-8")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return SimpleNamespace(returncode=0, stdout="hello\n", stderr="")
+
+    monkeypatch.setattr(runner_module.subprocess, "run", fake_subprocess_run)
+    extra_flags = ("-DLOCAL", "-D_GLIBCXX_DEBUG")
+    executable_suffix = ".exe" if runner_module.platform.system() == "Windows" else ".out"
+    executable_path = tmp_path / f"_A{executable_suffix}"
+
+    first_debug = run_problem_tests("A", "cpp", cpp_extra_flags=extra_flags)
+    second_debug = run_problem_tests("A", "cpp", cpp_extra_flags=extra_flags)
+    normal = run_problem_tests("A", "cpp")
+
+    assert first_debug.passed is True
+    assert second_debug.passed is True
+    assert normal.passed is True
+    assert config["runner"]["cpp_flags"] == base_flags
+    assert compile_commands[0] == [
+        "g++",
+        *base_flags,
+        *extra_flags,
+        str(cpp_file),
+        "-o",
+        str(executable_path),
+    ]
+    assert compile_commands[1] == compile_commands[0]
+    assert compile_commands[2] == [
+        "g++",
+        *base_flags,
+        str(cpp_file),
+        "-o",
+        str(executable_path),
+    ]
+    assert not executable_path.exists()
+
+
+def test_cpp_extra_flags_disable_python_fallback_when_cpp_source_is_missing(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "A.py").write_text("print(input())\n", encoding="utf-8")
+    extra_flags = ("-DLOCAL", "-D_GLIBCXX_DEBUG")
+
+    result = run_problem_tests("A", "cpp", cpp_extra_flags=extra_flags)
+
+    assert result.mode == "cpp"
+    assert result.error_status == "NO_SOURCE"
+    assert result.error_message == "C++ source not found: A.cpp"
+
+
+def test_cpp_extra_flags_are_rejected_for_python_runner(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "A.py").write_text("print(input())\n", encoding="utf-8")
+
+    result = run_problem_tests(
+        "A",
+        "python",
+        cpp_extra_flags=("-DLOCAL", "-D_GLIBCXX_DEBUG"),
+    )
+
+    assert result.error_status == "INVALID_LANGUAGE"
+    assert "only available for C++" in result.error_message
+
+
+def test_cpp_debug_compile_error_preserves_ce_result(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    cpp_file = tmp_path / "A.cpp"
+    cpp_file.write_text("broken C++\n", encoding="utf-8")
+    config = default_config()
+    config["runner"]["cpp_flags"] = ["-std=gnu++23", "-O2"]
+    compile_commands = []
+
+    monkeypatch.setattr(runner_module, "load_config", lambda cwd: config)
+    monkeypatch.setattr(runner_module, "resolve_executable", lambda command: command)
+
+    def fake_compile(command, **kwargs):
+        compile_commands.append(command[:])
+        return SimpleNamespace(returncode=1, stdout="", stderr="compile failed")
+
+    monkeypatch.setattr(runner_module.subprocess, "run", fake_compile)
+    extra_flags = ("-DLOCAL", "-D_GLIBCXX_DEBUG")
+
+    result = run_problem_tests("A", "cpp", cpp_extra_flags=extra_flags)
+
+    assert result.error_status == "CE"
+    assert result.error_message == "compile failed"
+    assert compile_commands[0][1:5] == [
+        "-std=gnu++23",
+        "-O2",
+        *extra_flags,
+    ]
 
 
 def test_run_problem_tests_calls_callback_in_sample_order(tmp_path, monkeypatch):

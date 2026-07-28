@@ -79,6 +79,8 @@ atc r A
 atc test A python
 atc t A pypy
 atc t A cpp
+atc t A --debug
+atc t A -d
 ```
 
 1問だけテストします。
@@ -87,6 +89,21 @@ atc t A cpp
 - `cpp`: `A.cpp` をコンパイルして実行
 - 省略時は `[defaults].language`
 - 指定言語のファイルが無い場合だけ、存在する別言語に fallback
+
+`--debug`または`-d`はC++テスト専用です。`.atc/config.toml`の
+`runner.cpp_flags`をそのまま維持し、その末尾へ`-DLOCAL`と
+`-D_GLIBCXX_DEBUG`を一時的に追加して、通常と同じサンプルテストを実行します。
+GDBは起動しません。`watch`では利用できません。
+
+```bash
+atc test A --debug
+atc test A -d
+atc t --debug A
+atc t -d A
+atc t all --debug
+```
+
+`--debug`指定時はC++ソースが必須で、Pythonへのfallbackは行いません。
 
 全 AC なら exit code 0、WA / RE / TLE / CE / NO_TESTS / ERROR があれば exit code 1 です。
 

@@ -1,3 +1,5 @@
+import pytest
+
 import atc.commands.run as commands_module
 from atc.commands.registry import resolve_command, usage_sections, usage_sections
 from atc.models import CaseResult, ProblemResult
@@ -32,7 +34,11 @@ def test_handle_run_all_prints_all_summary_and_returns_success(monkeypatch):
     results = [_passed_result("A"), _passed_result("B")]
     printed = []
 
-    monkeypatch.setattr(commands_module, "run_all_problem_tests", lambda lang=None: results)
+    monkeypatch.setattr(
+        commands_module,
+        "run_all_problem_tests",
+        lambda lang=None, cpp_extra_flags=(): results,
+    )
     monkeypatch.setattr(commands_module, "print_all_summary", lambda value: printed.append(value))
 
     assert commands_module.handle_run(["all", "py"]) == 0
@@ -48,7 +54,11 @@ def test_handle_run_all_returns_failure_when_any_result_fails(monkeypatch):
     results = [_passed_result("B"), failed]
     printed = []
 
-    monkeypatch.setattr(commands_module, "run_all_problem_tests", lambda lang=None: results)
+    monkeypatch.setattr(
+        commands_module,
+        "run_all_problem_tests",
+        lambda lang=None, cpp_extra_flags=(): results,
+    )
     monkeypatch.setattr(commands_module, "print_all_summary", lambda value: printed.append(value))
 
     assert commands_module.handle_run(["all"]) == 1
@@ -60,16 +70,75 @@ def test_handle_run_single_prints_detailed_result(monkeypatch):
     printed = []
     calls = []
 
-    def fake_run_problem_tests(problem, lang=None, show_compile=False):
-        calls.append((problem, lang, show_compile))
+    def fake_run_problem_tests(problem, lang=None, show_compile=False, cpp_extra_flags=()):
+        calls.append((problem, lang, show_compile, tuple(cpp_extra_flags)))
         return result
 
     monkeypatch.setattr(commands_module, "run_problem_tests", fake_run_problem_tests)
     monkeypatch.setattr(commands_module, "print_detailed_result", lambda value: printed.append(value))
 
     assert commands_module.handle_run(["A", "py"]) == 0
-    assert calls == [("A", "py", True)]
+    assert calls == [("A", "py", True, ())]
     assert printed == [result]
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["A", "--debug"],
+        ["--debug", "A"],
+        ["A", "-d"],
+        ["-d", "A"],
+        ["A", "cpp", "--debug"],
+    ],
+)
+def test_handle_run_accepts_debug_flag_before_or_after_problem(monkeypatch, args):
+    result = _passed_result("A")
+    calls = []
+
+    def fake_run_problem_tests(problem, lang=None, show_compile=False, cpp_extra_flags=()):
+        calls.append((problem, lang, show_compile, tuple(cpp_extra_flags)))
+        return result
+
+    monkeypatch.setattr(commands_module, "run_problem_tests", fake_run_problem_tests)
+    monkeypatch.setattr(commands_module, "print_detailed_result", lambda value: None)
+    monkeypatch.setattr(commands_module, "write_test_log", lambda results: None)
+
+    assert commands_module.handle_run(args) == 0
+    assert calls == [
+        (
+            "A",
+            "cpp",
+            True,
+            commands_module.CPP_DEBUG_EXTRA_FLAGS,
+        )
+    ]
+
+
+def test_handle_run_all_passes_debug_flags_to_all_runner(monkeypatch):
+    results = [_passed_result("A"), _passed_result("B")]
+    calls = []
+
+    def fake_run_all_problem_tests(lang=None, cpp_extra_flags=()):
+        calls.append((lang, tuple(cpp_extra_flags)))
+        return results
+
+    monkeypatch.setattr(commands_module, "run_all_problem_tests", fake_run_all_problem_tests)
+    monkeypatch.setattr(commands_module, "print_all_summary", lambda value: None)
+    monkeypatch.setattr(commands_module, "write_test_log", lambda values: None)
+
+    assert commands_module.handle_run(["all", "--debug"]) == 0
+    assert calls == [("cpp", commands_module.CPP_DEBUG_EXTRA_FLAGS)]
+
+
+@pytest.mark.parametrize("lang", ["py", "python", "pypy"])
+def test_handle_run_rejects_debug_for_non_cpp_language(monkeypatch, capsys, lang):
+    calls = []
+    monkeypatch.setattr(commands_module, "run_problem_tests", lambda *args, **kwargs: calls.append((args, kwargs)))
+
+    assert commands_module.handle_run(["A", lang, "--debug"]) == 1
+    assert calls == []
+    assert "--debug is only available for C++" in capsys.readouterr().out
 
 
 def test_usage_lines_include_main_commands():
@@ -92,6 +161,18 @@ def test_usage_lines_include_main_commands():
     assert "atc stress init A" in usage
     assert "atc stress promote A" in usage
     assert "atc manual" in usage
+
+
+def test_watch_usage_does_not_include_debug_option():
+    watch_commands = [
+        command
+        for _title, rows in usage_sections()
+        for command, _description in rows
+        if command.startswith("atc watch")
+    ]
+
+    assert watch_commands
+    assert all("--debug" not in command and "-d" not in command for command in watch_commands)
 
 
 def test_usage_sections_group_main_commands():

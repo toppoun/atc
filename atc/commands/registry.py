@@ -181,8 +181,8 @@ COMMANDS: Tuple[CommandSpec, ...] = (
         name="run",
         aliases=("r", "test", "t"),
         usage=(
-            ("atc run A [python|pypy|cpp]", "Run tests for one problem."), 
-            ("atc run all [python|pypy|cpp]", "Run tests for all available problems."), 
+            ("atc run A [python|pypy|cpp] [-d|--debug]", "Run tests for one problem."),
+            ("atc run all [python|pypy|cpp] [-d|--debug]", "Run tests for all available problems."),
             ),
         category="Run",
         handler=handle_run,
