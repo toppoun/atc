@@ -3,9 +3,12 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+import atc.core.stress as stress_module
+from atc.core.config import ConfigError, default_config
 from atc.core.stress import (
     StressError,
     compare_outputs,
@@ -95,6 +98,95 @@ def test_resolve_stress_timeout_rejects_non_positive_values():
     assert resolve_stress_timeout(1.5, config) == 1.5
     with pytest.raises(StressError):
         resolve_stress_timeout(0, config)
+
+
+def test_compile_cpp_solution_uses_cpp_library_without_debug_flags(tmp_path, monkeypatch):
+    cpp_file = tmp_path / "A.cpp"
+    cpp_file.write_text("int main() { return 0; }\n", encoding="utf-8")
+    library = tmp_path / "cpplib"
+    library.mkdir()
+    config = default_config()
+    config["paths"]["root"] = str(tmp_path)
+    config["paths"]["cpp_library"] = "cpplib"
+    config["runner"]["cpp_flags"] = ["-std=c++23", "-O0"]
+    config["runner"]["cpp_debug_flags"] = ["-DSTRESS_MUST_NOT_USE_THIS"]
+    compile_commands = []
+
+    monkeypatch.setattr(stress_module, "resolve_executable", lambda command: command)
+
+    def fake_compile(command, **kwargs):
+        compile_commands.append(command[:])
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(stress_module.subprocess, "run", fake_compile)
+
+    program = stress_module._compile_cpp_solution(tmp_path, "A", cpp_file, config)
+
+    executable_suffix = ".exe" if stress_module.platform.system() == "Windows" else ".out"
+    executable = tmp_path / ".atc" / "stress" / "A" / f"_A_stress{executable_suffix}"
+    assert compile_commands == [
+        [
+            "g++",
+            "-std=c++23",
+            "-O0",
+            "-I",
+            str(library.resolve()),
+            str(cpp_file),
+            "-o",
+            str(executable),
+        ]
+    ]
+    assert "-DSTRESS_MUST_NOT_USE_THIS" not in compile_commands[0]
+    assert program.command == [str(executable)]
+    assert program.path == cpp_file
+    assert program.cleanup_path == executable
+
+
+def test_compile_cpp_solution_without_library_keeps_existing_command(tmp_path, monkeypatch):
+    cpp_file = tmp_path / "A.cpp"
+    cpp_file.write_text("int main() { return 0; }\n", encoding="utf-8")
+    config = default_config()
+    config["runner"]["cpp_flags"] = ["-std=c++20", "-O2"]
+    compile_commands = []
+
+    monkeypatch.setattr(stress_module, "resolve_executable", lambda command: command)
+    monkeypatch.setattr(
+        stress_module.subprocess,
+        "run",
+        lambda command, **kwargs: (
+            compile_commands.append(command[:])
+            or SimpleNamespace(returncode=0, stdout="", stderr="")
+        ),
+    )
+
+    stress_module._compile_cpp_solution(tmp_path, "A", cpp_file, config)
+
+    assert compile_commands[0][1:3] == ["-std=c++20", "-O2"]
+    assert "-I" not in compile_commands[0]
+
+
+def test_compile_cpp_solution_invalid_library_stops_before_compile_output(tmp_path, monkeypatch):
+    cpp_file = tmp_path / "A.cpp"
+    cpp_file.write_text("int main() { return 0; }\n", encoding="utf-8")
+    config = default_config()
+    config["paths"]["root"] = str(tmp_path)
+    config["paths"]["cpp_library"] = "missing"
+    subprocess_calls = []
+    warnings = []
+
+    monkeypatch.setattr(
+        stress_module.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess_calls.append((args, kwargs)),
+    )
+    monkeypatch.setattr(stress_module, "warn", lambda message: warnings.append(message))
+
+    with pytest.raises(ConfigError, match=r"^C\+\+ library directory not found:"):
+        stress_module._compile_cpp_solution(tmp_path, "A", cpp_file, config)
+
+    assert subprocess_calls == []
+    assert warnings == []
+    assert not (tmp_path / ".atc" / "stress" / "A").exists()
 
 
 def test_save_failure_writes_files_and_meta(tmp_path):

@@ -76,6 +76,96 @@ def test_default_config_includes_cpp_debug_flags():
     ]
 
 
+def test_default_config_cpp_library_is_disabled():
+    assert config_module.default_config()["paths"]["cpp_library"] == ""
+
+
+def test_default_config_template_toml_includes_empty_cpp_library():
+    template = config_module.config_to_toml(config_module.default_config_template())
+
+    assert 'cpp_library = ""' in template
+
+
+def test_load_config_adds_empty_cpp_library_to_old_config(tmp_path, monkeypatch):
+    monkeypatch.setattr(config_module.Path, "home", lambda: tmp_path / "home")
+    _write_config(tmp_path, '[paths]\nroot = "."\n')
+
+    loaded = config_module.load_config(tmp_path)
+
+    assert loaded["paths"]["cpp_library"] == ""
+
+
+def test_cpp_library_path_returns_none_for_empty_value(tmp_path):
+    config = {"paths": {"root": "", "cpp_library": ""}}
+
+    assert config_module.cpp_library_path(config, tmp_path) is None
+
+
+def test_cpp_library_path_resolves_absolute_path(tmp_path):
+    library = tmp_path / "cpplib"
+    config = {"paths": {"root": "", "cpp_library": str(library)}}
+
+    assert config_module.cpp_library_path(config) == library.resolve()
+
+
+def test_cpp_library_path_resolves_relative_path_from_config_root(tmp_path):
+    config = {
+        "paths": {
+            "root": str(tmp_path),
+            "cpp_library": "cpplib",
+        }
+    }
+
+    assert config_module.cpp_library_path(config) == (tmp_path / "cpplib").resolve()
+
+
+def test_cpp_library_path_uses_config_project_root_when_root_is_empty(tmp_path):
+    config_file = tmp_path / ".atc" / "config.toml"
+    config = {
+        config_module.CONFIG_FILE_META_KEY: str(config_file),
+        "paths": {
+            "root": "",
+            "cpp_library": "cpplib",
+        },
+    }
+
+    assert config_module.cpp_library_path(config) == (tmp_path / "cpplib").resolve()
+
+
+def test_cpp_library_path_uses_start_without_config_information(tmp_path):
+    config = {"paths": {"root": "", "cpp_library": "cpplib"}}
+
+    assert config_module.cpp_library_path(config, tmp_path) == (tmp_path / "cpplib").resolve()
+
+
+def test_cpp_library_path_expands_user_home():
+    config = {"paths": {"root": "", "cpp_library": "~/atc-cpplib-test"}}
+
+    assert config_module.cpp_library_path(config) == Path("~/atc-cpplib-test").expanduser().resolve()
+
+
+def test_cpp_library_path_rejects_non_table_paths():
+    config = {"paths": []}
+
+    try:
+        config_module.cpp_library_path(config)
+    except config_module.ConfigError as e:
+        assert str(e) == "[paths] must be a table."
+    else:
+        raise AssertionError("ConfigError was not raised")
+
+
+def test_cpp_library_path_rejects_non_string_value():
+    config = {"paths": {"root": "", "cpp_library": ["cpplib"]}}
+
+    try:
+        config_module.cpp_library_path(config)
+    except config_module.ConfigError as e:
+        assert str(e) == "paths.cpp_library must be a path string."
+    else:
+        raise AssertionError("ConfigError was not raised")
+
+
 def test_runner_cpp_debug_flags_converts_list_items_to_strings():
     config = {"runner": {"cpp_debug_flags": ["-DLOCAL", 123]}}
 

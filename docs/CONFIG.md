@@ -17,6 +17,7 @@ VS Code 拡張機能も workspace folder から親方向に `.atc/config.toml` �
 ```toml
 [paths]
 root = "."
+cpp_library = "cpplib"
 
 [paths.contests]
 "abc\\d+" = "ABC"
@@ -37,6 +38,7 @@ python = "python"
 pypy = "pypy"
 cpp_compiler = "g++"
 cpp_flags = ["-std=c++20", "-O2", "-Wall", "-Wextra"]
+cpp_debug_flags = ["-DLOCAL", "-D_GLIBCXX_DEBUG"]
 timeout_seconds = 2.0
 compile_timeout_seconds = 10.0
 
@@ -66,6 +68,40 @@ root = "."
 この config が `/Users/friend/atcoder/.atc/config.toml` にある場合、root は `/Users/friend/atcoder` になります。
 
 `root = ""` の場合、`atc contest abc335` は現在のカレントディレクトリ直下に `abc335/` を作ります。
+
+### `paths.cpp_library`
+
+C++ ヘッダを格納するルートディレクトリを指定します。相対パスは `paths.root` 基準で解決され、`paths.root` が空の場合は config の project root（`.atc/config.toml` の親プロジェクト）基準になります。
+
+```toml
+[paths]
+root = "."
+cpp_library = "cpplib"
+```
+
+解決したディレクトリは、run と stress のすべての C++ コンパイルへ `-I` とパスの2引数として追加されます。実際に使用するヘッダは自動選択されず、C++ コード中の `#include` で決まります。
+
+```text
+cpplib/
+├── algo/
+│   └── debug.h
+└── atcoder/
+    ├── all
+    ├── dsu
+    └── modint
+```
+
+```cpp
+#include <atcoder/all>
+
+#ifdef LOCAL
+#include <algo/debug.h>
+#endif
+```
+
+`cpp_library = ""` または項目未指定の場合、この機能は無効です。
+
+従来どおり `runner.cpp_flags` に `"-I"` とパスを直接指定する方法も利用できます。互換性のため内容の解析や重複排除は行いませんが、新しい設定では `paths.cpp_library` の利用を推奨します。
 
 ### `paths.contests`
 
@@ -197,6 +233,7 @@ python = "python"
 pypy = "pypy"
 cpp_compiler = "g++"
 cpp_flags = ["-std=c++20", "-O2", "-Wall", "-Wextra"]
+cpp_debug_flags = ["-DLOCAL", "-D_GLIBCXX_DEBUG"]
 timeout_seconds = 2.0
 compile_timeout_seconds = 10.0
 ```
@@ -205,6 +242,7 @@ compile_timeout_seconds = 10.0
 - `runner.pypy`: PyPy 実行コマンド。見つからない場合は ERROR
 - `runner.cpp_compiler`: C++ compiler
 - `runner.cpp_flags`: C++ compile flags
+- `runner.cpp_debug_flags`: `atc run --debug` の場合だけ追加する C++ compile flags
 - `runner.timeout_seconds`: テストケース実行時間
 - `runner.compile_timeout_seconds`: C++ コンパイル時間
 

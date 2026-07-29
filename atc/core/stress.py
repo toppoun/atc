@@ -7,13 +7,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+from atc.core.cpp import build_cpp_compile_flags
 from atc.core.config import (
     load_config,
     normalize_run_language,
     resolve_executable,
     runner_command,
     runner_compile_timeout,
-    runner_cpp_flags,
     runner_timeout,
 )
 from atc.ui.console import (
@@ -249,6 +249,7 @@ def cmd_stress_promote(problem: str, name: Optional[str] = None, force: bool = F
 
 
 def _compile_cpp_solution(cwd: Path, problem: str, cpp_file: Path, config: dict) -> StressProgram:
+    flags = build_cpp_compile_flags(config, cwd)
     compiler = runner_command(config, "cpp_compiler", "g++")
     compiler_path = resolve_executable(compiler)
     if not compiler_path:
@@ -262,7 +263,7 @@ def _compile_cpp_solution(cwd: Path, problem: str, cpp_file: Path, config: dict)
     warn(f"Compiling {cpp_file.name}...")
     try:
         proc = subprocess.run(
-            [compiler_path, *runner_cpp_flags(config), str(cpp_file), "-o", str(exe_path)],
+            [compiler_path, *flags, str(cpp_file), "-o", str(exe_path)],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,

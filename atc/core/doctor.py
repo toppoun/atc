@@ -12,6 +12,8 @@ import tomllib
 from atc.ui.console import Text, Table, Panel, box, console
 from atc.core.config import (
     CONFIG_FILE_META_KEY,
+    ConfigError,
+    cpp_library_path,
     deep_merge_config,
     default_config,
     find_config_file,
@@ -542,6 +544,10 @@ def _doctor_check_config(report: DoctorReport, config: dict, config_file: Option
         report.item("INFO", key="config_file", label="Config file", value="(default config)")
 
     paths = config.get("paths", {})
+    if not isinstance(paths, dict):
+        report.item("ERROR", "[paths] must be a table.")
+        return
+
     root_value = str(paths.get("root") or "").strip()
     root = config_root(config)
     if root_value:
@@ -569,6 +575,10 @@ def _doctor_check_config(report: DoctorReport, config: dict, config_file: Option
 
 def _doctor_check_templates(report: DoctorReport, config: dict, cwd: Path):
     report.section("Templates")
+    if not isinstance(config.get("paths", {}), dict):
+        report.item("INFO", "Template checks skipped because [paths] is invalid.")
+        return
+
     for ext, label in [("py", "Python"), ("cpp", "C++")]:
         try:
             template = _resolve_template_file(ext, config, cwd)
@@ -585,7 +595,12 @@ def _doctor_check_templates(report: DoctorReport, config: dict, cwd: Path):
             )
 
 
-def _doctor_check_runner(report: DoctorReport, config: dict):
+def _doctor_check_runner(
+    report: DoctorReport,
+    config: dict,
+    cwd: Optional[Path] = None,
+):
+    cwd = cwd or Path.cwd()
     report.section("Runner")
     python_cmd = runner_command(config, "python", "python")
     python_runner = resolve_executable(python_cmd)
@@ -630,6 +645,20 @@ def _doctor_check_runner(report: DoctorReport, config: dict):
                 key="cpp_compiler",
                 label="C++ compiler not found.",
             )
+
+    try:
+        library_path = cpp_library_path(config, cwd)
+    except ConfigError as e:
+        report.item("ERROR", str(e))
+    else:
+        if library_path is None:
+            report.item("INFO", "C++ library: not configured")
+        elif not library_path.exists():
+            report.item("ERROR", f"C++ library directory not found: {library_path}")
+        elif not library_path.is_dir():
+            report.item("ERROR", f"C++ library path is not a directory: {library_path}")
+        else:
+            report.item("OK", f"C++ library: {library_path}")
 
     report.item("OK", f"C++ flags: {' '.join(runner_cpp_flags(config))}")
     cpp_debug_flags = runner_cpp_debug_flags(config)
@@ -839,6 +868,9 @@ def _doctor_check_vscode(report: DoctorReport):
 
 
 def _doctor_current_contest_root(config: dict, cwd: Path):
+    if not isinstance(config.get("paths", {}), dict):
+        return cwd
+
     root = config_root(config)
     return root if root else find_project_root(cwd, config)
 
@@ -902,7 +934,7 @@ def cmd_config_doctor():
     _doctor_check_python(report)
     _doctor_check_config(report, config, config_file, config_error)
     _doctor_check_templates(report, config, cwd)
-    _doctor_check_runner(report, config)
+    _doctor_check_runner(report, config, cwd)
     _doctor_check_watch(report, config)
     _doctor_check_tools(report)
     _doctor_check_vscode(report)

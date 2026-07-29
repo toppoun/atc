@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 import atc.core.runner as runner_module
-from atc.core.config import default_config
+from atc.core.config import ConfigError, default_config
 from atc.models import CaseResult, ProblemResult
 from atc.core.runner import LOG_DIR, results_passed, run_problem_tests, write_test_log
 
@@ -261,6 +261,8 @@ def test_cpp_debug_flags_are_appended_without_mutating_config_or_leaking(tmp_pat
     monkeypatch.chdir(tmp_path)
     cpp_file = tmp_path / "A.cpp"
     cpp_file.write_text("int main() { return 0; }\n", encoding="utf-8")
+    library = tmp_path / "cpplib"
+    library.mkdir()
     testdir = tmp_path / "tests" / "A"
     testdir.mkdir(parents=True)
     (testdir / "sample-1.in").write_text("hello\n", encoding="utf-8")
@@ -269,6 +271,8 @@ def test_cpp_debug_flags_are_appended_without_mutating_config_or_leaking(tmp_pat
     config = default_config()
     base_flags = ["-std=gnu++23", "-O2", "-Wall", "-Wextra"]
     debug_flags = ["-DPROJECT_DEBUG", "-fsanitize=undefined"]
+    config["paths"]["root"] = str(tmp_path)
+    config["paths"]["cpp_library"] = "cpplib"
     config["runner"]["cpp_flags"] = base_flags[:]
     config["runner"]["cpp_debug_flags"] = debug_flags[:]
     compile_commands = []
@@ -298,9 +302,12 @@ def test_cpp_debug_flags_are_appended_without_mutating_config_or_leaking(tmp_pat
     assert normal.passed is True
     assert config["runner"]["cpp_flags"] == base_flags
     assert config["runner"]["cpp_debug_flags"] == debug_flags
+    assert config["paths"]["cpp_library"] == "cpplib"
     assert compile_commands[0] == [
         "g++",
         *base_flags,
+        "-I",
+        str(library.resolve()),
         *debug_flags,
         *extra_flags,
         str(cpp_file),
@@ -311,11 +318,72 @@ def test_cpp_debug_flags_are_appended_without_mutating_config_or_leaking(tmp_pat
     assert compile_commands[2] == [
         "g++",
         *base_flags,
+        "-I",
+        str(library.resolve()),
         str(cpp_file),
         "-o",
         str(executable_path),
     ]
     assert not executable_path.exists()
+
+
+def test_missing_cpp_library_stops_before_subprocess(tmp_path, monkeypatch):
+    cpp_file = tmp_path / "A.cpp"
+    cpp_file.write_text("int main() { return 0; }\n", encoding="utf-8")
+    config = default_config()
+    config["paths"]["root"] = str(tmp_path)
+    config["paths"]["cpp_library"] = "missing"
+    subprocess_calls = []
+
+    monkeypatch.setattr(
+        runner_module.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess_calls.append((args, kwargs)),
+    )
+
+    with pytest.raises(ConfigError, match=r"^C\+\+ library directory not found:"):
+        runner_module._prepare_cpp_run_command(
+            tmp_path,
+            "A",
+            cpp_file,
+            config,
+        )
+
+    assert subprocess_calls == []
+
+
+def test_legacy_cpp_include_flags_are_preserved(tmp_path, monkeypatch):
+    cpp_file = tmp_path / "A.cpp"
+    cpp_file.write_text("int main() { return 0; }\n", encoding="utf-8")
+    legacy_library = tmp_path / "legacy-cpplib"
+    config = default_config()
+    config["runner"]["cpp_flags"] = [
+        "-std=c++20",
+        "-I",
+        str(legacy_library),
+    ]
+    compile_commands = []
+
+    monkeypatch.setattr(runner_module, "resolve_executable", lambda command: command)
+
+    def fake_compile(command, **kwargs):
+        compile_commands.append(command[:])
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(runner_module.subprocess, "run", fake_compile)
+
+    runner_module._prepare_cpp_run_command(
+        tmp_path,
+        "A",
+        cpp_file,
+        config,
+    )
+
+    assert compile_commands[0][1:4] == [
+        "-std=c++20",
+        "-I",
+        str(legacy_library),
+    ]
 
 
 def test_empty_cpp_debug_flags_adds_no_debug_flags(tmp_path, monkeypatch):

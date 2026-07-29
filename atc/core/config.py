@@ -39,6 +39,7 @@ def default_config() -> dict:
     return {
         "paths": {
             "root": "",
+            "cpp_library": "",
             "contests": copy.deepcopy(DEFAULT_CONTEST_PATH_RULES),
         },
         "templates": {
@@ -145,6 +146,39 @@ def config_root(config: dict) -> Optional[Path]:
         return (config_project_root(config_file) / root_path).resolve()
 
     return (Path.cwd() / root_path).resolve()
+
+
+def cpp_library_path(
+    config: dict,
+    start: Optional[Path] = None,
+) -> Optional[Path]:
+    paths = config.get("paths", {})
+    if not isinstance(paths, dict):
+        raise ConfigError("[paths] must be a table.")
+
+    raw_library_path = paths.get("cpp_library", "")
+    if not isinstance(raw_library_path, str):
+        raise ConfigError("paths.cpp_library must be a path string.")
+
+    library_value = raw_library_path.strip()
+    if not library_value:
+        return None
+
+    library_path = Path(library_value).expanduser()
+    if library_path.is_absolute():
+        return library_path.resolve()
+
+    root = config_root(config)
+    if root is not None:
+        base = root
+    else:
+        config_file = config_file_path(config)
+        if config_file is not None:
+            base = config_project_root(config_file)
+        else:
+            base = start if start is not None else Path.cwd()
+
+    return (base / library_path).resolve()
 
 
 def find_project_root(start: Path, config: Optional[dict] = None):

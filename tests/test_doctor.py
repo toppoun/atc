@@ -105,6 +105,77 @@ def test_doctor_broken_contest_metadata_reports_error(tmp_path, capsys):
     assert "failed to read contest metadata" in output
 
 
+def test_doctor_runner_displays_unconfigured_cpp_library_and_cpp_flags(monkeypatch):
+    config = doctor.default_config()
+    report = doctor.DoctorReport(immediate=False)
+    monkeypatch.setattr(doctor, "resolve_executable", lambda command: command)
+
+    doctor._doctor_check_runner(report, config)
+
+    items = {item.display_message: item for item in report.items}
+    assert items["C++ library: not configured"].status == "INFO"
+    assert "C++ flags: -std=c++20 -O2 -Wall -Wextra" in items
+    assert "C++ debug flags: -DLOCAL -D_GLIBCXX_DEBUG" in items
+
+
+def test_doctor_runner_displays_existing_cpp_library(tmp_path, monkeypatch):
+    library = tmp_path / "cpplib"
+    library.mkdir()
+    config = doctor.default_config()
+    config["paths"]["root"] = str(tmp_path)
+    config["paths"]["cpp_library"] = "cpplib"
+    report = doctor.DoctorReport(immediate=False)
+    monkeypatch.setattr(doctor, "resolve_executable", lambda command: command)
+
+    doctor._doctor_check_runner(report, config, tmp_path)
+
+    items = {item.display_message: item for item in report.items}
+    assert items[f"C++ library: {library.resolve()}"].status == "OK"
+
+
+def test_doctor_runner_reports_missing_cpp_library(tmp_path, monkeypatch):
+    config = doctor.default_config()
+    config["paths"]["root"] = str(tmp_path)
+    config["paths"]["cpp_library"] = "missing"
+    report = doctor.DoctorReport(immediate=False)
+    monkeypatch.setattr(doctor, "resolve_executable", lambda command: command)
+
+    doctor._doctor_check_runner(report, config, tmp_path)
+
+    message = f"C++ library directory not found: {(tmp_path / 'missing').resolve()}"
+    items = {item.display_message: item for item in report.items}
+    assert items[message].status == "ERROR"
+
+
+def test_doctor_runner_reports_file_cpp_library(tmp_path, monkeypatch):
+    library = tmp_path / "cpplib"
+    library.write_text("not a directory\n", encoding="utf-8")
+    config = doctor.default_config()
+    config["paths"]["root"] = str(tmp_path)
+    config["paths"]["cpp_library"] = "cpplib"
+    report = doctor.DoctorReport(immediate=False)
+    monkeypatch.setattr(doctor, "resolve_executable", lambda command: command)
+
+    doctor._doctor_check_runner(report, config, tmp_path)
+
+    items = {item.display_message: item for item in report.items}
+    assert items[f"C++ library path is not a directory: {library.resolve()}"].status == "ERROR"
+
+
+def test_doctor_runner_reports_invalid_cpp_library_without_traceback(monkeypatch, capsys):
+    config = doctor.default_config()
+    config["paths"]["cpp_library"] = ["cpplib"]
+    report = doctor.DoctorReport()
+    monkeypatch.setattr(doctor, "resolve_executable", lambda command: command)
+
+    doctor._doctor_check_runner(report, config)
+
+    output = capsys.readouterr().out
+    items = {item.display_message: item for item in report.items}
+    assert items["paths.cpp_library must be a path string."].status == "ERROR"
+    assert "Traceback" not in output
+
+
 def test_doctor_runner_displays_cpp_debug_flags(monkeypatch):
     config = doctor.default_config()
     report = doctor.DoctorReport(immediate=False)

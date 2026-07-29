@@ -7,13 +7,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, List, Optional, Sequence, Set
 
+from atc.core.cpp import build_cpp_compile_flags
 from atc.core.config import (
     SOURCE_EXTS,
     normalize_run_language,
     runner_command,
     runner_compile_timeout,
-    runner_cpp_debug_flags,
-    runner_cpp_flags,
     runner_timeout,
     load_config,
     resolve_executable,
@@ -60,6 +59,12 @@ def _prepare_cpp_run_command(
     debug: bool = False,
     cpp_extra_flags: Sequence[str] = (),
 ):
+    flags = build_cpp_compile_flags(
+        config,
+        cwd,
+        debug=debug,
+        extra_flags=cpp_extra_flags,
+    )
     compiler = runner_command(config, "cpp_compiler", "g++")
     compiler_path = resolve_executable(compiler)
     if not compiler_path:
@@ -67,10 +72,6 @@ def _prepare_cpp_run_command(
 
     suffix = ".exe" if platform.system() == "Windows" else ".out"
     exe_path = cwd / f"_{problem}{suffix}"
-    flags = list(runner_cpp_flags(config))
-    if debug:
-        flags.extend(runner_cpp_debug_flags(config))
-    flags.extend(cpp_extra_flags)
 
     try:
         c_proc = subprocess.run(

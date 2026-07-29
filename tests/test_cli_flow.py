@@ -130,6 +130,8 @@ def test_cli_config_init_writes_paths_contests_without_legacy_paths(tmp_path):
     _assert_success(result)
 
     config_text = (tmp_path / ".atc" / "config.toml").read_text(encoding="utf-8")
+    assert 'cpp_library = ""' in config_text
+    assert 'cpp_debug_flags = ["-DLOCAL", "-D_GLIBCXX_DEBUG"]' in config_text
     assert "[paths.contests]" in config_text
     assert '"abc\\\\d+" = "ABC"' in config_text
     assert '"arc\\\\d+" = "ARC"' in config_text
@@ -141,6 +143,42 @@ def test_cli_config_init_writes_paths_contests_without_legacy_paths(tmp_path):
         'agc = "AGC(Atcoder Grand Contest)"',
     ]:
         assert legacy_key not in config_text
+
+
+def test_cli_config_show_includes_resolved_cpp_library_default(tmp_path):
+    atc_dir = tmp_path / ".atc"
+    atc_dir.mkdir()
+    (atc_dir / "config.toml").write_text(
+        '[paths]\nroot = "."\n',
+        encoding="utf-8",
+    )
+
+    result = _run_cli(tmp_path, "config", "show")
+
+    _assert_success(result)
+    assert 'cpp_library = ""' in result.stdout
+
+
+def test_cli_run_invalid_cpp_library_reports_error_without_traceback(tmp_path):
+    atc_dir = tmp_path / ".atc"
+    atc_dir.mkdir()
+    (atc_dir / "config.toml").write_text(
+        "\n".join(
+            [
+                "[paths]",
+                'root = "."',
+                'cpp_library = "missing"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "A.cpp").write_text("int main() { return 0; }\n", encoding="utf-8")
+
+    result = _run_cli(tmp_path, "run", "A", "cpp")
+    combined = _assert_error_without_traceback(result)
+
+    assert "C++ library directory not found:" in combined
 
 
 def test_cli_without_args_prints_categorized_usage(tmp_path):
@@ -196,6 +234,20 @@ def test_cli_config_doctor_non_table_paths_contests_reports_error(tmp_path):
     combined = _assert_error_without_traceback(result)
 
     assert "[paths.contests] must be a table." in combined
+
+
+def test_cli_config_doctor_non_table_paths_reports_error_without_traceback(tmp_path):
+    atc_dir = tmp_path / ".atc"
+    atc_dir.mkdir(parents=True)
+    (atc_dir / "config.toml").write_text(
+        'paths = "invalid"\n',
+        encoding="utf-8",
+    )
+
+    result = _run_cli(tmp_path, "config", "doctor")
+    combined = _assert_error_without_traceback(result)
+
+    assert "[paths] must be a table." in combined
 
 
 def test_cli_config_doctor_broken_contest_metadata_reports_error(tmp_path):
