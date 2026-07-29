@@ -12,6 +12,7 @@ from atc.core.config import (
     normalize_run_language,
     runner_command,
     runner_compile_timeout,
+    runner_cpp_debug_flags,
     runner_cpp_flags,
     runner_timeout,
     load_config,
@@ -56,6 +57,7 @@ def _prepare_cpp_run_command(
     config: dict,
     show_compile=False,
     *,
+    debug: bool = False,
     cpp_extra_flags: Sequence[str] = (),
 ):
     compiler = runner_command(config, "cpp_compiler", "g++")
@@ -65,7 +67,10 @@ def _prepare_cpp_run_command(
 
     suffix = ".exe" if platform.system() == "Windows" else ".out"
     exe_path = cwd / f"_{problem}{suffix}"
-    flags = [*runner_cpp_flags(config), *cpp_extra_flags]
+    flags = list(runner_cpp_flags(config))
+    if debug:
+        flags.extend(runner_cpp_debug_flags(config))
+    flags.extend(cpp_extra_flags)
 
     try:
         c_proc = subprocess.run(
@@ -110,12 +115,15 @@ def _prepare_run_command(
     show_compile=False,
     config: Optional[dict] = None,
     *,
+    debug: bool = False,
     cpp_extra_flags: Sequence[str] = (),
 ):
     config = config or load_config(cwd)
     run_language = normalize_run_language(run_language, config)
     if not run_language:
         return None, [], None, "INVALID_LANGUAGE", "Invalid language. Use python, pypy, cpp, or set defaults.language to py/cpp."
+    if debug and run_language != "cpp":
+        return None, [], None, "INVALID_LANGUAGE", "--debug is only available for C++."
     if cpp_extra_flags and run_language != "cpp":
         return None, [], None, "INVALID_LANGUAGE", "C++ extra flags are only available for C++."
 
@@ -130,9 +138,10 @@ def _prepare_run_command(
                 cpp_file,
                 config,
                 show_compile,
+                debug=debug,
                 cpp_extra_flags=cpp_extra_flags,
             )
-        if cpp_extra_flags:
+        if debug or cpp_extra_flags:
             return "cpp", [], None, "NO_SOURCE", f"C++ source not found: {cpp_file.name}"
         if py_file.exists():
             return _prepare_python_run_command(py_file, "python", config)
@@ -147,6 +156,7 @@ def _prepare_run_command(
             cpp_file,
             config,
             show_compile,
+            debug=debug,
             cpp_extra_flags=cpp_extra_flags,
         )
 
@@ -161,6 +171,7 @@ def run_problem_tests(
     case_names: Optional[Set[str]] = None,
     on_case_result: Optional[Callable[[CaseResult], None]] = None,
     *,
+    debug: bool = False,
     cpp_extra_flags: Sequence[str] = (),
 ):
     cwd = Path.cwd()
@@ -176,6 +187,7 @@ def run_problem_tests(
         run_language,
         show_compile=show_compile,
         config=config,
+        debug=debug,
         cpp_extra_flags=cpp_extra_flags,
     )
     result.mode = mode
@@ -309,6 +321,7 @@ def _results_passed(results: List[ProblemResult]):
 def run_all_problem_tests(
     run_language: Optional[str] = None,
     *,
+    debug: bool = False,
     cpp_extra_flags: Sequence[str] = (),
 ):
     cwd = Path.cwd()
@@ -323,6 +336,7 @@ def run_all_problem_tests(
             problem,
             run_language,
             show_compile=False,
+            debug=debug,
             cpp_extra_flags=cpp_extra_flags,
         )
         for problem in problems

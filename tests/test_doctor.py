@@ -105,6 +105,29 @@ def test_doctor_broken_contest_metadata_reports_error(tmp_path, capsys):
     assert "failed to read contest metadata" in output
 
 
+def test_doctor_runner_displays_cpp_debug_flags(monkeypatch):
+    config = doctor.default_config()
+    report = doctor.DoctorReport(immediate=False)
+    monkeypatch.setattr(doctor, "resolve_executable", lambda command: command)
+
+    doctor._doctor_check_runner(report, config)
+
+    messages = [item.display_message for item in report.items]
+    assert "C++ debug flags: -DLOCAL -D_GLIBCXX_DEBUG" in messages
+
+
+def test_doctor_runner_displays_none_for_empty_cpp_debug_flags(monkeypatch):
+    config = doctor.default_config()
+    config["runner"]["cpp_debug_flags"] = []
+    report = doctor.DoctorReport(immediate=False)
+    monkeypatch.setattr(doctor, "resolve_executable", lambda command: command)
+
+    doctor._doctor_check_runner(report, config)
+
+    messages = [item.display_message for item in report.items]
+    assert "C++ debug flags: (none)" in messages
+
+
 def test_doctor_report_render_prints_dashboard(capsys):
     report = doctor.DoctorReport(immediate=False)
     report.section("Environment")

@@ -69,6 +69,61 @@ def test_default_config_template_includes_contest_path_rules():
     assert 'agc = "AGC(Atcoder Grand Contest)"' not in template
 
 
+def test_default_config_includes_cpp_debug_flags():
+    assert config_module.default_config()["runner"]["cpp_debug_flags"] == [
+        "-DLOCAL",
+        "-D_GLIBCXX_DEBUG",
+    ]
+
+
+def test_runner_cpp_debug_flags_converts_list_items_to_strings():
+    config = {"runner": {"cpp_debug_flags": ["-DLOCAL", 123]}}
+
+    assert config_module.runner_cpp_debug_flags(config) == ["-DLOCAL", "123"]
+
+
+def test_runner_cpp_debug_flags_splits_string_value():
+    config = {"runner": {"cpp_debug_flags": "-DLOCAL -D_GLIBCXX_DEBUG"}}
+
+    assert config_module.runner_cpp_debug_flags(config) == [
+        "-DLOCAL",
+        "-D_GLIBCXX_DEBUG",
+    ]
+
+
+def test_runner_cpp_debug_flags_invalid_value_falls_back_to_default():
+    config = {"runner": {"cpp_debug_flags": 123}}
+
+    assert config_module.runner_cpp_debug_flags(config) == [
+        "-DLOCAL",
+        "-D_GLIBCXX_DEBUG",
+    ]
+
+
+def test_runner_cpp_debug_flags_preserves_explicit_empty_list():
+    config = {"runner": {"cpp_debug_flags": []}}
+
+    assert config_module.runner_cpp_debug_flags(config) == []
+
+
+def test_default_config_template_toml_includes_cpp_debug_flags():
+    template = config_module.config_to_toml(config_module.default_config_template())
+
+    assert 'cpp_debug_flags = ["-DLOCAL", "-D_GLIBCXX_DEBUG"]' in template
+
+
+def test_load_config_adds_default_cpp_debug_flags_to_old_config(tmp_path, monkeypatch):
+    monkeypatch.setattr(config_module.Path, "home", lambda: tmp_path / "home")
+    _write_config(tmp_path, '[runner]\ncpp_flags = ["-std=c++17"]\n')
+
+    loaded = config_module.load_config(tmp_path)
+
+    assert loaded["runner"]["cpp_debug_flags"] == [
+        "-DLOCAL",
+        "-D_GLIBCXX_DEBUG",
+    ]
+
+
 def test_find_project_root_does_not_use_legacy_category_names(tmp_path, monkeypatch):
     monkeypatch.setattr(config_module.Path, "home", lambda: tmp_path / "home")
     work = tmp_path / "ABC(Atcoder Beginner Contest)" / "work"

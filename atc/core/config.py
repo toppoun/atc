@@ -54,6 +54,7 @@ def default_config() -> dict:
             "pypy": "pypy",
             "cpp_compiler": "g++",
             "cpp_flags": ["-std=c++20", "-O2", "-Wall", "-Wextra"],
+            "cpp_debug_flags": ["-DLOCAL", "-D_GLIBCXX_DEBUG"],
             "timeout_seconds": 2.0,
             "compile_timeout_seconds": 10.0,
         },
@@ -225,6 +226,16 @@ def runner_cpp_flags(config: dict):
     if isinstance(flags, str):
         return flags.split()
     return ["-std=c++20", "-O2", "-Wall", "-Wextra"]
+
+
+def runner_cpp_debug_flags(config: dict):
+    default_flags = default_config()["runner"]["cpp_debug_flags"]
+    flags = runner_settings(config).get("cpp_debug_flags", default_flags)
+    if isinstance(flags, list):
+        return [str(flag) for flag in flags]
+    if isinstance(flags, str):
+        return flags.split()
+    return default_flags
 
 
 def runner_timeout(config: dict):

@@ -18,6 +18,7 @@ from atc.core.config import (
     find_project_root,
     runner_command,
     runner_compile_timeout,
+    runner_cpp_debug_flags,
     runner_cpp_flags,
     runner_timeout,
     config_root,
@@ -631,6 +632,8 @@ def _doctor_check_runner(report: DoctorReport, config: dict):
             )
 
     report.item("OK", f"C++ flags: {' '.join(runner_cpp_flags(config))}")
+    cpp_debug_flags = runner_cpp_debug_flags(config)
+    report.item("OK", f"C++ debug flags: {' '.join(cpp_debug_flags) if cpp_debug_flags else '(none)'}")
     run_timeout = runner_timeout(config)
     compile_timeout = runner_compile_timeout(config)
     report.item("OK", f"Run timeout: {run_timeout}s" if run_timeout else "Run timeout: disabled")
