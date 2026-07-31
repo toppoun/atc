@@ -138,6 +138,7 @@ def test_compile_cpp_solution_uses_cpp_library_without_debug_flags(tmp_path, mon
         ]
     ]
     assert "-DSTRESS_MUST_NOT_USE_THIS" not in compile_commands[0]
+    assert "-DLOCAL" not in compile_commands[0]
     assert str(cpp_module.BUILTIN_CPP_INCLUDE_DIR) not in compile_commands[0]
     assert program.command == [str(executable)]
     assert program.path == cpp_file

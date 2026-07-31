@@ -311,6 +311,7 @@ def test_cpp_debug_flags_are_appended_without_mutating_config_or_leaking(tmp_pat
         str(library.resolve()),
         "-I",
         str(cpp_module.BUILTIN_CPP_INCLUDE_DIR),
+        cpp_module.BUILTIN_CPP_DEBUG_DEFINE,
         *debug_flags,
         *extra_flags,
         str(cpp_file),
@@ -426,7 +427,7 @@ def test_legacy_cpp_include_flags_are_preserved(tmp_path, monkeypatch):
     ]
 
 
-def test_empty_cpp_debug_flags_adds_no_debug_flags(tmp_path, monkeypatch):
+def test_empty_cpp_debug_flags_keeps_builtin_debug_define(tmp_path, monkeypatch):
     cpp_file = tmp_path / "A.cpp"
     cpp_file.write_text("int main() { return 0; }\n", encoding="utf-8")
     config = default_config()
@@ -457,6 +458,7 @@ def test_empty_cpp_debug_flags_adds_no_debug_flags(tmp_path, monkeypatch):
         "-std=c++20",
         "-I",
         str(cpp_module.BUILTIN_CPP_INCLUDE_DIR),
+        cpp_module.BUILTIN_CPP_DEBUG_DEFINE,
         str(cpp_file),
         "-o",
         str(tmp_path / ("_A.exe" if runner_module.platform.system() == "Windows" else "_A.out")),

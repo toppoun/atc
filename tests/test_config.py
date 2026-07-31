@@ -71,7 +71,6 @@ def test_default_config_template_includes_contest_path_rules():
 
 def test_default_config_includes_cpp_debug_flags():
     assert config_module.default_config()["runner"]["cpp_debug_flags"] == [
-        "-DLOCAL",
         "-D_GLIBCXX_DEBUG",
     ]
 
@@ -185,7 +184,6 @@ def test_runner_cpp_debug_flags_invalid_value_falls_back_to_default():
     config = {"runner": {"cpp_debug_flags": 123}}
 
     assert config_module.runner_cpp_debug_flags(config) == [
-        "-DLOCAL",
         "-D_GLIBCXX_DEBUG",
     ]
 
@@ -199,7 +197,8 @@ def test_runner_cpp_debug_flags_preserves_explicit_empty_list():
 def test_default_config_template_toml_includes_cpp_debug_flags():
     template = config_module.config_to_toml(config_module.default_config_template())
 
-    assert 'cpp_debug_flags = ["-DLOCAL", "-D_GLIBCXX_DEBUG"]' in template
+    assert 'cpp_debug_flags = ["-D_GLIBCXX_DEBUG"]' in template
+    assert "-DLOCAL" not in template
 
 
 def test_load_config_adds_default_cpp_debug_flags_to_old_config(tmp_path, monkeypatch):
@@ -209,9 +208,14 @@ def test_load_config_adds_default_cpp_debug_flags_to_old_config(tmp_path, monkey
     loaded = config_module.load_config(tmp_path)
 
     assert loaded["runner"]["cpp_debug_flags"] == [
-        "-DLOCAL",
         "-D_GLIBCXX_DEBUG",
     ]
+
+
+def test_runner_cpp_debug_flags_preserves_explicit_local_define():
+    config = {"runner": {"cpp_debug_flags": ["-DLOCAL"]}}
+
+    assert config_module.runner_cpp_debug_flags(config) == ["-DLOCAL"]
 
 
 def test_find_project_root_does_not_use_legacy_category_names(tmp_path, monkeypatch):

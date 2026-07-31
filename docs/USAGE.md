@@ -91,9 +91,17 @@ atc t A -d
 - 指定言語のファイルが無い場合だけ、存在する別言語に fallback
 
 `--debug`または`-d`はC++テスト専用です。追加のC++ライブラリ設定なしで、
-atc内蔵の`<atc/debug.hpp>`を利用できます。debug時だけatc内蔵includeルートを
-コンパイル引数へ追加し、`runner.cpp_debug_flags`を適用します。デフォルトの
-debugフラグは`-DLOCAL`と`-D_GLIBCXX_DEBUG`です。
+atc内蔵の`<atc/debug.hpp>`を利用できます。`atc t A -d`では、atcが
+次の引数を自動的に追加します。
+
+```text
+-I <atc内蔵include>
+-DLOCAL
+```
+
+その後へ、ユーザー設定の`runner.cpp_debug_flags`を追加します。デフォルトは
+`-D_GLIBCXX_DEBUG`です。`cpp_debug_flags = []`でもatc固定の`-DLOCAL`は
+残るため、内蔵`debug(...)`は引き続き利用できます。
 
 GDBは起動しません。`watch`では利用できません。`debug(...)`の出力先は
 `stderr`で、ACしたケースでも非空のdebug出力を結果表の後に表示します。

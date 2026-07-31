@@ -38,7 +38,7 @@ python = "python"
 pypy = "pypy"
 cpp_compiler = "g++"
 cpp_flags = ["-std=c++20", "-O2", "-Wall", "-Wextra"]
-cpp_debug_flags = ["-DLOCAL", "-D_GLIBCXX_DEBUG"]
+cpp_debug_flags = ["-D_GLIBCXX_DEBUG"]
 timeout_seconds = 2.0
 compile_timeout_seconds = 10.0
 
@@ -232,7 +232,7 @@ python = "python"
 pypy = "pypy"
 cpp_compiler = "g++"
 cpp_flags = ["-std=c++20", "-O2", "-Wall", "-Wextra"]
-cpp_debug_flags = ["-DLOCAL", "-D_GLIBCXX_DEBUG"]
+cpp_debug_flags = ["-D_GLIBCXX_DEBUG"]
 timeout_seconds = 2.0
 compile_timeout_seconds = 10.0
 ```
@@ -241,9 +241,27 @@ compile_timeout_seconds = 10.0
 - `runner.pypy`: PyPy 実行コマンド。見つからない場合は ERROR
 - `runner.cpp_compiler`: C++ compiler
 - `runner.cpp_flags`: C++ compile flags
-- `runner.cpp_debug_flags`: `atc run --debug` の場合だけ追加する C++ compile flags
+- `runner.cpp_debug_flags`: `atc run --debug` の場合だけ、atc固定の`-DLOCAL`より後へ追加するC++ compile flags
 - `runner.timeout_seconds`: テストケース実行時間
 - `runner.compile_timeout_seconds`: C++ コンパイル時間
+
+`atc t A -d`では、内蔵`<atc/debug.hpp>`を有効にするため、atcが
+`-DLOCAL`を必ず追加します。`runner.cpp_debug_flags`は
+`-D_GLIBCXX_DEBUG`やsanitizerなど、ユーザーが選択する追加のdebug用
+コンパイラオプションだけを設定します。
+
+```toml
+[runner]
+cpp_debug_flags = ["-D_GLIBCXX_DEBUG", "-fsanitize=address"]
+```
+
+`cpp_debug_flags = []`にすると追加検査だけが無効になります。atc固定の
+`-DLOCAL`と内蔵includeルートは引き続き追加されるため、`debug(...)`は
+利用できます。
+
+古いconfigで`cpp_debug_flags`に`-DLOCAL`を明示している場合も、その値を
+自動削除・重複排除はしません。同じdefineが重複して渡るだけなので通常は
+動作しますが、新しい推奨設定では`-DLOCAL`を除いてください。
 
 ## `[watch]`
 

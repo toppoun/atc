@@ -21,6 +21,7 @@ def test_build_cpp_compile_flags_without_library_has_no_include_flag(tmp_path):
 
     assert flags == config["runner"]["cpp_flags"]
     assert "-I" not in flags
+    assert cpp_module.BUILTIN_CPP_DEBUG_DEFINE not in flags
 
 
 def test_build_cpp_compile_flags_adds_builtin_include_for_debug_without_user_library(tmp_path):
@@ -32,6 +33,7 @@ def test_build_cpp_compile_flags_adds_builtin_include_for_debug_without_user_lib
         *config["runner"]["cpp_flags"],
         "-I",
         str(cpp_module.BUILTIN_CPP_INCLUDE_DIR),
+        cpp_module.BUILTIN_CPP_DEBUG_DEFINE,
         *config["runner"]["cpp_debug_flags"],
     ]
 
@@ -72,7 +74,6 @@ def test_build_cpp_compile_flags_debug_order(tmp_path):
     library.mkdir()
     config = _cpp_config(tmp_path, "cpplib")
     config["runner"]["cpp_flags"] = ["-std=c++23"]
-    config["runner"]["cpp_debug_flags"] = ["-DDEBUG"]
 
     flags = build_cpp_compile_flags(
         config,
@@ -87,8 +88,22 @@ def test_build_cpp_compile_flags_debug_order(tmp_path):
         str(library.resolve()),
         "-I",
         str(cpp_module.BUILTIN_CPP_INCLUDE_DIR),
-        "-DDEBUG",
+        cpp_module.BUILTIN_CPP_DEBUG_DEFINE,
+        "-D_GLIBCXX_DEBUG",
         "-fsanitize=address",
+    ]
+
+
+def test_build_cpp_compile_flags_appends_user_debug_flags_after_builtin_define(tmp_path):
+    config = _cpp_config(tmp_path)
+    config["runner"]["cpp_debug_flags"] = ["-DPROJECT_DEBUG", "-fsanitize=undefined"]
+
+    flags = build_cpp_compile_flags(config, tmp_path, debug=True)
+
+    builtin_index = flags.index(cpp_module.BUILTIN_CPP_DEBUG_DEFINE)
+    assert flags[builtin_index + 1:] == [
+        "-DPROJECT_DEBUG",
+        "-fsanitize=undefined",
     ]
 
 
@@ -107,7 +122,9 @@ def test_build_cpp_compile_flags_accepts_empty_debug_flags(tmp_path):
         str(library.resolve()),
         "-I",
         str(cpp_module.BUILTIN_CPP_INCLUDE_DIR),
+        cpp_module.BUILTIN_CPP_DEBUG_DEFINE,
     ]
+    assert "-D_GLIBCXX_DEBUG" not in flags
 
 
 def test_build_cpp_compile_flags_keeps_spaced_path_as_one_argument(tmp_path):
@@ -170,7 +187,7 @@ def test_build_cpp_compile_flags_does_not_mutate_config_lists(tmp_path):
     library.mkdir()
     config = _cpp_config(tmp_path, "cpplib")
     base_flags = ["-std=c++20", "-O2"]
-    debug_flags = ["-DLOCAL"]
+    debug_flags = ["-DPROJECT_DEBUG"]
     config["runner"]["cpp_flags"] = base_flags[:]
     config["runner"]["cpp_debug_flags"] = debug_flags[:]
 
@@ -198,3 +215,4 @@ def test_build_cpp_compile_flags_does_not_accumulate_between_calls(tmp_path):
     assert first.count("-I") == 2
     assert first.count(str(library.resolve())) == 1
     assert first.count(str(cpp_module.BUILTIN_CPP_INCLUDE_DIR)) == 1
+    assert first.count(cpp_module.BUILTIN_CPP_DEBUG_DEFINE) == 1

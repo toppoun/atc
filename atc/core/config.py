@@ -55,7 +55,7 @@ def default_config() -> dict:
             "pypy": "pypy",
             "cpp_compiler": "g++",
             "cpp_flags": ["-std=c++20", "-O2", "-Wall", "-Wextra"],
-            "cpp_debug_flags": ["-DLOCAL", "-D_GLIBCXX_DEBUG"],
+            "cpp_debug_flags": ["-D_GLIBCXX_DEBUG"],
             "timeout_seconds": 2.0,
             "compile_timeout_seconds": 10.0,
         },

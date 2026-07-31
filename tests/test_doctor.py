@@ -115,7 +115,7 @@ def test_doctor_runner_displays_unconfigured_cpp_library_and_cpp_flags(monkeypat
     items = {item.display_message: item for item in report.items}
     assert items["C++ library: not configured"].status == "INFO"
     assert "C++ flags: -std=c++20 -O2 -Wall -Wextra" in items
-    assert "C++ debug flags: -DLOCAL -D_GLIBCXX_DEBUG" in items
+    assert "C++ debug flags: -D_GLIBCXX_DEBUG" in items
 
 
 def test_doctor_runner_displays_existing_cpp_library(tmp_path, monkeypatch):
@@ -184,7 +184,7 @@ def test_doctor_runner_displays_cpp_debug_flags(monkeypatch):
     doctor._doctor_check_runner(report, config)
 
     messages = [item.display_message for item in report.items]
-    assert "C++ debug flags: -DLOCAL -D_GLIBCXX_DEBUG" in messages
+    assert "C++ debug flags: -D_GLIBCXX_DEBUG" in messages
 
 
 def test_doctor_runner_displays_none_for_empty_cpp_debug_flags(monkeypatch):

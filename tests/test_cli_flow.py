@@ -131,7 +131,8 @@ def test_cli_config_init_writes_paths_contests_without_legacy_paths(tmp_path):
 
     config_text = (tmp_path / ".atc" / "config.toml").read_text(encoding="utf-8")
     assert 'cpp_library = ""' in config_text
-    assert 'cpp_debug_flags = ["-DLOCAL", "-D_GLIBCXX_DEBUG"]' in config_text
+    assert 'cpp_debug_flags = ["-D_GLIBCXX_DEBUG"]' in config_text
+    assert "-DLOCAL" not in config_text
     assert "[paths.contests]" in config_text
     assert '"abc\\\\d+" = "ABC"' in config_text
     assert '"arc\\\\d+" = "ARC"' in config_text

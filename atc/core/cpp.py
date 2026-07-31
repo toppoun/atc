@@ -19,6 +19,7 @@ BUILTIN_CPP_DEBUG_HEADER = (
     / "atc"
     / "debug.hpp"
 )
+BUILTIN_CPP_DEBUG_DEFINE = "-DLOCAL"
 
 
 def build_cpp_compile_flags(
@@ -44,7 +45,11 @@ def build_cpp_compile_flags(
                 f"Built-in C++ debug header not found: "
                 f"{BUILTIN_CPP_DEBUG_HEADER}. Reinstall atc."
             )
-        flags.extend(["-I", str(BUILTIN_CPP_INCLUDE_DIR)])
+        flags.extend([
+            "-I",
+            str(BUILTIN_CPP_INCLUDE_DIR),
+            BUILTIN_CPP_DEBUG_DEFINE,
+        ])
         flags.extend(runner_cpp_debug_flags(config))
 
     flags.extend(str(flag) for flag in extra_flags)

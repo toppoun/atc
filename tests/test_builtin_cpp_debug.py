@@ -5,7 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from atc.core.cpp import BUILTIN_CPP_INCLUDE_DIR
+from atc.core.config import default_config
+from atc.core.cpp import (
+    BUILTIN_CPP_DEBUG_DEFINE,
+    BUILTIN_CPP_INCLUDE_DIR,
+    build_cpp_compile_flags,
+)
 
 
 CPP_SOURCE = r'''
@@ -153,6 +158,22 @@ EXPECTED_STDERR = """\
 [L]
 """
 
+CONDITIONAL_CPP_SOURCE = r'''
+#include <bits/stdc++.h>
+using namespace std;
+
+#ifdef LOCAL
+#include <atc/debug.hpp>
+#else
+#define debug(...) ((void)0)
+#endif
+
+int main() {
+    int x = 42;
+    debug(x);
+}
+'''
+
 
 def _cpp_compiler():
     return shutil.which("g++") or shutil.which("clang++")
@@ -199,3 +220,84 @@ def test_builtin_debug_header_compiles_and_formats_supported_types(tmp_path):
     assert run_result.returncode == 0, run_result.stderr
     assert run_result.stdout == ""
     assert normalized_stderr == EXPECTED_STDERR
+
+
+def test_empty_user_debug_flags_still_enable_builtin_debug(tmp_path):
+    compiler = _cpp_compiler()
+    if compiler is None:
+        pytest.skip("C++20 compiler not found (g++ or clang++)")
+
+    config = default_config()
+    config["runner"]["cpp_flags"] = ["-std=c++20"]
+    config["runner"]["cpp_debug_flags"] = []
+    flags = build_cpp_compile_flags(config, tmp_path, debug=True)
+    source = tmp_path / "debug.cpp"
+    executable = tmp_path / "debug.exe"
+    source.write_text(CONDITIONAL_CPP_SOURCE, encoding="utf-8")
+
+    assert flags == [
+        "-std=c++20",
+        "-I",
+        str(BUILTIN_CPP_INCLUDE_DIR),
+        BUILTIN_CPP_DEBUG_DEFINE,
+    ]
+
+    compile_result = subprocess.run(
+        [compiler, *flags, str(source), "-o", str(executable)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    assert compile_result.returncode == 0, compile_result.stderr
+
+    run_result = subprocess.run(
+        [str(executable)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    assert run_result.returncode == 0, run_result.stderr
+    assert re.fullmatch(r"\[L\d+\] x = 42\n", run_result.stderr)
+
+
+def test_normal_compile_keeps_conditional_debug_as_no_op(tmp_path):
+    compiler = _cpp_compiler()
+    if compiler is None:
+        pytest.skip("C++20 compiler not found (g++ or clang++)")
+
+    config = default_config()
+    config["runner"]["cpp_flags"] = ["-std=c++20"]
+    flags = build_cpp_compile_flags(config, tmp_path)
+    source = tmp_path / "normal.cpp"
+    executable = tmp_path / "normal.exe"
+    source.write_text(CONDITIONAL_CPP_SOURCE, encoding="utf-8")
+
+    assert flags == ["-std=c++20"]
+    assert BUILTIN_CPP_DEBUG_DEFINE not in flags
+    assert str(BUILTIN_CPP_INCLUDE_DIR) not in flags
+
+    compile_result = subprocess.run(
+        [compiler, *flags, str(source), "-o", str(executable)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    assert compile_result.returncode == 0, compile_result.stderr
+
+    run_result = subprocess.run(
+        [str(executable)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    assert run_result.returncode == 0, run_result.stderr
+    assert run_result.stdout == ""
+    assert run_result.stderr == ""

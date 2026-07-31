@@ -126,3 +126,11 @@ atc/resources/licenses/*.txt
 stress 用 generator / brute テンプレートは `atc/resources/templates/stress/` に置き、manifest の `stress` section に登録します。内蔵C++ヘッダは`atc/resources/cpp/include/`、第三者ライセンスは`atc/resources/licenses/`に置き、`pyproject.toml`のpackage-dataへ明示します。
 
 `atc stress init A` はstressテンプレートから `A_gen.py` / `A_brute.py` だけを作ります。`atc stress promote A` は保存済みの `.atc/stress/A/failed.in` と `brute.out` を通常テスト `tests/A/*.in` / `*.out` へコピーします。
+
+## C++ built-in debug
+
+`atc t A -d`でテンプレートの`#ifdef LOCAL`を確実に有効化するため、
+`-DLOCAL`はconfigではなく`atc/core/cpp.py`がdebug時に固定追加します。
+`runner.cpp_debug_flags`は`-D_GLIBCXX_DEBUG`やsanitizerなどの追加オプション
+専用です。`-DLOCAL`をデフォルトconfigへ戻さず、内蔵debugの有効性を
+ユーザーconfigに依存させないでください。
