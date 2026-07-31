@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterable, Optional, Sequence, Tuple, List
+from typing import Iterable, Optional, Sequence, Tuple
 
 from rich import box
 from rich.console import Console
@@ -123,7 +123,11 @@ def _case_failure_sections(problem: str, case: CaseResult):
 
 
 
-def print_detailed_result(result: ProblemResult):
+def print_detailed_result(
+    result: ProblemResult,
+    *,
+    show_debug_output: bool = False,
+):
     if result.error_status:
         error(result.error_status)
         if result.error_message:
@@ -141,6 +145,13 @@ def print_detailed_result(result: ProblemResult):
         total_count=result.total_count,
         failure_details=failure_details,
     )
+
+    if show_debug_output:
+        for case in result.cases:
+            if case.status == "AC":
+                print_debug_output(case.name, case.stderr)
+
+
 def print_test_results(
     cases,
     *,
@@ -185,7 +196,21 @@ def print_failure_detail(title: str, sections: Iterable[Tuple[str, str]], style:
         print_text(str(text))
 
 
-def print_all_summary(results: List[ProblemResult]) -> None:
+def print_debug_output(title: str, stderr: str) -> None:
+    if not stderr or not stderr.strip():
+        return
+
+    print_text()
+    print_text(f"=== {title} debug ===", style="cyan")
+    print_text()
+    print_text(stderr.rstrip("\r\n"))
+
+
+def print_all_summary(
+    results: Sequence[ProblemResult],
+    *,
+    show_debug_output: bool = False,
+) -> None:
     for result in results:
         if result.error_status:
             status = result.error_status
@@ -212,6 +237,14 @@ def print_all_summary(results: List[ProblemResult]) -> None:
                 f"{result.duration_ms / 1000:.2f}s",
             )
         )
+
+    if show_debug_output:
+        for result in results:
+            for case in result.cases:
+                print_debug_output(
+                    f"{result.problem} / {case.name}",
+                    case.stderr,
+                )
 
 
 

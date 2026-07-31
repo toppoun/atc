@@ -45,7 +45,10 @@ def _run_single_problem(
         show_compile=True,
         debug=debug,
     )
-    print_detailed_result(result)
+    print_detailed_result(
+        result,
+        show_debug_output=debug,
+    )
     write_test_log([result])
     return 0 if result.passed else 1
 
@@ -57,6 +60,9 @@ def _run_all_problems(
     debug: bool = False,
 ):
     results = run_all_problem_tests(lang, debug=debug)
-    print_all_summary(results)
+    print_all_summary(
+        results,
+        show_debug_output=debug,
+    )
     write_test_log(results)
     return 0 if bool(results) and all(result.passed for result in results) else 1
