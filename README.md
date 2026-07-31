@@ -48,6 +48,7 @@ atc config doctor
 | `atc c abc335 cpp` | `atc contest` の省略形 |
 | `atc refresh` | 既存 contest の `.atc/contest.toml` と不足 samples を更新 |
 | `atc run A` | A 問題をテスト |
+| `atc t A -d` | 追加設定なしで内蔵C++デバッグヘッダを使ってテスト |
 | `atc run all` | 検出できる全問題をテスト |
 | `atc watch` | ファイル変更を監視して自動テスト |
 | `atc stress A py` | ランダムケースで提出予定解と愚直解を比較 |

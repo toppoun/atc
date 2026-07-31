@@ -8,6 +8,18 @@ from atc.core.config import (
     runner_cpp_flags,
 )
 
+BUILTIN_CPP_INCLUDE_DIR = (
+    Path(__file__).resolve().parents[1]
+    / "resources"
+    / "cpp"
+    / "include"
+)
+BUILTIN_CPP_DEBUG_HEADER = (
+    BUILTIN_CPP_INCLUDE_DIR
+    / "atc"
+    / "debug.hpp"
+)
+
 
 def build_cpp_compile_flags(
     config: dict,
@@ -27,6 +39,12 @@ def build_cpp_compile_flags(
         flags.extend(["-I", str(library_path)])
 
     if debug:
+        if not BUILTIN_CPP_DEBUG_HEADER.is_file():
+            raise ConfigError(
+                f"Built-in C++ debug header not found: "
+                f"{BUILTIN_CPP_DEBUG_HEADER}. Reinstall atc."
+            )
+        flags.extend(["-I", str(BUILTIN_CPP_INCLUDE_DIR)])
         flags.extend(runner_cpp_debug_flags(config))
 
     flags.extend(str(flag) for flag in extra_flags)

@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import atc.core.cpp as cpp_module
 import atc.core.runner as runner_module
 from atc.core.config import ConfigError, default_config
 from atc.models import CaseResult, ProblemResult
@@ -308,6 +309,8 @@ def test_cpp_debug_flags_are_appended_without_mutating_config_or_leaking(tmp_pat
         *base_flags,
         "-I",
         str(library.resolve()),
+        "-I",
+        str(cpp_module.BUILTIN_CPP_INCLUDE_DIR),
         *debug_flags,
         *extra_flags,
         str(cpp_file),
@@ -347,6 +350,43 @@ def test_missing_cpp_library_stops_before_subprocess(tmp_path, monkeypatch):
             "A",
             cpp_file,
             config,
+        )
+
+    assert subprocess_calls == []
+
+
+def test_missing_builtin_debug_header_stops_before_subprocess(tmp_path, monkeypatch):
+    cpp_file = tmp_path / "A.cpp"
+    cpp_file.write_text("int main() { return 0; }\n", encoding="utf-8")
+    config = default_config()
+    subprocess_calls = []
+
+    monkeypatch.setattr(
+        cpp_module,
+        "BUILTIN_CPP_INCLUDE_DIR",
+        tmp_path / "missing-include",
+    )
+    monkeypatch.setattr(
+        cpp_module,
+        "BUILTIN_CPP_DEBUG_HEADER",
+        tmp_path / "missing-include" / "atc" / "debug.hpp",
+    )
+    monkeypatch.setattr(
+        runner_module.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess_calls.append((args, kwargs)),
+    )
+
+    with pytest.raises(
+        ConfigError,
+        match=r"^Built-in C\+\+ debug header not found:",
+    ):
+        runner_module._prepare_cpp_run_command(
+            tmp_path,
+            "A",
+            cpp_file,
+            config,
+            debug=True,
         )
 
     assert subprocess_calls == []
@@ -415,6 +455,8 @@ def test_empty_cpp_debug_flags_adds_no_debug_flags(tmp_path, monkeypatch):
     assert compile_commands[0] == [
         "g++",
         "-std=c++20",
+        "-I",
+        str(cpp_module.BUILTIN_CPP_INCLUDE_DIR),
         str(cpp_file),
         "-o",
         str(tmp_path / ("_A.exe" if runner_module.platform.system() == "Windows" else "_A.out")),
@@ -489,9 +531,11 @@ def test_cpp_debug_compile_error_preserves_ce_result(tmp_path, monkeypatch):
 
     assert result.error_status == "CE"
     assert result.error_message == "compile failed"
-    assert compile_commands[0][1:5] == [
+    assert compile_commands[0][1:7] == [
         "-std=gnu++23",
         "-O2",
+        "-I",
+        str(cpp_module.BUILTIN_CPP_INCLUDE_DIR),
         "-DLOCAL",
         "-D_GLIBCXX_DEBUG",
     ]

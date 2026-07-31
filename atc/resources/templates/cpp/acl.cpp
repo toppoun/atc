@@ -1,5 +1,12 @@
 #include <bits/stdc++.h>
 #include <atcoder/all>
+
+#ifdef LOCAL
+#include <atc/debug.hpp>
+#else
+#define debug(...) ((void)0)
+#endif
+
 using namespace std;
 using namespace atcoder;
 

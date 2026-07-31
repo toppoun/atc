@@ -1,4 +1,11 @@
 #include <bits/stdc++.h>
+
+#ifdef LOCAL
+#include <atc/debug.hpp>
+#else
+#define debug(...) ((void)0)
+#endif
+
 using namespace std;
 
 using ll = long long;
@@ -11,17 +18,10 @@ const int MOD2 = 998244353;
 #define rep(i, n) for (int i = 0; i < (int)(n); i++)
 #define all(x) (x).begin(), (x).end()
 
-template<class T>
-void dbg_one(const char* name, const T& value) {
-    cerr << name << " = " << value << '\n';
-}
-
-#define dbg(x) dbg_one(#x, x)
-
 void solve() {
     int n;
     cin >> n;
-    dbg(n);
+    debug(n);
 }
 
 int main() {

@@ -29,7 +29,7 @@
     },
     "debug": {
       "path": "cpp/debug.cpp",
-      "description": "C++ template with debug helpers"
+      "description": "C++ template using the built-in atc debug header"
     }
   },
   "stress": {

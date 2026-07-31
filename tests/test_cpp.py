@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+import atc.core.cpp as cpp_module
 from atc.core.config import ConfigError, default_config
 from atc.core.cpp import build_cpp_compile_flags
 
@@ -20,6 +21,19 @@ def test_build_cpp_compile_flags_without_library_has_no_include_flag(tmp_path):
 
     assert flags == config["runner"]["cpp_flags"]
     assert "-I" not in flags
+
+
+def test_build_cpp_compile_flags_adds_builtin_include_for_debug_without_user_library(tmp_path):
+    config = _cpp_config(tmp_path)
+
+    flags = build_cpp_compile_flags(config, tmp_path, debug=True)
+
+    assert flags == [
+        *config["runner"]["cpp_flags"],
+        "-I",
+        str(cpp_module.BUILTIN_CPP_INCLUDE_DIR),
+        *config["runner"]["cpp_debug_flags"],
+    ]
 
 
 def test_build_cpp_compile_flags_adds_resolved_library_path(tmp_path):
@@ -71,6 +85,8 @@ def test_build_cpp_compile_flags_debug_order(tmp_path):
         "-std=c++23",
         "-I",
         str(library.resolve()),
+        "-I",
+        str(cpp_module.BUILTIN_CPP_INCLUDE_DIR),
         "-DDEBUG",
         "-fsanitize=address",
     ]
@@ -85,7 +101,13 @@ def test_build_cpp_compile_flags_accepts_empty_debug_flags(tmp_path):
 
     flags = build_cpp_compile_flags(config, tmp_path, debug=True)
 
-    assert flags == ["-std=c++20", "-I", str(library.resolve())]
+    assert flags == [
+        "-std=c++20",
+        "-I",
+        str(library.resolve()),
+        "-I",
+        str(cpp_module.BUILTIN_CPP_INCLUDE_DIR),
+    ]
 
 
 def test_build_cpp_compile_flags_keeps_spaced_path_as_one_argument(tmp_path):
@@ -122,6 +144,27 @@ def test_build_cpp_compile_flags_rejects_file_library(tmp_path):
         build_cpp_compile_flags(config, tmp_path)
 
 
+def test_build_cpp_compile_flags_rejects_missing_builtin_debug_header(tmp_path, monkeypatch):
+    missing_header = tmp_path / "include" / "atc" / "debug.hpp"
+    monkeypatch.setattr(
+        cpp_module,
+        "BUILTIN_CPP_INCLUDE_DIR",
+        tmp_path / "include",
+    )
+    monkeypatch.setattr(
+        cpp_module,
+        "BUILTIN_CPP_DEBUG_HEADER",
+        missing_header,
+    )
+    config = _cpp_config(tmp_path)
+
+    with pytest.raises(
+        ConfigError,
+        match=r"^Built-in C\+\+ debug header not found: .* Reinstall atc\.$",
+    ):
+        build_cpp_compile_flags(config, tmp_path, debug=True)
+
+
 def test_build_cpp_compile_flags_does_not_mutate_config_lists(tmp_path):
     library = tmp_path / "cpplib"
     library.mkdir()
@@ -152,4 +195,6 @@ def test_build_cpp_compile_flags_does_not_accumulate_between_calls(tmp_path):
     second = build_cpp_compile_flags(config, tmp_path, debug=True)
 
     assert first == second
-    assert first.count("-I") == 1
+    assert first.count("-I") == 2
+    assert first.count(str(library.resolve())) == 1
+    assert first.count(str(cpp_module.BUILTIN_CPP_INCLUDE_DIR)) == 1

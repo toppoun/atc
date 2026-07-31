@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
+import atc.core.cpp as cpp_module
 import atc.core.stress as stress_module
 from atc.core.config import ConfigError, default_config
 from atc.core.stress import (
@@ -137,6 +138,7 @@ def test_compile_cpp_solution_uses_cpp_library_without_debug_flags(tmp_path, mon
         ]
     ]
     assert "-DSTRESS_MUST_NOT_USE_THIS" not in compile_commands[0]
+    assert str(cpp_module.BUILTIN_CPP_INCLUDE_DIR) not in compile_commands[0]
     assert program.command == [str(executable)]
     assert program.path == cpp_file
     assert program.cleanup_path == executable

@@ -83,21 +83,20 @@ cpp_library = "cpplib"
 
 ```text
 cpplib/
-├── algo/
-│   └── debug.h
-└── atcoder/
-    ├── all
-    ├── dsu
-    └── modint
+├── atcoder/
+│   ├── all
+│   ├── dsu
+│   └── modint
+└── my/
+    └── segtree.hpp
 ```
 
 ```cpp
 #include <atcoder/all>
-
-#ifdef LOCAL
-#include <algo/debug.h>
-#endif
+#include <my/segtree.hpp>
 ```
+
+`paths.cpp_library`はACL、自作アルゴリズムライブラリ、ユーザー自身のヘッダ用です。atc内蔵の`<atc/debug.hpp>`はdebug実行時に自動でincludeルートが追加されるため、この設定は必要ありません。
 
 `cpp_library = ""` または項目未指定の場合、この機能は無効です。
 

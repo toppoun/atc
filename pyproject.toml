@@ -33,6 +33,8 @@ atc = [
   "resources/templates/python/*.py",
   "resources/templates/cpp/*.cpp",
   "resources/templates/stress/*.py",
+  "resources/cpp/include/atc/*.hpp",
+  "resources/licenses/*.txt",
 ]
 
 [tool.pytest.ini_options]

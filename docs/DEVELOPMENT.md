@@ -113,12 +113,16 @@ npm run compile
 ## package-data / templates
 
 ```text
-atc/templates/template.py
-atc/templates/template.cpp
-atc/templates/manifest.json
-atc/templates/python/*.py
-atc/templates/cpp/*.cpp
-atc/templates/stress/*.py
+atc/resources/templates/template.py
+atc/resources/templates/template.cpp
+atc/resources/templates/manifest.json
+atc/resources/templates/python/*.py
+atc/resources/templates/cpp/*.cpp
+atc/resources/templates/stress/*.py
+atc/resources/cpp/include/atc/*.hpp
+atc/resources/licenses/*.txt
 ```
 
-stress 用 generator / brute テンプレートは `atc/templates/stress/` に置き、manifest の `stress` section に登録します。`atc stress init A` はこのテンプレートから `A_gen.py` / `A_brute.py` だけを作ります。`atc stress promote A` は保存済みの `.atc/stress/A/failed.in` と `brute.out` を通常テスト `tests/A/*.in` / `*.out` へコピーします。
+stress 用 generator / brute テンプレートは `atc/resources/templates/stress/` に置き、manifest の `stress` section に登録します。内蔵C++ヘッダは`atc/resources/cpp/include/`、第三者ライセンスは`atc/resources/licenses/`に置き、`pyproject.toml`のpackage-dataへ明示します。
+
+`atc stress init A` はstressテンプレートから `A_gen.py` / `A_brute.py` だけを作ります。`atc stress promote A` は保存済みの `.atc/stress/A/failed.in` と `brute.out` を通常テスト `tests/A/*.in` / `*.out` へコピーします。

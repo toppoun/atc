@@ -1,4 +1,11 @@
 #include <bits/stdc++.h>
+
+#ifdef LOCAL
+#include <atc/debug.hpp>
+#else
+#define debug(...) ((void)0)
+#endif
+
 using namespace std;
 
 // 型エイリアス

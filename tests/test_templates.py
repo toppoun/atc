@@ -20,6 +20,12 @@ from atc.core.templates import (
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+CPP_TEMPLATE_PATHS = [
+    TEMPLATE_DIR / "template.cpp",
+    TEMPLATE_DIR / "cpp" / "default.cpp",
+    TEMPLATE_DIR / "cpp" / "acl.cpp",
+    TEMPLATE_DIR / "cpp" / "debug.cpp",
+]
 
 
 def _write_config(root, content):
@@ -108,8 +114,56 @@ def test_package_manifest_contains_stress_templates():
     assert brute_template.exists()
 
 
-def test_pyproject_includes_stress_templates_as_package_data():
+@pytest.mark.parametrize("template_path", CPP_TEMPLATE_PATHS)
+def test_cpp_templates_use_builtin_debug_header(template_path):
+    source = template_path.read_text(encoding="utf-8")
+
+    assert "#ifdef LOCAL" in source
+    assert "#include <atc/debug.hpp>" in source
+    assert "#define debug(...) ((void)0)" in source
+
+
+def test_cpp_debug_template_uses_debug_macro_without_legacy_helper():
+    source = (TEMPLATE_DIR / "cpp" / "debug.cpp").read_text(encoding="utf-8")
+
+    assert "debug(n);" in source
+    assert "dbg_one" not in source
+    assert "#define dbg" not in source
+
+
+def test_pyproject_includes_resources_as_package_data():
     pyproject = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     package_data = pyproject["tool"]["setuptools"]["package-data"]["atc"]
 
     assert "resources/templates/stress/*.py" in package_data
+    assert "resources/cpp/include/atc/*.hpp" in package_data
+    assert "resources/licenses/*.txt" in package_data
+
+
+def test_builtin_debug_header_records_upstream_and_license():
+    commit_sha = "d19de7037bd8e2c0a66960635f488e8aeced1bd1"
+    header = (
+        PROJECT_ROOT
+        / "atc"
+        / "resources"
+        / "cpp"
+        / "include"
+        / "atc"
+        / "debug.hpp"
+    ).read_text(encoding="utf-8")
+    license_text = (
+        PROJECT_ROOT
+        / "atc"
+        / "resources"
+        / "licenses"
+        / "Heltion-debug.h-MIT.txt"
+    ).read_text(encoding="utf-8")
+    notices = (PROJECT_ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+
+    assert header.startswith("#pragma once\n")
+    assert "// SPDX-License-Identifier: MIT" in header
+    assert commit_sha in header
+    assert "Copyright (c) 2023 Yaowei Lyu" in license_text
+    assert "MIT License" in license_text
+    assert commit_sha in notices
+    assert "atc/resources/licenses/Heltion-debug.h-MIT.txt" in notices
