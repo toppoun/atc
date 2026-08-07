@@ -76,9 +76,29 @@ require_pipx_features() {
     die "現在のpipxは必要なoptionに対応していません。pipxを更新してから再実行してください。"
   fi
   if ! ensurepath_help="$("$PIPX_CMD" ensurepath --help 2>&1)" \
-    || [[ "$ensurepath_help" != *"--prepend"* ]]; then
-    die "現在のpipxはensurepath --prependに対応していません。pipxを更新してから再実行してください。"
+    || [[ "$ensurepath_help" != *"--prepend"* \
+      || "$ensurepath_help" != *"--force"* ]]; then
+    die "現在のpipxはensurepath --prepend --forceに対応していません。pipxを更新してから再実行してください。"
   fi
+}
+
+configure_pipx_path() {
+  local first_entry
+  first_entry="${PATH%%:*}"
+
+  if [[ "$first_entry" == "$PIPX_BIN_DIR" ]]; then
+    return 0
+  fi
+
+  case ":$PATH:" in
+    *":$PIPX_BIN_DIR:"*)
+      "$PIPX_CMD" ensurepath --prepend --force
+      ;;
+    *)
+      "$PIPX_CMD" ensurepath --prepend
+      ;;
+  esac
+  export PATH="$PIPX_BIN_DIR:$PATH"
 }
 
 bootstrap_pipx() {
@@ -96,7 +116,6 @@ bootstrap_pipx() {
   "$BOOTSTRAP_DIR/bin/python" -m pip install pipx
   bootstrap_pipx="$BOOTSTRAP_DIR/bin/pipx"
   "$bootstrap_pipx" install pipx
-  "$bootstrap_pipx" ensurepath --prepend
 
   PIPX_BIN_DIR="$("$bootstrap_pipx" environment --value PIPX_BIN_DIR)"
   PIPX_CMD="$PIPX_BIN_DIR/pipx"
@@ -122,8 +141,7 @@ ensure_pipx() {
   fi
   [[ -n "$PIPX_BIN_DIR" ]] || die "pipx application directoryを取得できません。"
 
-  "$PIPX_CMD" ensurepath --prepend
-  export PATH="$PIPX_BIN_DIR:$PATH"
+  configure_pipx_path
 }
 
 ensure_uv() {

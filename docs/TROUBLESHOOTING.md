@@ -20,8 +20,10 @@ atc config doctor
 対処:
 
 - `pipx list`で`atc`がインストールされているか確認
-- `pipx ensurepath --prepend`を実行し、新しいterminalを開く
-- repository内で`./install.sh`、または既存installationなら`./update.sh`を実行する
+- repository内で`./install.sh`、または既存installationなら`./update.sh`を実行してPATH優先順を修復する
+- 新しいterminalを開く
+
+過去のpipx append設定を手動で修復する場合だけ、`pipx ensurepath --prepend --force`を1回実行してください。
 
 ## `oj` が見つからない
 

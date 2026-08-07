@@ -33,13 +33,14 @@ cd <repository>
 - uvの検出、またはHomebrewによるuv導入
 - uv backendとstandalone Python 3.11を指定したpipx editable install
 - `--include-resources-from online-judge-tools`による`atc` / `oj`の公開
-- `pipx ensurepath --prepend`と、現在のscript内でのpipx application directoryのPATH反映
+- `PIPX_BIN_DIR`の現在位置に応じた`pipx ensurepath --prepend`（既存append設定の修復時だけ`--force`）
+- 現在のscript内でのpipx application directoryのPATH先頭反映
 - `atc --help`と`oj --help`の確認
 - `vscode/atc-helper`で`npm ci`
 - TypeScript compileと、固定されたlocal `@vscode/vsce`によるVSIX package
 - `code --install-extension <vsix> --force`
 
-インストール後は新しいterminalを開き、pipxのPATH設定を反映してください。VS Codeでは`Developer: Reload Window`を実行するか、VS Codeを再起動してください。
+インストール後は新しいterminalを開き、pipxのPATH設定を反映してください。既にPATH先頭ならshell設定を変更せず、過去のappend設定がある場合だけprependへ修復します。VS Codeでは`Developer: Reload Window`を実行するか、VS Codeを再起動してください。
 
 確認:
 

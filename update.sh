@@ -59,9 +59,29 @@ require_pipx_features() {
     die "現在のpipxは必要なoptionに対応していません。pipxを更新するか、./install.shを実行してください。"
   fi
   if ! ensurepath_help="$("$PIPX_CMD" ensurepath --help 2>&1)" \
-    || [[ "$ensurepath_help" != *"--prepend"* ]]; then
-    die "現在のpipxはensurepath --prependに対応していません。pipxを更新するか、./install.shを実行してください。"
+    || [[ "$ensurepath_help" != *"--prepend"* \
+      || "$ensurepath_help" != *"--force"* ]]; then
+    die "現在のpipxはensurepath --prepend --forceに対応していません。pipxを更新するか、./install.shを実行してください。"
   fi
+}
+
+configure_pipx_path() {
+  local first_entry
+  first_entry="${PATH%%:*}"
+
+  if [[ "$first_entry" == "$PIPX_BIN_DIR" ]]; then
+    return 0
+  fi
+
+  case ":$PATH:" in
+    *":$PIPX_BIN_DIR:"*)
+      "$PIPX_CMD" ensurepath --prepend --force
+      ;;
+    *)
+      "$PIPX_CMD" ensurepath --prepend
+      ;;
+  esac
+  export PATH="$PIPX_BIN_DIR:$PATH"
 }
 
 require_node() {
@@ -85,8 +105,7 @@ require_command "code" "VS CodeのCommand Paletteで Shell Command: Install 'cod
 PIPX_HOME="$("$PIPX_CMD" environment --value PIPX_HOME)"
 PIPX_BIN_DIR="$("$PIPX_CMD" environment --value PIPX_BIN_DIR)"
 [[ -d "$PIPX_HOME/venvs/$PACKAGE_NAME" ]] || die "pipx管理のatc環境が見つかりません。./install.shを先に実行してください。"
-"$PIPX_CMD" ensurepath --prepend
-export PATH="$PIPX_BIN_DIR:$PATH"
+configure_pipx_path
 
 log "現在のlocal sourceからPython CLI環境を更新しています"
 "$PIPX_CMD" install \
