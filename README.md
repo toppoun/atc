@@ -26,8 +26,15 @@ macOS では `install.sh` で Python CLI と VS Code 拡張をまとめて入れ
 手動で CLI だけ入れる場合:
 
 ```bash
-pipx install --editable --include-deps .
-pipx ensurepath
+pipx install \
+  --backend uv \
+  --python 3.11 \
+  --fetch-python=always \
+  --force \
+  --editable \
+  --include-resources-from online-judge-tools \
+  .
+pipx ensurepath --prepend
 ```
 
 VS Code 拡張込みの詳しい手順は [docs/INSTALL.md](docs/INSTALL.md) を見てください。

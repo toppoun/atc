@@ -63,13 +63,21 @@ cleanup_bootstrap() {
 
 require_pipx_features() {
   local install_help
+  local ensurepath_help
   if ! install_help="$("$PIPX_CMD" install --help 2>&1)"; then
     die "pipx を実行できません。pipx installationを確認してください: $PIPX_CMD"
   fi
-  if [[ "$install_help" != *"--editable"* \
-    || "$install_help" != *"--include-deps"* \
+  if [[ "$install_help" != *"--backend"* \
+    || "$install_help" != *"--python"* \
+    || "$install_help" != *"--fetch-python"* \
+    || "$install_help" != *"--editable"* \
+    || "$install_help" != *"--include-resources-from"* \
     || "$install_help" != *"--force"* ]]; then
     die "現在のpipxは必要なoptionに対応していません。pipxを更新してから再実行してください。"
+  fi
+  if ! ensurepath_help="$("$PIPX_CMD" ensurepath --help 2>&1)" \
+    || [[ "$ensurepath_help" != *"--prepend"* ]]; then
+    die "現在のpipxはensurepath --prependに対応していません。pipxを更新してから再実行してください。"
   fi
 }
 
@@ -88,7 +96,7 @@ bootstrap_pipx() {
   "$BOOTSTRAP_DIR/bin/python" -m pip install pipx
   bootstrap_pipx="$BOOTSTRAP_DIR/bin/pipx"
   "$bootstrap_pipx" install pipx
-  "$bootstrap_pipx" ensurepath
+  "$bootstrap_pipx" ensurepath --prepend
 
   PIPX_BIN_DIR="$("$bootstrap_pipx" environment --value PIPX_BIN_DIR)"
   PIPX_CMD="$PIPX_BIN_DIR/pipx"
@@ -114,8 +122,21 @@ ensure_pipx() {
   fi
   [[ -n "$PIPX_BIN_DIR" ]] || die "pipx application directoryを取得できません。"
 
-  "$PIPX_CMD" ensurepath
+  "$PIPX_CMD" ensurepath --prepend
   export PATH="$PIPX_BIN_DIR:$PATH"
+}
+
+ensure_uv() {
+  if has_command "uv"; then
+    return 0
+  fi
+  if has_command "brew"; then
+    log "Homebrewでuvをインストールしています"
+    brew install uv
+    has_command "uv" || die "brew install後もuvが見つかりません。HomebrewのPATHを確認してください。"
+    return 0
+  fi
+  die "uvが見つかりません。Homebrewがない場合はuvを安全にインストールしてPATHに追加してから再実行してください。"
 }
 
 require_node() {
@@ -147,8 +168,18 @@ require_command "code" "VS CodeのCommand Paletteで Shell Command: Install 'cod
 log "pipxを確認しています"
 ensure_pipx
 
-log "Python CLIをpipxの独立環境へインストールしています"
-"$PIPX_CMD" install --force --editable --include-deps "$PROJECT_ROOT"
+log "uvを確認しています"
+ensure_uv
+
+log "Python CLIをstandalone Python 3.11のpipx環境へインストールしています"
+"$PIPX_CMD" install \
+  --backend uv \
+  --python 3.11 \
+  --fetch-python=always \
+  --force \
+  --editable \
+  --include-resources-from online-judge-tools \
+  "$PROJECT_ROOT"
 
 [[ -x "$PIPX_BIN_DIR/atc" ]] || die "pipx application directoryにatcが見つかりません: $PIPX_BIN_DIR"
 [[ -x "$PIPX_BIN_DIR/oj" ]] || die "pipx application directoryにojが見つかりません: $PIPX_BIN_DIR"
@@ -167,8 +198,8 @@ log "VS Code拡張機能をインストールしています"
 code --install-extension "$VSIX_PATH" --force
 
 log "doctorチェック"
-doctor_command "atc" "atc CLI" "新しいterminalを開き、pipx ensurepathの変更を反映してください。"
-doctor_command "oj" "online-judge-tools" "新しいterminalを開き、pipx ensurepathの変更を反映してください。"
+doctor_command "atc" "atc CLI" "新しいterminalを開き、pipx ensurepath --prependの変更を反映してください。"
+doctor_command "oj" "online-judge-tools" "新しいterminalを開き、pipx ensurepath --prependの変更を反映してください。"
 
 if has_command "clang++"; then
   printf '[OK] C++ compiler: %s\n' "$(command -v clang++)"
@@ -181,11 +212,12 @@ fi
 
 doctor_command "pypy3" "pypy3" "PyPyを使う場合だけ必要です。例: brew install pypy3"
 
-cat <<'EOF'
+cat <<EOF
 
 ==> インストールが完了しました
 
 pipxのPATH設定を確実に反映するため、新しいterminalを開いてください。
+pipx版atc/ojは次のdirectoryにあります: $PIPX_BIN_DIR
 VS Code連携を使う場合は、Developer: Reload Windowを実行するか、VS Codeを再起動してください。
 
 次に試すコマンド:

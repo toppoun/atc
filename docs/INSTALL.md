@@ -10,11 +10,13 @@ macOS向けの導入手順です。Windows用`install.ps1`はありません。
 - VS Codeの`code`コマンド
 - C++を使う場合はXcode Command Line Tools
 
-`install.sh`はPython CLIとVS Code拡張機能をまとめてインストールします。Python CLIはpipxの独立環境へ入り、dependencyの`online-judge-tools`が提供する`oj`も通常のshellから利用できるようになります。
+`install.sh`はPython CLIとVS Code拡張機能をまとめてインストールします。Python CLIはpipx + uvによるstandalone Python 3.11の独立環境へ入り、dependencyの`online-judge-tools`が提供する`oj`も通常のshellから利用できるようになります。
 
 pipxが既にあればそのまま使います。なければHomebrewが利用可能な環境では`brew install pipx`を実行します。Homebrewもない場合は、`python3`、`python`の順にvenvを利用できるPython 3.10以上を探し、一時venvからpipx自身をpipx管理環境へbootstrapします。
 
-Anaconda / Condaのbase環境が有効でも、既存環境へpipx、`atc`、dependencyを直接インストールしません。Conda Pythonしかない場合も、pipx bootstrap用venvを作るinterpreterとしてのみ利用します。
+uvがなければHomebrew環境では`brew install uv`を実行します。Homebrewもない場合は、uvを安全にインストールしてPATHへ追加するよう案内して終了します。
+
+`atc` runtimeは`--python 3.11 --fetch-python=always`で取得するstandalone Pythonを使うため、Anaconda / CondaやHomebrew Pythonに依存せず、既存環境を変更しません。Python 3.11を使用するのは、現在の`online-judge-tools`をPython 3.12以降の`distutils`削除の影響から避けるためです。
 
 ## 初回インストール
 
@@ -28,8 +30,10 @@ cd <repository>
 
 - Node.js / npm / `code`とrepository metadataの確認
 - pipxの検出、またはHomebrew / 専用venvによるpipx導入
-- `pipx install --force --editable --include-deps <project-root>`
-- `pipx ensurepath`と、現在のscript内でのpipx application directoryのPATH反映
+- uvの検出、またはHomebrewによるuv導入
+- uv backendとstandalone Python 3.11を指定したpipx editable install
+- `--include-resources-from online-judge-tools`による`atc` / `oj`の公開
+- `pipx ensurepath --prepend`と、現在のscript内でのpipx application directoryのPATH反映
 - `atc --help`と`oj --help`の確認
 - `vscode/atc-helper`で`npm ci`
 - TypeScript compileと、固定されたlocal `@vscode/vsce`によるVSIX package
@@ -55,7 +59,7 @@ git pull
 
 Git操作はユーザーが`update.sh`の前に行います。`update.sh`自体はGit working treeを変更しません。
 
-`update.sh`は既存のpipx管理環境を確認し、現在checkoutされているlocal sourceをeditable installとして`--force`で再適用します。これにより、Python sourceだけでなく`pyproject.toml`のdependency、entry point、Python requirementの変更もpipx環境へ反映します。その後、`npm ci`、compile、VSIX package、VS Code拡張機能の再インストールを行います。
+`update.sh`は既存のpipx / uvと`atc`環境を確認し、install時と同じuv backend、standalone Python 3.11、resource公開条件で現在のlocal sourceを`--force`で再適用します。これにより、Python sourceだけでなく`pyproject.toml`のdependency、entry point、Python requirementの変更もpipx環境へ反映します。その後、`npm ci`、compile、VSIX package、VS Code拡張機能の再インストールを行います。
 
 pipxや既存の`atc`環境が見つからない場合は、先に`./install.sh`を実行してください。
 
@@ -107,7 +111,7 @@ clang++ --version
 
 ## online-judge-tools
 
-サンプル取得には`oj`を使います。`install.sh`は`--include-deps`によりpipx管理の`atc`環境から`oj`も公開します。
+サンプル取得には`oj`を使います。`install.sh`は`--include-resources-from online-judge-tools`により、pipx管理の`atc`環境から必要な`oj`だけを追加公開します。
 
 ```bash
 oj --version
@@ -121,8 +125,15 @@ oj login https://atcoder.jp/
 補助scriptを使わない場合:
 
 ```bash
-pipx install --force --editable --include-deps .
-pipx ensurepath
+pipx install \
+  --backend uv \
+  --python 3.11 \
+  --fetch-python=always \
+  --force \
+  --editable \
+  --include-resources-from online-judge-tools \
+  .
+pipx ensurepath --prepend
 
 cd vscode/atc-helper
 npm ci

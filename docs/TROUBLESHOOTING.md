@@ -20,7 +20,7 @@ atc config doctor
 対処:
 
 - `pipx list`で`atc`がインストールされているか確認
-- `pipx ensurepath`を実行し、新しいterminalを開く
+- `pipx ensurepath --prepend`を実行し、新しいterminalを開く
 - repository内で`./install.sh`、または既存installationなら`./update.sh`を実行する
 
 ## `oj` が見つからない
@@ -39,7 +39,7 @@ cd <repository>
 oj login https://atcoder.jp/
 ```
 
-`atc`はpipxの`--include-deps`でインストールされるため、dependencyの`oj`も同じ独立環境から公開されます。
+`atc`はstandalone Python 3.11のpipx環境へ入り、`--include-resources-from online-judge-tools`によって`oj`も同じ環境から公開されます。
 
 ## AtCoder にログインしているか確認したい
 

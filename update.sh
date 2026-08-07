@@ -46,13 +46,21 @@ find_pipx() {
 
 require_pipx_features() {
   local install_help
+  local ensurepath_help
   if ! install_help="$("$PIPX_CMD" install --help 2>&1)"; then
     die "pipxを実行できません。./install.shを先に実行してください。"
   fi
-  if [[ "$install_help" != *"--editable"* \
-    || "$install_help" != *"--include-deps"* \
+  if [[ "$install_help" != *"--backend"* \
+    || "$install_help" != *"--python"* \
+    || "$install_help" != *"--fetch-python"* \
+    || "$install_help" != *"--editable"* \
+    || "$install_help" != *"--include-resources-from"* \
     || "$install_help" != *"--force"* ]]; then
     die "現在のpipxは必要なoptionに対応していません。pipxを更新するか、./install.shを実行してください。"
+  fi
+  if ! ensurepath_help="$("$PIPX_CMD" ensurepath --help 2>&1)" \
+    || [[ "$ensurepath_help" != *"--prepend"* ]]; then
+    die "現在のpipxはensurepath --prependに対応していません。pipxを更新するか、./install.shを実行してください。"
   fi
 }
 
@@ -68,6 +76,7 @@ log "既存installationを確認しています"
 PIPX_CMD="$(find_pipx || true)"
 [[ -n "$PIPX_CMD" ]] || die "pipxが見つかりません。./install.shを先に実行してください。"
 require_pipx_features
+require_command "uv" "uvが見つかりません。./install.shを先に実行してください。"
 require_node
 require_command "code" "VS CodeのCommand Paletteで Shell Command: Install 'code' command in PATH を実行してください。"
 [[ -d "$EXT_DIR" ]] || die "VS Code拡張機能ディレクトリが見つかりません: $EXT_DIR"
@@ -76,10 +85,18 @@ require_command "code" "VS CodeのCommand Paletteで Shell Command: Install 'cod
 PIPX_HOME="$("$PIPX_CMD" environment --value PIPX_HOME)"
 PIPX_BIN_DIR="$("$PIPX_CMD" environment --value PIPX_BIN_DIR)"
 [[ -d "$PIPX_HOME/venvs/$PACKAGE_NAME" ]] || die "pipx管理のatc環境が見つかりません。./install.shを先に実行してください。"
+"$PIPX_CMD" ensurepath --prepend
 export PATH="$PIPX_BIN_DIR:$PATH"
 
 log "現在のlocal sourceからPython CLI環境を更新しています"
-"$PIPX_CMD" install --force --editable --include-deps "$PROJECT_ROOT"
+"$PIPX_CMD" install \
+  --backend uv \
+  --python 3.11 \
+  --fetch-python=always \
+  --force \
+  --editable \
+  --include-resources-from online-judge-tools \
+  "$PROJECT_ROOT"
 
 [[ -x "$PIPX_BIN_DIR/atc" ]] || die "pipx application directoryにatcが見つかりません: $PIPX_BIN_DIR"
 [[ -x "$PIPX_BIN_DIR/oj" ]] || die "pipx application directoryにojが見つかりません: $PIPX_BIN_DIR"
