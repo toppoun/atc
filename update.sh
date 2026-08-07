@@ -12,6 +12,7 @@ PACKAGE_NAME="atc"
 PIPX_CMD=""
 PIPX_HOME=""
 PIPX_BIN_DIR=""
+VENV_PYTHON=""
 
 log() {
   printf '\n==> %s\n' "$1"
@@ -51,8 +52,6 @@ require_pipx_features() {
     die "pipxを実行できません。./install.shを先に実行してください。"
   fi
   if [[ "$install_help" != *"--backend"* \
-    || "$install_help" != *"--python"* \
-    || "$install_help" != *"--fetch-python"* \
     || "$install_help" != *"--editable"* \
     || "$install_help" != *"--include-resources-from"* \
     || "$install_help" != *"--force"* ]]; then
@@ -105,13 +104,17 @@ require_command "code" "VS CodeのCommand Paletteで Shell Command: Install 'cod
 PIPX_HOME="$("$PIPX_CMD" environment --value PIPX_HOME)"
 PIPX_BIN_DIR="$("$PIPX_CMD" environment --value PIPX_BIN_DIR)"
 [[ -d "$PIPX_HOME/venvs/$PACKAGE_NAME" ]] || die "pipx管理のatc環境が見つかりません。./install.shを先に実行してください。"
+VENV_PYTHON="$PIPX_HOME/venvs/$PACKAGE_NAME/bin/python"
+[[ -x "$VENV_PYTHON" ]] || die "pipx管理のatc環境のPythonが見つかりません。./install.shを実行して環境を再構築してください。"
+if ! "$VENV_PYTHON" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 11) else 1)'; then
+  VENV_PYTHON_VERSION="$("$VENV_PYTHON" --version 2>&1 || true)"
+  die "既存のatc pipx環境はPython 3.11ではありません (${VENV_PYTHON_VERSION:-version unknown})。./install.shを実行して環境を再構築してください。"
+fi
 configure_pipx_path
 
 log "現在のlocal sourceからPython CLI環境を更新しています"
 "$PIPX_CMD" install \
   --backend uv \
-  --python 3.11 \
-  --fetch-python=always \
   --force \
   --editable \
   --include-resources-from online-judge-tools \

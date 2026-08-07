@@ -60,7 +60,7 @@ git pull
 
 Git操作はユーザーが`update.sh`の前に行います。`update.sh`自体はGit working treeを変更しません。
 
-`update.sh`は既存のpipx / uvと`atc`環境を確認し、install時と同じuv backend、standalone Python 3.11、resource公開条件で現在のlocal sourceを`--force`で再適用します。これにより、Python sourceだけでなく`pyproject.toml`のdependency、entry point、Python requirementの変更もpipx環境へ反映します。その後、`npm ci`、compile、VSIX package、VS Code拡張機能の再インストールを行います。
+`update.sh`は既存のpipx / uvと`atc`環境を確認し、その環境がPython 3.11である場合だけ、既存interpreterを維持して現在のlocal sourceを`--force`で再適用します。Python 3.11以外の場合は更新せず、`install.sh`による再構築を案内します。これにより、Python sourceだけでなく`pyproject.toml`のdependency、entry point、Python requirementの変更もpipx環境へ反映します。その後、`npm ci`、compile、VSIX package、VS Code拡張機能の再インストールを行います。
 
 pipxや既存の`atc`環境が見つからない場合は、先に`./install.sh`を実行してください。
 
