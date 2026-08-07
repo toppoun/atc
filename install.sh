@@ -6,13 +6,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$SCRIPT_DIR"
 EXT_DIR="$PROJECT_ROOT/vscode/atc-helper"
+VSIX_PATH="$EXT_DIR/atc-helper.vsix"
+PIPX_CMD=""
+PIPX_BIN_DIR=""
+BOOTSTRAP_DIR=""
 
 log() {
   printf '\n==> %s\n' "$1"
-}
-
-warn() {
-  printf '\n[WARN] %s\n' "$1" >&2
 }
 
 die() {
@@ -32,36 +32,97 @@ require_command() {
   fi
 }
 
-require_python_pip() {
-  require_command "python3" "Python 公式サイト、または Homebrew でインストールしてください: brew install python"
-  if ! python3 -m pip --version >/dev/null 2>&1; then
-    die "pip が使えません。python3 -m ensurepip --upgrade または Python の再インストールを試してください。"
-  fi
-  if ! has_command "pip" && ! has_command "pip3"; then
-    warn "pip / pip3 コマンドは PATH にありませんが、python3 -m pip は使えるため続行します。"
+find_pipx() {
+  if has_command "pipx"; then
+    command -v pipx
+  elif [[ -x "$HOME/.local/bin/pipx" ]]; then
+    printf '%s\n' "$HOME/.local/bin/pipx"
+  else
+    return 1
   fi
 }
 
-latest_vsix() {
-  python3 - "$1" <<'PY'
-from pathlib import Path
-import sys
-
-directory = Path(sys.argv[1])
-files = sorted(directory.glob("*.vsix"), key=lambda p: p.stat().st_mtime, reverse=True)
-if not files:
-    raise SystemExit(1)
-print(files[0])
-PY
+find_bootstrap_python() {
+  local candidate
+  for candidate in python3 python; do
+    if has_command "$candidate" \
+      && "$candidate" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)' >/dev/null 2>&1 \
+      && "$candidate" -m venv --help >/dev/null 2>&1; then
+      command -v "$candidate"
+      return 0
+    fi
+  done
+  return 1
 }
 
-show_path_hint() {
-  local user_base
-  user_base="$(python3 -m site --user-base 2>/dev/null || true)"
-  warn "atc コマンドが PATH から見つかりません。"
-  if [[ -n "$user_base" ]]; then
-    warn "pip の script path が PATH に入っていない可能性があります: $user_base/bin"
-    warn "例: echo 'export PATH=\"$user_base/bin:\$PATH\"' >> ~/.zshrc"
+cleanup_bootstrap() {
+  if [[ -n "$BOOTSTRAP_DIR" && -d "$BOOTSTRAP_DIR" ]]; then
+    rm -rf "$BOOTSTRAP_DIR"
+  fi
+}
+
+require_pipx_features() {
+  local install_help
+  if ! install_help="$("$PIPX_CMD" install --help 2>&1)"; then
+    die "pipx を実行できません。pipx installationを確認してください: $PIPX_CMD"
+  fi
+  if [[ "$install_help" != *"--editable"* \
+    || "$install_help" != *"--include-deps"* \
+    || "$install_help" != *"--force"* ]]; then
+    die "現在のpipxは必要なoptionに対応していません。pipxを更新してから再実行してください。"
+  fi
+}
+
+bootstrap_pipx() {
+  local python_cmd
+  local bootstrap_pipx
+  if ! python_cmd="$(find_bootstrap_python)"; then
+    die "pipxの導入にはvenvを利用できるPython 3.10以上が必要です。python3またはpythonを用意してください。"
+  fi
+
+  BOOTSTRAP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/atc-pipx-bootstrap.XXXXXX")"
+  trap cleanup_bootstrap EXIT
+
+  log "専用の一時venvからpipxをbootstrapしています ($python_cmd)"
+  "$python_cmd" -m venv "$BOOTSTRAP_DIR"
+  "$BOOTSTRAP_DIR/bin/python" -m pip install pipx
+  bootstrap_pipx="$BOOTSTRAP_DIR/bin/pipx"
+  "$bootstrap_pipx" install pipx
+  "$bootstrap_pipx" ensurepath
+
+  PIPX_BIN_DIR="$("$bootstrap_pipx" environment --value PIPX_BIN_DIR)"
+  PIPX_CMD="$PIPX_BIN_DIR/pipx"
+  [[ -x "$PIPX_CMD" ]] || die "bootstrapしたpipx executableが見つかりません: $PIPX_CMD"
+}
+
+ensure_pipx() {
+  PIPX_CMD="$(find_pipx || true)"
+  if [[ -z "$PIPX_CMD" ]]; then
+    if has_command "brew"; then
+      log "Homebrewでpipxをインストールしています"
+      brew install pipx
+      PIPX_CMD="$(find_pipx || true)"
+      [[ -n "$PIPX_CMD" ]] || die "brew install後もpipxが見つかりません。HomebrewのPATHを確認してください。"
+    else
+      bootstrap_pipx
+    fi
+  fi
+
+  require_pipx_features
+  if [[ -z "$PIPX_BIN_DIR" ]]; then
+    PIPX_BIN_DIR="$("$PIPX_CMD" environment --value PIPX_BIN_DIR)"
+  fi
+  [[ -n "$PIPX_BIN_DIR" ]] || die "pipx application directoryを取得できません。"
+
+  "$PIPX_CMD" ensurepath
+  export PATH="$PIPX_BIN_DIR:$PATH"
+}
+
+require_node() {
+  require_command "node" "Node.js 20以上をインストールしてください。例: brew install node"
+  require_command "npm" "Node.js / npmをインストールしてください。例: brew install node"
+  if ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 20 ? 0 : 1)'; then
+    die "VS Code拡張機能のbuildにはNode.js 20以上が必要です。"
   fi
 }
 
@@ -77,46 +138,37 @@ doctor_command() {
   fi
 }
 
-install_python_cli() {
-  if ! python3 -m pip install -e .; then
-    die "Python CLI のインストールに失敗しました。pip のエラー内容を確認してください。Homebrew Python で externally-managed-environment と表示される場合は、仮想環境を有効化してから再実行してください。"
-  fi
-}
-
 log "必要なコマンドを確認しています"
-require_python_pip
-require_command "node" "Node.js / npm をインストールしてください: brew install node"
-require_command "npm" "Node.js / npm をインストールしてください: brew install node"
-require_command "code" "VS Code の Command Palette で Shell Command: Install 'code' command in PATH を実行してください。"
-require_command "git" "Git をインストールしてください: xcode-select --install または brew install git"
+require_node
+require_command "code" "VS CodeのCommand Paletteで Shell Command: Install 'code' command in PATH を実行してください。"
+[[ -d "$EXT_DIR" ]] || die "VS Code拡張機能ディレクトリが見つかりません: $EXT_DIR"
+[[ -f "$EXT_DIR/package-lock.json" ]] || die "package-lock.jsonが見つかりません: $EXT_DIR/package-lock.json"
 
-[[ -d "$EXT_DIR" ]] || die "VS Code 拡張機能ディレクトリが見つかりません: $EXT_DIR"
+log "pipxを確認しています"
+ensure_pipx
 
-log "Python CLI をインストールしています"
-cd "$PROJECT_ROOT"
-install_python_cli
+log "Python CLIをpipxの独立環境へインストールしています"
+"$PIPX_CMD" install --force --editable --include-deps "$PROJECT_ROOT"
 
-log "atc コマンドを確認しています"
-if has_command "atc"; then
-  atc config show
-else
-  show_path_hint
-fi
+[[ -x "$PIPX_BIN_DIR/atc" ]] || die "pipx application directoryにatcが見つかりません: $PIPX_BIN_DIR"
+[[ -x "$PIPX_BIN_DIR/oj" ]] || die "pipx application directoryにojが見つかりません: $PIPX_BIN_DIR"
+"$PIPX_BIN_DIR/atc" --help >/dev/null
+"$PIPX_BIN_DIR/oj" --help >/dev/null
 
-log "VS Code 拡張機能をビルドしています"
+log "VS Code拡張機能をビルドしています"
 cd "$EXT_DIR"
-npm install
+npm ci
 npm run compile
-npx @vscode/vsce package --allow-missing-repository
+npm run package -- --out "$VSIX_PATH"
 
-VSIX_PATH="$(latest_vsix "$EXT_DIR")" || die ".vsix ファイルが見つかりません。vsce package の結果を確認してください。"
+[[ -f "$VSIX_PATH" ]] || die ".vsixファイルが見つかりません: $VSIX_PATH"
 
-log "VS Code 拡張機能をインストールしています"
+log "VS Code拡張機能をインストールしています"
 code --install-extension "$VSIX_PATH" --force
 
-log "doctor チェック"
-doctor_command "atc" "atc CLI" "pip の script path を PATH に追加してください。"
-doctor_command "oj" "online-judge-tools" "python3 -m pip install online-judge-tools"
+log "doctorチェック"
+doctor_command "atc" "atc CLI" "新しいterminalを開き、pipx ensurepathの変更を反映してください。"
+doctor_command "oj" "online-judge-tools" "新しいterminalを開き、pipx ensurepathの変更を反映してください。"
 
 if has_command "clang++"; then
   printf '[OK] C++ compiler: %s\n' "$(command -v clang++)"
@@ -124,20 +176,22 @@ elif has_command "g++"; then
   printf '[OK] C++ compiler: %s\n' "$(command -v g++)"
 else
   printf '[WARN] C++ compiler: not found\n'
-  printf '       C++ を使う場合は Xcode Command Line Tools を入れてください: xcode-select --install\n'
+  printf '       C++を使う場合はXcode Command Line Toolsを入れてください: xcode-select --install\n'
 fi
 
-doctor_command "pypy3" "pypy3" "PyPy を使う場合だけ必要です。例: brew install pypy3"
+doctor_command "pypy3" "pypy3" "PyPyを使う場合だけ必要です。例: brew install pypy3"
 
 cat <<'EOF'
 
 ==> インストールが完了しました
 
-VS Code 連携を使う場合は、VS Code で Developer: Reload Window を実行するか、VS Code を再起動してください。
-AtCoder 用の root ディレクトリ、または .atc/current-contest.json が作られる project root を VS Code で開くのがおすすめです。
+pipxのPATH設定を確実に反映するため、新しいterminalを開いてください。
+VS Code連携を使う場合は、Developer: Reload Windowを実行するか、VS Codeを再起動してください。
 
 次に試すコマンド:
 
+  atc --help
+  oj --help
   atc config init
   atc contest abc335 cpp
 

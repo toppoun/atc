@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Uninstall the atc Python CLI and local VS Code extension.
+# Uninstall only the atc pipx environment and local VS Code extension.
 # User data such as .atc/config.toml and contest folders is intentionally kept.
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$SCRIPT_DIR"
+PACKAGE_NAME="atc"
+EXTENSION_ID="kouki.atc-helper"
+PIPX_CMD=""
 
 log() {
   printf '\n==> %s\n' "$1"
@@ -19,74 +20,68 @@ has_command() {
   command -v "$1" >/dev/null 2>&1
 }
 
-read_package_name() {
-  python3 - "$PROJECT_ROOT/pyproject.toml" <<'PY'
-from pathlib import Path
-import re
-import sys
-
-text = Path(sys.argv[1]).read_text(encoding="utf-8")
-match = re.search(r'(?m)^name\s*=\s*"([^"]+)"', text)
-print(match.group(1) if match else "atc")
-PY
+find_pipx() {
+  if has_command "pipx"; then
+    command -v pipx
+  elif [[ -x "$HOME/.local/bin/pipx" ]]; then
+    printf '%s\n' "$HOME/.local/bin/pipx"
+  else
+    return 1
+  fi
 }
 
-read_extension_id() {
-  python3 - "$PROJECT_ROOT/vscode/atc-helper/package.json" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-package_json = Path(sys.argv[1])
-data = json.loads(package_json.read_text(encoding="utf-8"))
-print(f"{data.get('publisher', 'kouki')}.{data.get('name', 'atc-helper')}")
-PY
-}
-
-PACKAGE_NAME="atc"
-EXTENSION_ID="kouki.atc-helper"
-
-if has_command "python3"; then
-  PACKAGE_NAME="$(read_package_name)"
-  EXTENSION_ID="$(read_extension_id)"
-else
-  warn "python3 が見つからないため、既定値で削除を試します: package=$PACKAGE_NAME extension=$EXTENSION_ID"
-fi
-
-log "VS Code 拡張機能をアンインストールしています"
+log "VS Code拡張機能をアンインストールしています"
 if has_command "code"; then
-  if code --uninstall-extension "$EXTENSION_ID"; then
-    printf 'VS Code extension removed: %s\n' "$EXTENSION_ID"
+  if INSTALLED_EXTENSIONS="$(code --list-extensions 2>/dev/null)"; then
+    if grep -Fxiq "$EXTENSION_ID" <<< "$INSTALLED_EXTENSIONS"; then
+      if code --uninstall-extension "$EXTENSION_ID"; then
+        printf 'VS Code extension removed: %s\n' "$EXTENSION_ID"
+      else
+        warn "VS Code拡張機能のアンインストールに失敗しました: $EXTENSION_ID"
+      fi
+    else
+      printf 'VS Code extension is not installed; skip: %s\n' "$EXTENSION_ID"
+    fi
   else
-    warn "VS Code 拡張機能のアンインストールに失敗しました。未インストールの可能性もあります。"
+    warn "installed extensionの確認に失敗したため、$EXTENSION_IDの削除を試します。"
+    if code --uninstall-extension "$EXTENSION_ID"; then
+      printf 'VS Code extension removed: %s\n' "$EXTENSION_ID"
+    else
+      warn "VS Code拡張機能のアンインストールに失敗しました: $EXTENSION_ID"
+    fi
   fi
 else
-  warn "code コマンドが見つかりません。VS Code の Extensions から $EXTENSION_ID を手動で削除してください。"
+  warn "codeコマンドが見つかりません。VS CodeのExtensionsから$EXTENSION_IDを手動で削除してください。"
 fi
 
-log "Python CLI をアンインストールしています"
-if has_command "python3"; then
-  if python3 -m pip uninstall -y "$PACKAGE_NAME"; then
-    printf 'Python package removed: %s\n' "$PACKAGE_NAME"
+log "Python CLIをアンインストールしています"
+PIPX_CMD="$(find_pipx || true)"
+if [[ -n "$PIPX_CMD" ]]; then
+  PIPX_HOME="$("$PIPX_CMD" environment --value PIPX_HOME 2>/dev/null || true)"
+  if [[ -n "$PIPX_HOME" && ! -d "$PIPX_HOME/venvs/$PACKAGE_NAME" ]]; then
+    printf 'pipx package is not installed; skip: %s\n' "$PACKAGE_NAME"
+  elif "$PIPX_CMD" uninstall "$PACKAGE_NAME"; then
+    printf 'pipx package removed: %s\n' "$PACKAGE_NAME"
   else
-    warn "Python パッケージのアンインストールに失敗しました。pip 環境を確認してください。"
+    warn "pipx packageのアンインストールに失敗しました: $PACKAGE_NAME"
   fi
 else
-  warn "python3 が見つからないため、Python CLI のアンインストールをスキップしました。"
+  warn "pipxが見つからないため、atcのpipx環境を削除できませんでした。pipx自体は削除しません。"
 fi
 
 cat <<'EOF'
 
-==> アンインストールが完了しました
+==> アンインストール処理が完了しました
 
 以下はユーザーデータなので削除していません。
 
   .atc/config.toml
   .atc/current-contest.json
   .atc/test-runs/
-  各 contest フォルダ
+  各contestフォルダ
   templates/
 
 不要な場合だけ、手動で削除してください。
+pipx、Homebrew、Python、Node.js、npm、VS Code自体は削除していません。
 
 EOF

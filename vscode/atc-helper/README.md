@@ -7,11 +7,10 @@ Requires VS Code 1.93 or later.
 ## Local VSIX Install
 
 ```bash
-npm install
+npm ci
 npm run compile
-npm install -g @vscode/vsce
-npx @vscode/vsce package --allow-missing-repository
-code --install-extension ./atc-helper-0.0.1.vsix --force
+npm run package -- --out ./atc-helper.vsix
+code --install-extension ./atc-helper.vsix --force
 ```
 
 Check the installed extension:
@@ -27,10 +26,10 @@ If `kouki.atc-helper@0.0.1` appears, the extension is installed. After installin
 After changing the extension code, rebuild the VSIX and reinstall it:
 
 ```bash
-npm install
+npm ci
 npm run compile
-npx @vscode/vsce package --allow-missing-repository
-code --install-extension ./atc-helper-0.0.1.vsix --force
+npm run package -- --out ./atc-helper.vsix
+code --install-extension ./atc-helper.vsix --force
 ```
 
 Then run `Developer: Reload Window` in VS Code. The `--force` flag overwrites the installed extension even when the version is still `0.0.1`.

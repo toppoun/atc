@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Update an existing macOS installation of the atc CLI and local VS Code extension.
+# Apply the current local checkout to an existing macOS installation.
+# Updating the Git checkout itself is intentionally the user's responsibility.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$SCRIPT_DIR"
 EXT_DIR="$PROJECT_ROOT/vscode/atc-helper"
+VSIX_PATH="$EXT_DIR/atc-helper.vsix"
+PACKAGE_NAME="atc"
+PIPX_CMD=""
+PIPX_HOME=""
+PIPX_BIN_DIR=""
 
 log() {
   printf '\n==> %s\n' "$1"
-}
-
-warn() {
-  printf '\n[WARN] %s\n' "$1" >&2
 }
 
 die() {
@@ -32,80 +34,73 @@ require_command() {
   fi
 }
 
-require_python_pip() {
-  require_command "python3" "Python 公式サイト、または Homebrew でインストールしてください: brew install python"
-  if ! python3 -m pip --version >/dev/null 2>&1; then
-    die "pip が使えません。python3 -m ensurepip --upgrade または Python の再インストールを試してください。"
+find_pipx() {
+  if has_command "pipx"; then
+    command -v pipx
+  elif [[ -x "$HOME/.local/bin/pipx" ]]; then
+    printf '%s\n' "$HOME/.local/bin/pipx"
+  else
+    return 1
   fi
 }
 
-latest_vsix() {
-  python3 - "$1" <<'PY'
-from pathlib import Path
-import sys
-
-directory = Path(sys.argv[1])
-files = sorted(directory.glob("*.vsix"), key=lambda p: p.stat().st_mtime, reverse=True)
-if not files:
-    raise SystemExit(1)
-print(files[0])
-PY
-}
-
-show_path_hint() {
-  local user_base
-  user_base="$(python3 -m site --user-base 2>/dev/null || true)"
-  warn "atc コマンドが PATH から見つかりません。"
-  if [[ -n "$user_base" ]]; then
-    warn "pip の script path が PATH に入っていない可能性があります: $user_base/bin"
-    warn "例: echo 'export PATH=\"$user_base/bin:\$PATH\"' >> ~/.zshrc"
+require_pipx_features() {
+  local install_help
+  if ! install_help="$("$PIPX_CMD" install --help 2>&1)"; then
+    die "pipxを実行できません。./install.shを先に実行してください。"
+  fi
+  if [[ "$install_help" != *"--editable"* \
+    || "$install_help" != *"--include-deps"* \
+    || "$install_help" != *"--force"* ]]; then
+    die "現在のpipxは必要なoptionに対応していません。pipxを更新するか、./install.shを実行してください。"
   fi
 }
 
-install_python_cli() {
-  if ! python3 -m pip install -e .; then
-    die "Python CLI の更新に失敗しました。pip のエラー内容を確認してください。Homebrew Python で externally-managed-environment と表示される場合は、仮想環境を有効化してから再実行してください。"
+require_node() {
+  require_command "node" "Node.js 20以上をインストールしてください。例: brew install node"
+  require_command "npm" "Node.js / npmをインストールしてください。例: brew install node"
+  if ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 20 ? 0 : 1)'; then
+    die "VS Code拡張機能のbuildにはNode.js 20以上が必要です。"
   fi
 }
 
-log "必要なコマンドを確認しています"
-require_python_pip
-require_command "node" "Node.js / npm をインストールしてください: brew install node"
-require_command "npm" "Node.js / npm をインストールしてください: brew install node"
-require_command "code" "VS Code の Command Palette で Shell Command: Install 'code' command in PATH を実行してください。"
-require_command "git" "Git をインストールしてください: xcode-select --install または brew install git"
+log "既存installationを確認しています"
+PIPX_CMD="$(find_pipx || true)"
+[[ -n "$PIPX_CMD" ]] || die "pipxが見つかりません。./install.shを先に実行してください。"
+require_pipx_features
+require_node
+require_command "code" "VS CodeのCommand Paletteで Shell Command: Install 'code' command in PATH を実行してください。"
+[[ -d "$EXT_DIR" ]] || die "VS Code拡張機能ディレクトリが見つかりません: $EXT_DIR"
+[[ -f "$EXT_DIR/package-lock.json" ]] || die "package-lock.jsonが見つかりません: $EXT_DIR/package-lock.json"
 
-[[ -d "$EXT_DIR" ]] || die "VS Code 拡張機能ディレクトリが見つかりません: $EXT_DIR"
+PIPX_HOME="$("$PIPX_CMD" environment --value PIPX_HOME)"
+PIPX_BIN_DIR="$("$PIPX_CMD" environment --value PIPX_BIN_DIR)"
+[[ -d "$PIPX_HOME/venvs/$PACKAGE_NAME" ]] || die "pipx管理のatc環境が見つかりません。./install.shを先に実行してください。"
+export PATH="$PIPX_BIN_DIR:$PATH"
 
-log "リポジトリを更新しています"
-cd "$PROJECT_ROOT"
-git pull
+log "現在のlocal sourceからPython CLI環境を更新しています"
+"$PIPX_CMD" install --force --editable --include-deps "$PROJECT_ROOT"
 
-log "Python CLI を更新しています"
-install_python_cli
+[[ -x "$PIPX_BIN_DIR/atc" ]] || die "pipx application directoryにatcが見つかりません: $PIPX_BIN_DIR"
+[[ -x "$PIPX_BIN_DIR/oj" ]] || die "pipx application directoryにojが見つかりません: $PIPX_BIN_DIR"
+"$PIPX_BIN_DIR/atc" --help >/dev/null
+"$PIPX_BIN_DIR/oj" --help >/dev/null
 
-log "VS Code 拡張機能を更新しています"
+log "VS Code拡張機能を更新しています"
 cd "$EXT_DIR"
-npm install
+npm ci
 npm run compile
-npx @vscode/vsce package --allow-missing-repository
+npm run package -- --out "$VSIX_PATH"
 
-VSIX_PATH="$(latest_vsix "$EXT_DIR")" || die ".vsix ファイルが見つかりません。vsce package の結果を確認してください。"
+[[ -f "$VSIX_PATH" ]] || die ".vsixファイルが見つかりません: $VSIX_PATH"
 
-log "VS Code 拡張機能を再インストールしています"
+log "VS Code拡張機能を再インストールしています"
 code --install-extension "$VSIX_PATH" --force
-
-log "atc 設定を確認しています"
-if has_command "atc"; then
-  atc config show
-else
-  show_path_hint
-fi
 
 cat <<'EOF'
 
 ==> 更新が完了しました
 
-VS Code で Developer: Reload Window を実行するか、VS Code を再起動してください。
+VS CodeでDeveloper: Reload Windowを実行するか、VS Codeを再起動してください。
 
 EOF

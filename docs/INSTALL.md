@@ -1,53 +1,63 @@
 # Install
 
-macOS 向けの導入手順です。Windows 用 `install.ps1` はありません。
+macOS向けの導入手順です。Windows用`install.ps1`はありません。
 
 ## 必要なもの
 
 - macOS
-- Python 3
-- Git
-- Node.js / npm
+- Node.js 20以上 / npm
 - VS Code
-- VS Code の `code` コマンド
-- C++ を使う場合は Xcode Command Line Tools
+- VS Codeの`code`コマンド
+- C++を使う場合はXcode Command Line Tools
 
-`install.sh` は Python CLI と VS Code 拡張機能をまとめて入れます。`online-judge-tools` は Python package dependency として入ります。
+`install.sh`はPython CLIとVS Code拡張機能をまとめてインストールします。Python CLIはpipxの独立環境へ入り、dependencyの`online-judge-tools`が提供する`oj`も通常のshellから利用できるようになります。
 
-## 最短手順
+pipxが既にあればそのまま使います。なければHomebrewが利用可能な環境では`brew install pipx`を実行します。Homebrewもない場合は、`python3`、`python`の順にvenvを利用できるPython 3.10以上を探し、一時venvからpipx自身をpipx管理環境へbootstrapします。
+
+Anaconda / Condaのbase環境が有効でも、既存環境へpipx、`atc`、dependencyを直接インストールしません。Conda Pythonしかない場合も、pipx bootstrap用venvを作るinterpreterとしてのみ利用します。
+
+## 初回インストール
 
 ```bash
-git clone <repo>
-cd <repo>
-chmod +x install.sh update.sh uninstall.sh
+git clone <repository>
+cd <repository>
 ./install.sh
 ```
 
-`install.sh` が行うこと:
+`install.sh`が行うこと:
 
-- 必要コマンドの確認
-- `python3 -m pip install -e .`
-- `vscode/atc-helper` の `npm install`
-- `npm run compile`
-- `npx @vscode/vsce package --allow-missing-repository`
+- Node.js / npm / `code`とrepository metadataの確認
+- pipxの検出、またはHomebrew / 専用venvによるpipx導入
+- `pipx install --force --editable --include-deps <project-root>`
+- `pipx ensurepath`と、現在のscript内でのpipx application directoryのPATH反映
+- `atc --help`と`oj --help`の確認
+- `vscode/atc-helper`で`npm ci`
+- TypeScript compileと、固定されたlocal `@vscode/vsce`によるVSIX package
 - `code --install-extension <vsix> --force`
-- `atc`, `oj`, `clang++` / `g++`, `pypy3` の簡易チェック
 
-インストール後は VS Code で `Developer: Reload Window` を実行するか、VS Code を再起動してください。
+インストール後は新しいterminalを開き、pipxのPATH設定を反映してください。VS Codeでは`Developer: Reload Window`を実行するか、VS Codeを再起動してください。
 
-環境確認:
+確認:
 
 ```bash
+atc --help
+oj --help
 atc config doctor
 ```
 
 ## 更新
 
 ```bash
+cd <repository>
+git pull
 ./update.sh
 ```
 
-`update.sh` は `git pull`、Python CLI の再インストール、VS Code 拡張機能の再ビルドと再インストールを行います。
+Git操作はユーザーが`update.sh`の前に行います。`update.sh`自体はGit working treeを変更しません。
+
+`update.sh`は既存のpipx管理環境を確認し、現在checkoutされているlocal sourceをeditable installとして`--force`で再適用します。これにより、Python sourceだけでなく`pyproject.toml`のdependency、entry point、Python requirementの変更もpipx環境へ反映します。その後、`npm ci`、compile、VSIX package、VS Code拡張機能の再インストールを行います。
+
+pipxや既存の`atc`環境が見つからない場合は、先に`./install.sh`を実行してください。
 
 ## アンインストール
 
@@ -55,27 +65,32 @@ atc config doctor
 ./uninstall.sh
 ```
 
-`uninstall.sh` は VS Code 拡張機能と Python package `atc` を削除します。
+`uninstall.sh`は次だけをbest-effortで削除します。
+
+- pipx管理のPython package`atc`（dependency appの`oj`を含む）
+- VS Code extension`kouki.atc-helper`
+
+未インストールの項目やmetadata不足だけで、削除可能なもう一方の処理を中止しません。pipx、Homebrew、Python、Node.js、npm、VS Code自体は削除しません。
 
 以下はユーザーデータなので削除しません。
 
 - `.atc/config.toml`
 - `.atc/current-contest.json`
 - `.atc/test-runs/`
-- 各 contest フォルダ
+- 各contestフォルダ
 - `templates/`
 
 不要な場合だけ手動で削除してください。
 
-## `code` コマンドが無い場合
+## `code`コマンドがない場合
 
-VS Code で Command Palette を開き、次を実行してください。
+VS CodeでCommand Paletteを開き、次を実行してください。
 
 ```text
 Shell Command: Install 'code' command in PATH
 ```
 
-その後、terminal を開き直して確認します。
+その後、terminalを開き直して確認します。
 
 ```bash
 code --version
@@ -83,7 +98,7 @@ code --version
 
 ## Xcode Command Line Tools
 
-C++ を使う場合は `clang++` または `g++` が必要です。
+C++を使う場合は`clang++`または`g++`が必要です。
 
 ```bash
 xcode-select --install
@@ -92,26 +107,28 @@ clang++ --version
 
 ## online-judge-tools
 
-サンプル取得には `oj` を使います。見つからない場合は入れ直してください。
+サンプル取得には`oj`を使います。`install.sh`は`--include-deps`によりpipx管理の`atc`環境から`oj`も公開します。
 
 ```bash
-python3 -m pip install online-judge-tools
 oj --version
 oj login https://atcoder.jp/
 ```
 
+`oj`が見つからない場合は、新しいterminalでPATHを再確認するか、repository内で`./update.sh`を実行してください。
+
 ## 手動インストール
 
-補助スクリプトを使わない場合:
+補助scriptを使わない場合:
 
 ```bash
-python3 -m pip install -e .
+pipx install --force --editable --include-deps .
+pipx ensurepath
 
 cd vscode/atc-helper
-npm install
+npm ci
 npm run compile
-npx @vscode/vsce package --allow-missing-repository
-code --install-extension ./atc-helper-0.0.1.vsix --force
+npm run package -- --out ./atc-helper.vsix
+code --install-extension ./atc-helper.vsix --force
 ```
 
-VS Code を reload してください。
+新しいterminalを開き、VS Codeをreloadしてください。

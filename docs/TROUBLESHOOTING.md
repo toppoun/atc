@@ -19,9 +19,9 @@ atc config doctor
 
 対処:
 
-- `python3 -m pip install -e .` を実行したか確認
-- 仮想環境を使っている場合は activate する
-- pip の script path が PATH に入っているか確認
+- `pipx list`で`atc`がインストールされているか確認
+- `pipx ensurepath`を実行し、新しいterminalを開く
+- repository内で`./install.sh`、または既存installationなら`./update.sh`を実行する
 
 ## `oj` が見つからない
 
@@ -34,9 +34,12 @@ oj --version
 対処:
 
 ```bash
-python3 -m pip install online-judge-tools
+cd <repository>
+./update.sh
 oj login https://atcoder.jp/
 ```
+
+`atc`はpipxの`--include-deps`でインストールされるため、dependencyの`oj`も同じ独立環境から公開されます。
 
 ## AtCoder にログインしているか確認したい
 
@@ -199,9 +202,10 @@ debounce_seconds = 1.5
 
 ```bash
 cd vscode/atc-helper
+npm ci
 npm run compile
-npx @vscode/vsce package --allow-missing-repository
-code --install-extension ./atc-helper-0.0.1.vsix --force
+npm run package -- --out ./atc-helper.vsix
+code --install-extension ./atc-helper.vsix --force
 ```
 
 その後、VS Code で `Developer: Reload Window` を実行してください。

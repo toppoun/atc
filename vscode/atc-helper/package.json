@@ -26,9 +26,11 @@
   },
   "scripts": {
     "compile": "tsc -p ./",
+    "package": "vsce package --allow-missing-repository",
     "watch": "tsc -watch -p ./"
   },
   "devDependencies": {
+    "@vscode/vsce": "3.9.2",
     "@types/vscode": "1.93.0",
     "typescript": "^5.3.3"
   }
