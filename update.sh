@@ -113,6 +113,7 @@ fi
 configure_pipx_path
 
 log "現在のlocal sourceからPython CLI環境を更新しています"
+PIPX_DEFAULT_PYTHON="$VENV_PYTHON" \
 "$PIPX_CMD" install \
   --backend uv \
   --force \
