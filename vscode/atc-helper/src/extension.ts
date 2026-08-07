@@ -29,7 +29,8 @@ let manualTerminal: vscode.Terminal | undefined;
 let watchTerminal: vscode.Terminal | undefined;
 let activeContestDir: string | undefined;
 let pendingWatchContestDir: vscode.Uri | undefined;
-let watchSwitchExecution: vscode.TerminalShellExecution | undefined;
+let activeWatchExecution: vscode.TerminalShellExecution | undefined;
+let startingWatchExecution: vscode.TerminalShellExecution | undefined;
 
 function decodeUtf8(bytes: Uint8Array): string {
   const TextDecoderCtor = (globalThis as unknown as { TextDecoder: Utf8TextDecoder }).TextDecoder;
@@ -629,13 +630,15 @@ function recreateWatchTerminal(terminal: vscode.Terminal, contestDir: vscode.Uri
   }
 
   watchTerminal = undefined;
-  watchSwitchExecution = undefined;
+  activeWatchExecution = undefined;
+  startingWatchExecution = undefined;
+  pendingWatchContestDir = undefined;
   terminal.dispose();
   createWatchTerminal(contestDir);
 }
 
 function startPendingWatchSwitch(): void {
-  if (watchSwitchExecution || !pendingWatchContestDir) {
+  if (activeWatchExecution || startingWatchExecution || !pendingWatchContestDir) {
     return;
   }
 
@@ -656,7 +659,7 @@ function startPendingWatchSwitch(): void {
   }
 
   try {
-    watchSwitchExecution = shellIntegration.executeCommand(watchCommand(contestDir));
+    startingWatchExecution = shellIntegration.executeCommand(watchCommand(contestDir));
   } catch (error) {
     logMessage(`[atc-helper] failed to switch managed watch terminal: ${String(error)}`);
     recreateWatchTerminal(terminal, contestDir);
@@ -664,16 +667,58 @@ function startPendingWatchSwitch(): void {
 }
 
 function requestWatchSwitch(contestDir: vscode.Uri): void {
+  const stopAlreadyRequested = pendingWatchContestDir !== undefined;
   pendingWatchContestDir = contestDir;
+
+  const terminal = watchTerminal;
+  if (!terminal) {
+    startPendingWatchSwitch();
+    return;
+  }
+
+  if (!terminal.shellIntegration) {
+    pendingWatchContestDir = undefined;
+    logMessage("[atc-helper] shell integration unavailable; recreating managed watch terminal");
+    recreateWatchTerminal(terminal, contestDir);
+    return;
+  }
+
+  if (activeWatchExecution) {
+    if (!stopAlreadyRequested) {
+      terminal.sendText("\x03", false);
+    }
+    return;
+  }
+
   startPendingWatchSwitch();
 }
 
 function handleManagedWatchExecutionStarted(event: vscode.TerminalShellExecutionStartEvent): void {
-  if (event.terminal !== watchTerminal || event.execution !== watchSwitchExecution) {
+  if (event.terminal !== watchTerminal) {
     return;
   }
 
-  watchSwitchExecution = undefined;
+  const startsRequestedWatch = event.execution === startingWatchExecution;
+  if (!startsRequestedWatch && event.execution.commandLine.value.trim() !== "atc watch") {
+    return;
+  }
+
+  if (startsRequestedWatch) {
+    startingWatchExecution = undefined;
+  }
+  activeWatchExecution = event.execution;
+
+  if (pendingWatchContestDir) {
+    event.terminal.sendText("\x03", false);
+  }
+}
+
+function handleManagedWatchExecutionEnded(event: vscode.TerminalShellExecutionEndEvent): void {
+  if (event.terminal !== watchTerminal || event.execution !== activeWatchExecution) {
+    return;
+  }
+
+  activeWatchExecution = undefined;
   startPendingWatchSwitch();
 }
 
@@ -706,8 +751,9 @@ function handleManagedTerminalClosed(terminal: vscode.Terminal): void {
   }
   if (terminal === watchTerminal) {
     watchTerminal = undefined;
-    watchSwitchExecution = undefined;
-    startPendingWatchSwitch();
+    activeWatchExecution = undefined;
+    startingWatchExecution = undefined;
+    pendingWatchContestDir = undefined;
   }
 }
 
@@ -788,12 +834,20 @@ export function activate(context: vscode.ExtensionContext) {
   const terminalExecutionStartDisposable = vscode.window.onDidStartTerminalShellExecution(
     handleManagedWatchExecutionStarted
   );
+  const terminalExecutionEndDisposable = vscode.window.onDidEndTerminalShellExecution(
+    handleManagedWatchExecutionEnded
+  );
   const disposable = vscode.commands.registerCommand(
     "atc-helper.openContestTerminals",
     openContestTerminalsFromCurrentContestOrInput
   );
 
-  context.subscriptions.push(terminalCloseDisposable, terminalExecutionStartDisposable, disposable);
+  context.subscriptions.push(
+    terminalCloseDisposable,
+    terminalExecutionStartDisposable,
+    terminalExecutionEndDisposable,
+    disposable
+  );
 }
 
 export function deactivate() {}
