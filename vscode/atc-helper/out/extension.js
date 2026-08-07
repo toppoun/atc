@@ -18,6 +18,8 @@ let lastWatchedRequestKey;
 let manualTerminal;
 let watchTerminal;
 let activeContestDir;
+let pendingWatchContestDir;
+let watchSwitchExecution;
 function decodeUtf8(bytes) {
     const TextDecoderCtor = globalThis.TextDecoder;
     return new TextDecoderCtor("utf-8").decode(bytes);
@@ -508,6 +510,9 @@ function quoteTerminalPath(path) {
 function changeDirectory(terminal, contestDir) {
     terminal.sendText(`cd ${quoteTerminalPath(contestDir.fsPath)}`);
 }
+function watchCommand(contestDir) {
+    return `cd ${quoteTerminalPath(contestDir.fsPath)}; atc watch`;
+}
 function createManualTerminal(contestDir) {
     manualTerminal = vscode.window.createTerminal({
         name: "atc terminal",
@@ -525,6 +530,51 @@ function createWatchTerminal(contestDir) {
     watchTerminal.show();
     watchTerminal.sendText("atc watch");
 }
+function recreateWatchTerminal(terminal, contestDir) {
+    if (terminal !== watchTerminal) {
+        return;
+    }
+    watchTerminal = undefined;
+    watchSwitchExecution = undefined;
+    terminal.dispose();
+    createWatchTerminal(contestDir);
+}
+function startPendingWatchSwitch() {
+    if (watchSwitchExecution || !pendingWatchContestDir) {
+        return;
+    }
+    const contestDir = pendingWatchContestDir;
+    pendingWatchContestDir = undefined;
+    const terminal = watchTerminal;
+    if (!terminal) {
+        createWatchTerminal(contestDir);
+        return;
+    }
+    const shellIntegration = terminal.shellIntegration;
+    if (!shellIntegration) {
+        logMessage("[atc-helper] shell integration unavailable; recreating managed watch terminal");
+        recreateWatchTerminal(terminal, contestDir);
+        return;
+    }
+    try {
+        watchSwitchExecution = shellIntegration.executeCommand(watchCommand(contestDir));
+    }
+    catch (error) {
+        logMessage(`[atc-helper] failed to switch managed watch terminal: ${String(error)}`);
+        recreateWatchTerminal(terminal, contestDir);
+    }
+}
+function requestWatchSwitch(contestDir) {
+    pendingWatchContestDir = contestDir;
+    startPendingWatchSwitch();
+}
+function handleManagedWatchExecutionStarted(event) {
+    if (event.terminal !== watchTerminal || event.execution !== watchSwitchExecution) {
+        return;
+    }
+    watchSwitchExecution = undefined;
+    startPendingWatchSwitch();
+}
 function ensureContestTerminals(contestDir) {
     const contestDirKey = contestDir.toString();
     const contestChanged = activeContestDir !== contestDirKey;
@@ -538,9 +588,7 @@ function ensureContestTerminals(contestDir) {
     }
     if (watchTerminal) {
         if (contestChanged) {
-            watchTerminal.sendText("\x03", false);
-            changeDirectory(watchTerminal, contestDir);
-            watchTerminal.sendText("atc watch");
+            requestWatchSwitch(contestDir);
         }
     }
     else {
@@ -554,6 +602,8 @@ function handleManagedTerminalClosed(terminal) {
     }
     if (terminal === watchTerminal) {
         watchTerminal = undefined;
+        watchSwitchExecution = undefined;
+        startPendingWatchSwitch();
     }
 }
 async function openContestTerminalsFromCurrentContestOrInput() {
@@ -615,8 +665,9 @@ async function registerCurrentContestWatchers(context) {
 function activate(context) {
     void registerCurrentContestWatchers(context);
     const terminalCloseDisposable = vscode.window.onDidCloseTerminal(handleManagedTerminalClosed);
+    const terminalExecutionStartDisposable = vscode.window.onDidStartTerminalShellExecution(handleManagedWatchExecutionStarted);
     const disposable = vscode.commands.registerCommand("atc-helper.openContestTerminals", openContestTerminalsFromCurrentContestOrInput);
-    context.subscriptions.push(terminalCloseDisposable, disposable);
+    context.subscriptions.push(terminalCloseDisposable, terminalExecutionStartDisposable, disposable);
 }
 function deactivate() { }
 //# sourceMappingURL=extension.js.map

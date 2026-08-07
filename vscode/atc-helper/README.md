@@ -2,6 +2,8 @@
 
 VS Code extension for opening AtCoder contest terminals from `current-contest.json`.
 
+Requires VS Code 1.93 or later.
+
 ## Local VSIX Install
 
 ```bash
@@ -33,4 +35,4 @@ code --install-extension ./atc-helper-0.0.1.vsix --force
 
 Then run `Developer: Reload Window` in VS Code. The `--force` flag overwrites the installed extension even when the version is still `0.0.1`.
 
-The command `AtC: Open Contest Terminals` ensures a split terminal group for the current contest. The extension also watches `.atc/current-contest.json` and reuses its managed terminals when that file changes, restarting only `atc watch` when switching contests.
+The command `AtC: Open Contest Terminals` ensures a split terminal group for the current contest. The extension also watches `.atc/current-contest.json` and reuses its managed terminals when that file changes. When switching contests, Terminal Shell Integration synchronizes stopping and restarting `atc watch`; if shell integration is unavailable, only the managed watch terminal is recreated.

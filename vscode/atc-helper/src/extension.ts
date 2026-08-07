@@ -28,6 +28,8 @@ let lastWatchedRequestKey: string | undefined;
 let manualTerminal: vscode.Terminal | undefined;
 let watchTerminal: vscode.Terminal | undefined;
 let activeContestDir: string | undefined;
+let pendingWatchContestDir: vscode.Uri | undefined;
+let watchSwitchExecution: vscode.TerminalShellExecution | undefined;
 
 function decodeUtf8(bytes: Uint8Array): string {
   const TextDecoderCtor = (globalThis as unknown as { TextDecoder: Utf8TextDecoder }).TextDecoder;
@@ -598,6 +600,10 @@ function changeDirectory(terminal: vscode.Terminal, contestDir: vscode.Uri): voi
   terminal.sendText(`cd ${quoteTerminalPath(contestDir.fsPath)}`);
 }
 
+function watchCommand(contestDir: vscode.Uri): string {
+  return `cd ${quoteTerminalPath(contestDir.fsPath)}; atc watch`;
+}
+
 function createManualTerminal(contestDir: vscode.Uri): void {
   manualTerminal = vscode.window.createTerminal({
     name: "atc terminal",
@@ -617,6 +623,60 @@ function createWatchTerminal(contestDir: vscode.Uri): void {
   watchTerminal.sendText("atc watch");
 }
 
+function recreateWatchTerminal(terminal: vscode.Terminal, contestDir: vscode.Uri): void {
+  if (terminal !== watchTerminal) {
+    return;
+  }
+
+  watchTerminal = undefined;
+  watchSwitchExecution = undefined;
+  terminal.dispose();
+  createWatchTerminal(contestDir);
+}
+
+function startPendingWatchSwitch(): void {
+  if (watchSwitchExecution || !pendingWatchContestDir) {
+    return;
+  }
+
+  const contestDir = pendingWatchContestDir;
+  pendingWatchContestDir = undefined;
+
+  const terminal = watchTerminal;
+  if (!terminal) {
+    createWatchTerminal(contestDir);
+    return;
+  }
+
+  const shellIntegration = terminal.shellIntegration;
+  if (!shellIntegration) {
+    logMessage("[atc-helper] shell integration unavailable; recreating managed watch terminal");
+    recreateWatchTerminal(terminal, contestDir);
+    return;
+  }
+
+  try {
+    watchSwitchExecution = shellIntegration.executeCommand(watchCommand(contestDir));
+  } catch (error) {
+    logMessage(`[atc-helper] failed to switch managed watch terminal: ${String(error)}`);
+    recreateWatchTerminal(terminal, contestDir);
+  }
+}
+
+function requestWatchSwitch(contestDir: vscode.Uri): void {
+  pendingWatchContestDir = contestDir;
+  startPendingWatchSwitch();
+}
+
+function handleManagedWatchExecutionStarted(event: vscode.TerminalShellExecutionStartEvent): void {
+  if (event.terminal !== watchTerminal || event.execution !== watchSwitchExecution) {
+    return;
+  }
+
+  watchSwitchExecution = undefined;
+  startPendingWatchSwitch();
+}
+
 function ensureContestTerminals(contestDir: vscode.Uri): void {
   const contestDirKey = contestDir.toString();
   const contestChanged = activeContestDir !== contestDirKey;
@@ -631,9 +691,7 @@ function ensureContestTerminals(contestDir: vscode.Uri): void {
 
   if (watchTerminal) {
     if (contestChanged) {
-      watchTerminal.sendText("\x03", false);
-      changeDirectory(watchTerminal, contestDir);
-      watchTerminal.sendText("atc watch");
+      requestWatchSwitch(contestDir);
     }
   } else {
     createWatchTerminal(contestDir);
@@ -648,6 +706,8 @@ function handleManagedTerminalClosed(terminal: vscode.Terminal): void {
   }
   if (terminal === watchTerminal) {
     watchTerminal = undefined;
+    watchSwitchExecution = undefined;
+    startPendingWatchSwitch();
   }
 }
 
@@ -725,12 +785,15 @@ export function activate(context: vscode.ExtensionContext) {
   void registerCurrentContestWatchers(context);
 
   const terminalCloseDisposable = vscode.window.onDidCloseTerminal(handleManagedTerminalClosed);
+  const terminalExecutionStartDisposable = vscode.window.onDidStartTerminalShellExecution(
+    handleManagedWatchExecutionStarted
+  );
   const disposable = vscode.commands.registerCommand(
     "atc-helper.openContestTerminals",
     openContestTerminalsFromCurrentContestOrInput
   );
 
-  context.subscriptions.push(terminalCloseDisposable, disposable);
+  context.subscriptions.push(terminalCloseDisposable, terminalExecutionStartDisposable, disposable);
 }
 
 export function deactivate() {}

@@ -235,7 +235,7 @@ terminal が開く条件:
 - 左: `atc terminal`
 - 右: `atc watch`
 
-拡張自身が作成した terminal は保持して再利用します。同じ contest なら不足している terminal だけを作成し、別の contest なら `atc terminal` の cwd を変更し、`atc watch` は `Ctrl+C` で停止して cwd 変更後に再起動します。
+拡張自身が作成した terminal は保持して再利用します。同じ contest なら不足している terminal だけを作成し、別の contest なら `atc terminal` の cwd を変更します。`atc watch` は VS Code 1.93 以降の Terminal Shell Integration API で実行中のwatchを停止し、prompt復帰後に cwd 変更とwatch再起動を行います。Shell Integrationが利用できない場合だけ、managed watch terminalを再作成します。
 
 ## config doctor
 
