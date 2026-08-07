@@ -235,6 +235,8 @@ terminal が開く条件:
 - 左: `atc terminal`
 - 右: `atc watch`
 
+拡張自身が作成した terminal は保持して再利用します。同じ contest なら不足している terminal だけを作成し、別の contest なら `atc terminal` の cwd を変更し、`atc watch` は `Ctrl+C` で停止して cwd 変更後に再起動します。
+
 ## config doctor
 
 `atc config doctor` は `doctor.py` が担当します。

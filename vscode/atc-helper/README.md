@@ -33,4 +33,4 @@ code --install-extension ./atc-helper-0.0.1.vsix --force
 
 Then run `Developer: Reload Window` in VS Code. The `--force` flag overwrites the installed extension even when the version is still `0.0.1`.
 
-The command `AtC: Open Contest Terminals` opens a split terminal group for the current contest. The extension also watches `.atc/current-contest.json` and opens the terminals when that file changes.
+The command `AtC: Open Contest Terminals` ensures a split terminal group for the current contest. The extension also watches `.atc/current-contest.json` and reuses its managed terminals when that file changes, restarting only `atc watch` when switching contests.

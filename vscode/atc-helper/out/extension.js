@@ -15,6 +15,9 @@ const DEFAULT_CONTEST_PATH_RULES = {
 const CONFIG_FILE_NAME = "config.toml";
 const reportedConfigErrors = new Set();
 let lastWatchedRequestKey;
+let manualTerminal;
+let watchTerminal;
+let activeContestDir;
 function decodeUtf8(bytes) {
     const TextDecoderCtor = globalThis.TextDecoder;
     return new TextDecoderCtor("utf-8").decode(bytes);
@@ -492,21 +495,66 @@ async function readCurrentContestDir() {
 function currentContestRequestKey(currentContest) {
     return `${currentContest.source.toString()}::${currentContest.requestId ?? currentContest.contestDir.toString()}`;
 }
-async function openContestTerminals(contestDir) {
-    const manualTerminal = vscode.window.createTerminal({
+function quoteTerminalPath(path) {
+    const shell = vscode.env.shell.toLowerCase();
+    if (shell.includes("powershell") || shell.includes("pwsh")) {
+        return `'${path.replace(/'/g, "''")}'`;
+    }
+    if (shell.includes("cmd.exe") || shell.endsWith("\\cmd")) {
+        return `"${path}"`;
+    }
+    return `'${path.replace(/'/g, `'\\''`)}'`;
+}
+function changeDirectory(terminal, contestDir) {
+    terminal.sendText(`cd ${quoteTerminalPath(contestDir.fsPath)}`);
+}
+function createManualTerminal(contestDir) {
+    manualTerminal = vscode.window.createTerminal({
         name: "atc terminal",
-        cwd: contestDir
+        cwd: contestDir,
+        location: watchTerminal ? { parentTerminal: watchTerminal } : undefined
     });
     manualTerminal.show();
-    const watchTerminal = vscode.window.createTerminal({
+}
+function createWatchTerminal(contestDir) {
+    watchTerminal = vscode.window.createTerminal({
         name: "atc watch",
         cwd: contestDir,
-        location: {
-            parentTerminal: manualTerminal
-        }
+        location: manualTerminal ? { parentTerminal: manualTerminal } : undefined
     });
     watchTerminal.show();
     watchTerminal.sendText("atc watch");
+}
+function ensureContestTerminals(contestDir) {
+    const contestDirKey = contestDir.toString();
+    const contestChanged = activeContestDir !== contestDirKey;
+    if (manualTerminal) {
+        if (contestChanged) {
+            changeDirectory(manualTerminal, contestDir);
+        }
+    }
+    else {
+        createManualTerminal(contestDir);
+    }
+    if (watchTerminal) {
+        if (contestChanged) {
+            watchTerminal.sendText("\x03", false);
+            changeDirectory(watchTerminal, contestDir);
+            watchTerminal.sendText("atc watch");
+        }
+    }
+    else {
+        createWatchTerminal(contestDir);
+    }
+    activeContestDir = contestDirKey;
+}
+function handleManagedTerminalClosed(terminal) {
+    if (terminal === manualTerminal) {
+        manualTerminal = undefined;
+    }
+    if (terminal === watchTerminal) {
+        watchTerminal = undefined;
+    }
 }
 async function openContestTerminalsFromCurrentContestOrInput() {
     const currentContest = await readCurrentContestDir();
@@ -531,7 +579,7 @@ async function openContestTerminalsFromCurrentContestOrInput() {
             return;
         }
     }
-    await openContestTerminals(contestDir);
+    ensureContestTerminals(contestDir);
 }
 async function openContestTerminalsFromWatchedFile(currentContestUri) {
     logMessage(`[atc-helper] current contest changed: ${currentContestUri.fsPath}`);
@@ -549,7 +597,7 @@ async function openContestTerminalsFromWatchedFile(currentContestUri) {
         return;
     }
     lastWatchedRequestKey = requestKey;
-    await openContestTerminals(currentContest.contestDir);
+    ensureContestTerminals(currentContest.contestDir);
 }
 async function registerCurrentContestWatchers(context) {
     for (const rootUri of await getCurrentContestRootCandidates()) {
@@ -566,8 +614,9 @@ async function registerCurrentContestWatchers(context) {
 }
 function activate(context) {
     void registerCurrentContestWatchers(context);
+    const terminalCloseDisposable = vscode.window.onDidCloseTerminal(handleManagedTerminalClosed);
     const disposable = vscode.commands.registerCommand("atc-helper.openContestTerminals", openContestTerminalsFromCurrentContestOrInput);
-    context.subscriptions.push(disposable);
+    context.subscriptions.push(terminalCloseDisposable, disposable);
 }
 function deactivate() { }
 //# sourceMappingURL=extension.js.map
