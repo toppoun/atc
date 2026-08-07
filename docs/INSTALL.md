@@ -5,7 +5,7 @@ macOS向けの導入手順です。Windows用`install.ps1`はありません。
 ## 必要なもの
 
 - macOS
-- Node.js 20以上 / npm
+- Node.js 22以上 / npm
 - VS Code
 - VS Codeの`code`コマンド
 - C++を使う場合はXcode Command Line Tools

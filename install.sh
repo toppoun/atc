@@ -119,10 +119,10 @@ ensure_pipx() {
 }
 
 require_node() {
-  require_command "node" "Node.js 20以上をインストールしてください。例: brew install node"
+  require_command "node" "Node.js 22以上をインストールしてください。例: brew install node"
   require_command "npm" "Node.js / npmをインストールしてください。例: brew install node"
-  if ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 20 ? 0 : 1)'; then
-    die "VS Code拡張機能のbuildにはNode.js 20以上が必要です。"
+  if ! node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 22 ? 0 : 1)'; then
+    die "VS Code拡張機能のbuildにはNode.js 22以上が必要です。"
   fi
 }
 
