@@ -598,11 +598,11 @@ function quoteTerminalPath(path: string): string {
 }
 
 function changeDirectory(terminal: vscode.Terminal, contestDir: vscode.Uri): void {
-  terminal.sendText(`cd ${quoteTerminalPath(contestDir.fsPath)}`);
+  terminal.sendText(`cd ${quoteTerminalPath(contestDir.fsPath)}; clear`);
 }
 
 function watchCommand(contestDir: vscode.Uri): string {
-  return `cd ${quoteTerminalPath(contestDir.fsPath)}; atc watch`;
+  return `cd ${quoteTerminalPath(contestDir.fsPath)}; clear; atc watch`;
 }
 
 function createManualTerminal(contestDir: vscode.Uri): void {

@@ -509,10 +509,10 @@ function quoteTerminalPath(path) {
     return `'${path.replace(/'/g, `'\\''`)}'`;
 }
 function changeDirectory(terminal, contestDir) {
-    terminal.sendText(`cd ${quoteTerminalPath(contestDir.fsPath)}`);
+    terminal.sendText(`cd ${quoteTerminalPath(contestDir.fsPath)}; clear`);
 }
 function watchCommand(contestDir) {
-    return `cd ${quoteTerminalPath(contestDir.fsPath)}; atc watch`;
+    return `cd ${quoteTerminalPath(contestDir.fsPath)}; clear; atc watch`;
 }
 function createManualTerminal(contestDir) {
     manualTerminal = vscode.window.createTerminal({
