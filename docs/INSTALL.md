@@ -144,3 +144,84 @@ code --install-extension ./atc-helper.vsix --force
 ```
 
 新しいterminalを開き、VS Codeをreloadしてください。
+
+## 旧 `install.sh` からの移行
+
+以前の `install.sh` では、`atc` と `online-judge-tools` が現在使用中のPython環境へ直接インストールされている場合があります。
+
+現在の `install.sh` は、`pipx` と独立したPython 3.11環境を使用します。
+
+旧環境から移行する場合は、先に旧版を削除せず、次の順番で作業してください。
+
+### 1. 現在のインストール先を確認する
+
+```bash
+which atc
+which oj
+
+head -n 1 "$(which atc)"
+head -n 1 "$(which oj)"
+```
+
+例えばAnacondaへ直接インストールされている場合は、次のように表示されます。
+
+```text
+/opt/anaconda3/bin/atc
+/opt/anaconda3/bin/oj
+
+#!/opt/anaconda3/bin/python3.x
+#!/opt/anaconda3/bin/python3.x
+```
+
+### 2. 最新版をインストールする
+
+リポジトリのルートで実行します。
+
+```bash
+./install.sh
+```
+
+インストール後、新しいterminalを開いて確認してください。
+
+```bash
+which atc
+which oj
+pipx list
+```
+
+正常に移行できていれば、`atc` と `oj` は通常次の場所を指します。
+
+```text
+~/.local/bin/atc
+~/.local/bin/oj
+```
+
+また、`pipx list` では `atc` が独立したPython 3.11環境にインストールされ、`atc` と `oj` が公開されていることを確認できます。
+
+### 3. 旧Python環境から削除する
+
+新しい `atc` と `oj` が正常に動くことを確認してから、旧Python環境に入っているものを削除してください。
+
+Anacondaへ直接インストールされていた場合の例:
+
+```bash
+/opt/anaconda3/bin/python -m pip uninstall atc online-judge-tools
+```
+
+削除後、もう一度確認します。
+
+```bash
+which atc
+which oj
+
+atc --help
+oj --help
+
+pipx list
+```
+
+`atc` と `oj` が `~/.local/bin` を指し、両方正常に実行できれば移行完了です。
+
+> [!IMPORTANT]
+> `rich`、`requests`、`setuptools` などの依存packageまで削除する必要はありません。
+> 他のPython packageやConda自身が利用している可能性があるため、旧環境から削除するのは基本的に `atc` と `online-judge-tools` だけにしてください。
